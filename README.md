@@ -37,7 +37,7 @@ An information network that lives in your pocket and spreads through human conta
 
 Freepath is an information network that requires no internet, no servers, and no central authority of any kind.
 
-Instead of routing your messages through a data center, Freepath works the way rumors and letters worked for thousands
+Instead of routing your messages through a data center, Freepath works the way stories and letters worked for thousands
 of years: **person to person, device to device**.
 
 When two phones running Freepath come near each other — at a coffee shop, on a bus, at a concert — they automatically
@@ -89,8 +89,9 @@ There is something we find genuinely compelling about a network with no internet
 people. It moves because we move. It reaches places because we go there.
 
 You don't receive anything passively from a server somewhere. You receive because you were present — because you went to
-a place, crossed paths with someone, or chose to visit a [hub](#hubs). This is intentional. It means that access to
-information is tied to physical participation, not to a subscription or an algorithm.
+a place, crossed paths with someone, or chose to visit a [hub](#hubs). This is intentional. We believe access to
+information should be tied to physical participation, not to a subscription
+or an algorithm.
 
 This constraint — that you have to go to the place — is not a limitation we're working around. It's a property we find
 worth exploring. It keeps the network grounded in real communities, real spaces, and real encounters. And it makes
@@ -172,9 +173,6 @@ You may carry content from people you've never met and will never know. Someone 
 visited. It travels through a dozen hands before it reaches you, silently, as you walk past a stranger on a train. You
 don't know the chain. You may not even know the author's name.
 
-There is something worth sitting with in that. A network where strangers carry each other's words — not because they
-were targeted, not because an algorithm surfaced it, but because a person decided it was worth bringing along.
-
 ### How devices talk to each other
 
 Freepath is designed to work over multiple short-range communication channels, depending on what the devices support:
@@ -225,6 +223,9 @@ themselves.
 This is still an open idea. The mechanisms are not defined yet — but the direction is deliberate: governance that is
 local, participatory, and grounded in physical presence.
 
+We find something worth sitting with in all of this. A network where strangers carry each other's words — not because
+they were targeted, not because an algorithm surfaced it, but because a person decided it was worth bringing along.
+
 ## Privacy and trust
 
 Every identity in Freepath is a cryptographic keypair — generated on your device, stored nowhere else. You are your key.
@@ -254,8 +255,8 @@ For this reason, Freepath prioritizes **text**, and specifically **Markdown** �
 weightless in terms of storage. Photos are supported with care. Heavier content like video is technically possible but
 will naturally be limited in practice, and storage policies on each device will reflect that reality.
 
-This is not a bug. It's an honest consequence of the model — and in some ways, a feature. A network that fits in your
-pocket can only carry what a pocket can hold.
+We see this not as a bug but as an honest consequence of the model — and in some ways, a feature. A network that fits
+in your pocket can only carry what a pocket can hold.
 
 ### Deletion
 
@@ -274,28 +275,28 @@ internet or without wanting to depend on it — is a place where this concept co
 
 - **University campuses** — students sharing lecture notes, event announcements, and local news as they move between
   buildings and common spaces
-- **Music festivals and open-air events** — schedules, artist info, community boards, and announcements propagating
-  organically through the crowd
-- **Local neighbourhood networks** — residents sharing bulletins, alerts, recommendations, and community decisions
-  within a few city blocks
-- **Hiking trails and national parks** — trail conditions, safety alerts, and traveler notes passed between hikers
-  moving in opposite directions
-- **Refugee camps and humanitarian zones** — information distribution in areas with no infrastructure, where access to
-  communication is critical
-- **Independent bookshops, cafes, and cultural spaces** — curated content, event listings, local zines, and
-  recommendations carried by the people who pass through
-- **Public libraries** — a natural hub for a community's shared knowledge, open to anyone who walks through the door
 - **Schools** — teachers and students exchanging materials, announcements, and resources without depending on a platform
   or internet connection
+- **Public libraries** — a natural hub for a community's shared knowledge, open to anyone who walks through the door
+- **Independent bookshops, cafes, and cultural spaces** — curated content, event listings, local zines, and
+  recommendations carried by the people who pass through
+- **Local neighbourhood networks** — residents sharing bulletins, alerts, recommendations, and community decisions
+  within a few city blocks
 - **Markets and fairs** — vendor listings, maps, schedules, and community notices spreading through the crowd
+- **Music festivals and open-air events** — schedules, artist info, community boards, and announcements propagating
+  organically through the crowd
+- **Hiking trails and national parks** — trail conditions, safety alerts, and traveler notes passed between hikers
+  moving in opposite directions
 - **Sailing and maritime communities** — boats passing in harbours exchanging weather reports, navigation notes, and
   local knowledge
 - **Underground and independent press** — journalism and writing that travels through communities without relying on
   platforms that can suppress or deprioritize it
-- **Disaster response zones** — first responders and affected communities sharing real-time information when
-  infrastructure has failed
+- **Refugee camps and humanitarian zones** — information distribution in areas with no infrastructure, where access to
+  communication is critical
 - **Protest and activist movements** — organizing and sharing information in environments where connectivity is cut,
   monitored, or unreliable
+- **Disaster response zones** — first responders and affected communities sharing real-time information when
+  infrastructure has failed
 
 This list is not exhaustive. Wherever people move, the network can follow.
 
@@ -305,8 +306,7 @@ Freepath is currently an idea. This repository exists to share that idea and fin
 building.
 
 There is no technical design yet, and no code. The next steps are to start shaping the technical foundations of the
-protocol and to begin building the application. Both are open — if you want to be part of that process, now is the time
-to get involved.
+protocol and to begin building the application. Both are open — if you want to be part of that process, now is the time.
 
 If you've thought about these problems — decentralized communication, mesh networking, offline-first systems, digital
 sovereignty — we'd love to hear from you.
