@@ -2,6 +2,10 @@ README.pdf
 README_*.md
 README_*.pdf
 
+PRESENTATION.pdf
+PRESENTATION_*.md
+PRESENTATION_*.pdf
+
 *.iml
 .kotlin
 .gradle
