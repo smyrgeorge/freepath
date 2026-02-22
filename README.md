@@ -24,6 +24,7 @@ An information network that lives in your pocket and spreads through human conta
 - [Privacy and trust](#privacy-and-trust)
 - [Content](#content)
     - [Deletion](#deletion)
+- [Where it could work](#where-it-could-work)
 - [Where we are](#where-we-are)
 - [Get involved](#get-involved)
 
@@ -260,6 +261,38 @@ path and sends it to you again.
 We find this concept deeply compelling. Deletion means something here. Content doesn't linger forever on a server
 somewhere, out of your reach and out of your control. What you choose to remove, you remove. What survives, survives
 because other people decided to keep it — not because a corporation did.
+
+## Where it could work
+
+Freepath is not designed for one specific use case. Any place where people gather, move, and share — without reliable
+internet or without wanting to depend on it — is a place where this concept could take root.
+
+- **University campuses** — students sharing lecture notes, event announcements, and local news as they move between
+  buildings and common spaces
+- **Music festivals and open-air events** — schedules, artist info, community boards, and announcements propagating
+  organically through the crowd
+- **Local neighbourhood networks** — residents sharing bulletins, alerts, recommendations, and community decisions
+  within a few city blocks
+- **Hiking trails and national parks** — trail conditions, safety alerts, and traveler notes passed between hikers
+  moving in opposite directions
+- **Refugee camps and humanitarian zones** — information distribution in areas with no infrastructure, where access to
+  communication is critical
+- **Independent bookshops, cafes, and cultural spaces** — curated content, event listings, local zines, and
+  recommendations carried by the people who pass through
+- **Public libraries** — a natural hub for a community's shared knowledge, open to anyone who walks through the door
+- **Schools** — teachers and students exchanging materials, announcements, and resources without depending on a platform
+  or internet connection
+- **Markets and fairs** — vendor listings, maps, schedules, and community notices spreading through the crowd
+- **Sailing and maritime communities** — boats passing in harbours exchanging weather reports, navigation notes, and
+  local knowledge
+- **Underground and independent press** — journalism and writing that travels through communities without relying on
+  platforms that can suppress or deprioritize it
+- **Disaster response zones** — first responders and affected communities sharing real-time information when
+  infrastructure has failed
+- **Protest and activist movements** — organizing and sharing information in environments where connectivity is cut,
+  monitored, or unreliable
+
+This list is not exhaustive. Wherever people move, the network can follow.
 
 ## Where we are
 
