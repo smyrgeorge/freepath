@@ -2,6 +2,11 @@
 
 An information network that lives in your pocket and spreads through human contact.
 
+> [!NOTE]
+> Freepath is at a very early stage. There is no code, no technical design, and no roadmap yet. We are currently in the
+> process of thinking through how this could be built — collecting ideas, perspectives, and opinions. If something here
+> resonates with you, we'd love to hear your thoughts.
+
 ---
 
 ## Table of Contents
