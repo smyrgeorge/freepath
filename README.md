@@ -18,8 +18,6 @@
 - [Where we are](#where-we-are)
 - [Get involved](#get-involved)
 
----
-
 ## The idea
 
 Freepath is an information network that requires no internet, no servers, and no central authority of any kind.
