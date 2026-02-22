@@ -7,14 +7,14 @@
 ## Table of Contents
 
 - [The idea](#the-idea)
-    - [Why not a social network?](#why-not-a-social-network)
     - [The name](#the-name)
+    - [Why not a social network?](#why-not-a-social-network)
 - [You control what you share](#you-control-what-you-share)
 - [How information travels](#how-information-travels)
     - [How devices talk to each other](#how-devices-talk-to-each-other)
 - [Privacy and trust](#privacy-and-trust)
 - [Content](#content)
-  - [Deletion](#deletion)
+    - [Deletion](#deletion)
 - [Where we are](#where-we-are)
 - [Get involved](#get-involved)
 
@@ -31,6 +31,16 @@ the crowd itself.
 
 Your phone becomes a node. You become the infrastructure.
 
+### The name
+
+**Free** — because there are no servers, no gatekeepers, no central authority that can grant or revoke access. The
+network belongs to no one, which means it belongs to everyone.
+
+**Path** — because information doesn't travel through cables or data centers. It travels through people. It follows the
+routes that humans walk, the places they gather, the moments they cross paths. The path is physical, human, and alive.
+
+The name is part of this concept and may change as the idea evolves.
+
 ### Why not a social network?
 
 We deliberately avoid the term. Not because it's inaccurate, but because it carries too much baggage — timelines,
@@ -41,16 +51,6 @@ the next Twitter, or the next Signal. It sees itself as something different in n
 information through the very act of people being in the same place.
 
 Think of it less as an app and more as a concept — an invisible, ownerless current that flows through human proximity.
-
-### The name
-
-**Free** — because there are no servers, no gatekeepers, no central authority that can grant or revoke access. The
-network belongs to no one, which means it belongs to everyone.
-
-**Path** — because information doesn't travel through cables or data centers. It travels through people. It follows the
-routes that humans walk, the places they gather, the moments they cross paths. The path is physical, human, and alive.
-
-The name is part of this concept and may change as the idea evolves.
 
 ## You control what you share
 
