@@ -137,7 +137,7 @@ h1 {
   align-items: center;
   justify-content: space-between;
   padding: 8px 14px;
-  border-bottom: 1.5px solid #e0e0e0;
+  border-bottom: 2px solid #e0e0e0;
   flex-shrink: 0;
 }
 
@@ -174,7 +174,7 @@ h1 {
 /* Bottom tab bar */
 .tab-bar {
   display: flex;
-  border-top: 1.5px solid #e0e0e0;
+  border-top: 2px solid #e0e0e0;
   flex-shrink: 0;
 }
 
@@ -232,7 +232,7 @@ h1 {
 .block-w-full{ width: 100%; }
 
 .block-dark { background: #bbb; }
-.block-light { background: #f0f0f0; border: 1.5px solid #ddd; }
+.block-light { background: #f0f0f0; border: 2px solid #ddd; }
 
 .row {
   display: flex;
@@ -262,7 +262,7 @@ h1 {
 }
 
 .card {
-  border: 1.5px solid #ddd;
+  border: 2px solid #ddd;
   border-radius: 8px;
   padding: 10px;
   background: #fff;
@@ -334,7 +334,7 @@ h1 {
 
 .input-field {
   height: 32px;
-  border: 1.5px solid #ccc;
+  border: 2px solid #ccc;
   border-radius: 8px;
   background: #fafafa;
   padding: 0 10px;
@@ -394,7 +394,7 @@ h1 {
 .signal-bars {
   display: flex;
   align-items: flex-end;
-  gap: 1.5px;
+  gap: 2px;
   height: 12px;
 }
 
@@ -475,7 +475,7 @@ h1 {
 .bt-wave-ring {
   position: absolute;
   border-radius: 50%;
-  border: 1.5px dashed #bbb;
+  border: 2px dashed #bbb;
 }
 
 .bt-center {
@@ -497,7 +497,7 @@ h1 {
   height: 20px;
   border-radius: 50%;
   background: #e0e0e0;
-  border: 1.5px solid #aaa;
+  border: 2px solid #aaa;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -579,7 +579,7 @@ h1 {
   gap: 6px;
   padding: 6px 14px;
   background: var(--toggle-bg);
-  border: 1.5px solid var(--toggle-bd);
+  border: 2px solid var(--toggle-bd);
   border-radius: 20px;
   color: var(--toggle-clr);
   font-size: 11px;
