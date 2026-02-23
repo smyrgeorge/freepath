@@ -21,7 +21,7 @@
   </button>
 
   <h1>Freepath</h1>
-  <p class="subtitle">Mobile App Wireframes &nbsp;·&nbsp; 9 screens</p>
+  <p class="subtitle">Mobile App Wireframes &nbsp;·&nbsp; 11 screens</p>
 
   <div class="screens">
 
@@ -205,22 +205,11 @@
 
           <!-- Tab bar -->
           <div class="tab-bar">
-            <div class="tab active">
-              <div class="tab-icon">☰</div>
-              Feed
-            </div>
-            <div class="tab">
-              <div class="tab-icon circle">◎</div>
-              Nearby
-            </div>
-            <div class="tab">
-              <div class="tab-icon">✦</div>
-              Hubs
-            </div>
-            <div class="tab">
-              <div class="tab-icon circle">◉</div>
-              Identity
-            </div>
+            <div class="tab active"><div class="tab-icon">☰</div>Feed</div>
+            <div class="tab"><div class="tab-icon circle">◎</div>Nearby</div>
+            <div class="tab"><div class="tab-icon">◈</div>Network</div>
+            <div class="tab"><div class="tab-icon">▤</div>Library</div>
+            <div class="tab"><div class="tab-icon circle">◉</div>Me</div>
           </div>
         </div>
       </div>
@@ -469,8 +458,9 @@
           <div class="tab-bar">
             <div class="tab"><div class="tab-icon">☰</div>Feed</div>
             <div class="tab active"><div class="tab-icon circle">◎</div>Nearby</div>
-            <div class="tab"><div class="tab-icon">✦</div>Hubs</div>
-            <div class="tab"><div class="tab-icon circle">◉</div>Identity</div>
+            <div class="tab"><div class="tab-icon">◈</div>Network</div>
+            <div class="tab"><div class="tab-icon">▤</div>Library</div>
+            <div class="tab"><div class="tab-icon circle">◉</div>Me</div>
           </div>
         </div>
       </div>
@@ -548,17 +538,26 @@
     </div>
 
     <!-- ═══════════════════════════════════════ -->
-    <!-- 8. TRUST / CONTACTS                     -->
+    <!-- 8. MY NETWORK — PEOPLE                  -->
     <!-- ═══════════════════════════════════════ -->
     <div class="screen-wrap">
-      <div class="screen-label">8 · Trust &amp; Contacts</div>
+      <div class="screen-label">8 · My Network — People</div>
       <div class="phone">
         <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
         <div class="screen-body">
           <div class="nav-bar">
-            <div class="nav-title">Trust</div>
+            <div class="nav-title">My Network</div>
             <div class="nav-icon">+</div>
           </div>
+
+          <!-- Segmented control — outside .content so it is never clipped -->
+          <div style="padding:8px 14px 0;flex-shrink:0;">
+            <div style="display:flex;border:1.5px solid #ddd;border-radius:8px;overflow:hidden;">
+              <div style="flex:1;padding:5px 0;text-align:center;font-size:9px;font-weight:700;background:#222;color:#fff;">People</div>
+              <div style="flex:1;padding:5px 0;text-align:center;font-size:9px;font-weight:700;color:#aaa;">Places</div>
+            </div>
+          </div>
+
           <div class="content" style="gap:10px;">
 
             <!-- Add by QR -->
@@ -637,19 +636,237 @@
           <div class="tab-bar">
             <div class="tab"><div class="tab-icon">☰</div>Feed</div>
             <div class="tab"><div class="tab-icon circle">◎</div>Nearby</div>
-            <div class="tab"><div class="tab-icon">✦</div>Hubs</div>
-            <div class="tab active"><div class="tab-icon circle">◉</div>Identity</div>
+            <div class="tab active"><div class="tab-icon">◈</div>Network</div>
+            <div class="tab"><div class="tab-icon">▤</div>Library</div>
+            <div class="tab"><div class="tab-icon circle">◉</div>Me</div>
           </div>
         </div>
       </div>
-      <div class="annotation">Web of trust — add, trust, block</div>
+      <div class="annotation">My Network › People — contacts, trust levels, QR add</div>
     </div>
 
     <!-- ═══════════════════════════════════════ -->
-    <!-- 9. IDENTITY / SETTINGS                  -->
+    <!-- 9. MY NETWORK — PLACES                  -->
     <!-- ═══════════════════════════════════════ -->
     <div class="screen-wrap">
-      <div class="screen-label">9 · Identity &amp; Settings</div>
+      <div class="screen-label">9 · My Network — Places</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body">
+          <div class="nav-bar">
+            <div class="nav-title">My Network</div>
+            <div class="nav-icon">⌕</div>
+          </div>
+          <div class="content" style="gap:10px;">
+
+            <!-- Segmented control -->
+            <div style="display:flex;border:1.5px solid #ddd;border-radius:8px;overflow:hidden;">
+              <div style="flex:1;padding:5px 0;text-align:center;font-size:9px;font-weight:700;color:#aaa;">People</div>
+              <div style="flex:1;padding:5px 0;text-align:center;font-size:9px;font-weight:700;background:#222;color:#fff;">Places</div>
+            </div>
+
+            <!-- Hub 1 — bookshop, visited recently -->
+            <div class="card">
+              <div class="row" style="justify-content:space-between;">
+                <div class="row">
+                  <div class="avatar" style="border-radius:8px;font-size:14px;">⬡</div>
+                  <div>
+                    <div style="font-size:9px;font-weight:700;">The Corner Bookshop</div>
+                    <div style="font-size:8px;color:#aaa;">Last visit: today · 3 items collected</div>
+                  </div>
+                </div>
+                <div class="pill">Public</div>
+              </div>
+              <div class="row" style="margin-top:2px;justify-content:space-between;">
+                <div style="font-size:8px;color:#bbb;">hub·id: 8c4d·e291</div>
+                <div style="font-size:8px;color:#aaa;">~12 m away</div>
+              </div>
+            </div>
+
+            <!-- Hub 2 — city library, visited last week -->
+            <div class="card">
+              <div class="row" style="justify-content:space-between;">
+                <div class="row">
+                  <div class="avatar" style="border-radius:8px;font-size:14px;">⬡</div>
+                  <div>
+                    <div style="font-size:9px;font-weight:700;">City Library Hub</div>
+                    <div style="font-size:8px;color:#aaa;">Last visit: 1 week ago · 8 items</div>
+                  </div>
+                </div>
+                <div class="pill">Public</div>
+              </div>
+              <div class="row" style="margin-top:2px;justify-content:space-between;">
+                <div style="font-size:8px;color:#bbb;">hub·id: 3f19·a074</div>
+                <div style="font-size:8px;color:#aaa;">Out of range</div>
+              </div>
+            </div>
+
+            <!-- Hub 3 — private/encrypted -->
+            <div class="card">
+              <div class="row" style="justify-content:space-between;">
+                <div class="row">
+                  <div class="avatar" style="border-radius:8px;font-size:14px;">⬡</div>
+                  <div>
+                    <div style="font-size:9px;font-weight:700;">Makers Space BXL</div>
+                    <div style="font-size:8px;color:#aaa;">Last visit: 2 weeks ago · 2 items</div>
+                  </div>
+                </div>
+                <div class="pill">Members</div>
+              </div>
+              <div class="row" style="margin-top:2px;justify-content:space-between;">
+                <div style="font-size:8px;color:#bbb;">hub·id: c02e·55b1</div>
+                <div style="font-size:8px;color:#aaa;">Out of range</div>
+              </div>
+            </div>
+
+            <!-- Empty-state hint -->
+            <div style="text-align:center;font-size:8px;color:#ccc;margin-top:4px;">
+              Hubs appear here after your first visit
+            </div>
+
+          </div>
+
+          <div class="tab-bar">
+            <div class="tab"><div class="tab-icon">☰</div>Feed</div>
+            <div class="tab"><div class="tab-icon circle">◎</div>Nearby</div>
+            <div class="tab active"><div class="tab-icon">◈</div>Network</div>
+            <div class="tab"><div class="tab-icon">▤</div>Library</div>
+            <div class="tab"><div class="tab-icon circle">◉</div>Me</div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation">My Network › Places — known hubs, last visit, range status</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 10. LIBRARY                             -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">10 · Library</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body">
+          <div class="nav-bar">
+            <div class="nav-title">Library</div>
+            <div class="nav-icon">⌕</div>
+          </div>
+          <div class="content" style="gap:10px;">
+
+            <!-- Storage summary strip -->
+            <div style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;padding:5px 8px;display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:8px;color:#777;">Local storage</div>
+                <div style="font-size:8px;font-weight:700;color:#444;">284 MB / 1 GB</div>
+              </div>
+              <div class="storage-bar">
+                <div class="storage-fill" style="width:28%;"></div>
+              </div>
+            </div>
+
+            <!-- Filter chips -->
+            <div style="display:flex;gap:5px;">
+              <div class="pill pill-dark">All</div>
+              <div class="pill">Posts</div>
+              <div class="pill">Hubs</div>
+              <div class="pill">Images</div>
+            </div>
+
+            <!-- Item 1 — starred post -->
+            <div class="card">
+              <div class="card-meta">
+                <div class="row">
+                  <div class="avatar avatar-sm">A</div>
+                  <div>
+                    <div style="font-size:9px;font-weight:700;">alice·7f3a</div>
+                    <div style="font-size:8px;color:#aaa;">Post · collected 2 days ago</div>
+                  </div>
+                </div>
+                <div style="font-size:11px;color:#444;">★</div>
+              </div>
+              <div class="block block-w-full block-sm"></div>
+              <div class="block block-w-80 block-sm"></div>
+              <div class="row" style="margin-top:2px;justify-content:space-between;">
+                <div class="pill">Trusted</div>
+                <div style="font-size:8px;color:#bbb;">12 KB</div>
+              </div>
+            </div>
+
+            <!-- Item 2 — hub content -->
+            <div class="card">
+              <div class="card-meta">
+                <div class="row">
+                  <div class="avatar avatar-sm" style="border-radius:4px;">⬡</div>
+                  <div>
+                    <div style="font-size:9px;font-weight:700;">The Corner Bookshop</div>
+                    <div style="font-size:8px;color:#aaa;">Hub · collected 5 days ago</div>
+                  </div>
+                </div>
+                <div style="font-size:11px;color:#ddd;">★</div>
+              </div>
+              <div class="block block-w-full block-sm"></div>
+              <div class="block block-w-60 block-sm"></div>
+              <div class="row" style="margin-top:2px;justify-content:space-between;">
+                <div class="pill">Hub</div>
+                <div style="font-size:8px;color:#bbb;">34 KB</div>
+              </div>
+            </div>
+
+            <!-- Item 3 — stranger post -->
+            <div class="card" style="opacity:0.7;">
+              <div class="card-meta">
+                <div class="row">
+                  <div class="avatar avatar-sm">?</div>
+                  <div>
+                    <div style="font-size:9px;font-weight:700;">unknown·c2b8</div>
+                    <div style="font-size:8px;color:#aaa;">Post · collected 1 week ago</div>
+                  </div>
+                </div>
+                <div style="font-size:11px;color:#ddd;">★</div>
+              </div>
+              <div class="block block-w-full block-sm"></div>
+              <div class="row" style="margin-top:2px;justify-content:space-between;">
+                <div class="pill">Stranger</div>
+                <div style="font-size:8px;color:#bbb;">8 KB</div>
+              </div>
+            </div>
+
+            <!-- Item 4 — hub content, faded (older) -->
+            <div class="card" style="opacity:0.5;">
+              <div class="card-meta">
+                <div class="row">
+                  <div class="avatar avatar-sm" style="border-radius:4px;">⬡</div>
+                  <div>
+                    <div style="font-size:9px;font-weight:700;">City Library Hub</div>
+                    <div style="font-size:8px;color:#aaa;">Hub · collected 2 weeks ago</div>
+                  </div>
+                </div>
+              </div>
+              <div class="block block-w-80 block-sm"></div>
+              <div class="row" style="margin-top:2px;justify-content:space-between;">
+                <div class="pill">Hub</div>
+                <div style="font-size:8px;color:#bbb;">61 KB · expiring soon</div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="tab-bar">
+            <div class="tab"><div class="tab-icon">☰</div>Feed</div>
+            <div class="tab"><div class="tab-icon circle">◎</div>Nearby</div>
+            <div class="tab"><div class="tab-icon">◈</div>Network</div>
+            <div class="tab active"><div class="tab-icon">▤</div>Library</div>
+            <div class="tab"><div class="tab-icon circle">◉</div>Me</div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation">Downloaded content — filter, star, manage TTL</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 11. IDENTITY / SETTINGS                 -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">11 · Identity &amp; Settings</div>
       <div class="phone">
         <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
         <div class="screen-body">
@@ -718,8 +935,9 @@
           <div class="tab-bar">
             <div class="tab"><div class="tab-icon">☰</div>Feed</div>
             <div class="tab"><div class="tab-icon circle">◎</div>Nearby</div>
-            <div class="tab"><div class="tab-icon">✦</div>Hubs</div>
-            <div class="tab active"><div class="tab-icon circle">◉</div>Identity</div>
+            <div class="tab"><div class="tab-icon">◈</div>Network</div>
+            <div class="tab"><div class="tab-icon">▤</div>Library</div>
+            <div class="tab active"><div class="tab-icon circle">◉</div>Me</div>
           </div>
         </div>
       </div>
