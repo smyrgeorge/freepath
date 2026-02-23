@@ -7,6 +7,10 @@ An information network that lives in your pocket and spreads through human conta
 > process of thinking through how this could be built — collecting ideas, perspectives, and opinions. If something here
 > resonates with you, we'd love to hear your thoughts.
 
+📱 [Wireframes](https://smyrgeorge.github.io/freepath/wireframes)
+
+🏠 [Homepage](https://smyrgeorge.github.io/) (under construction)
+
 ---
 
 ## Table of Contents
