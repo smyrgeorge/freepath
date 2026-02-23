@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Freepath — Mobile Wireframes</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Set theme before paint to prevent flash -->
+  <script>
+    (function() {
+      const saved = localStorage.getItem('theme');
+      if (saved) document.documentElement.dataset.theme = saved;
+    })();
+  </script>
+</head>
+<body>
+
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+    <span id="themeIcon">◑</span>
+    <span id="themeLabel">Dark mode</span>
+  </button>
+
+  <h1>Freepath</h1>
+  <p class="subtitle">Mobile App Wireframes &nbsp;·&nbsp; 9 screens</p>
+
+  <div class="screens">
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 1. ONBOARDING                           -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">1 · Onboarding</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body">
+          <div class="content" style="justify-content:center; gap:18px;">
+
+            <!-- Logo area -->
+            <div style="text-align:center; margin-bottom:8px;">
+              <div style="width:56px;height:56px;border:3px solid #222;border-radius:16px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:22px;">⬡</div>
+              <div style="font-size:16px;font-weight:700;letter-spacing:0.04em;">FREEPATH</div>
+              <div style="font-size:9px;color:#888;margin-top:3px;">Information travels through people</div>
+            </div>
+
+            <!-- Generating key -->
+            <div class="card" style="gap:8px;">
+              <div style="font-size:10px;font-weight:700;text-align:center;">Your identity is being created</div>
+              <div class="fingerprint">3a7f·b2c1·09e4·fa83·<br/>22d6·8b0a·c71f·4e59</div>
+              <div style="font-size:8px;color:#999;text-align:center;">A cryptographic key pair was generated on this device.<br/>No account. No email. No server.</div>
+            </div>
+
+            <div class="btn btn-primary">Continue</div>
+            <div style="text-align:center;font-size:8px;color:#bbb;">Your key never leaves this device</div>
+
+          </div>
+        </div>
+      </div>
+      <div class="annotation">First launch — key generation</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 2. ONBOARDING — CARRY STRATEGY         -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">2 · Setup — Carry Strategy</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body">
+          <div class="nav-bar">
+            <div style="font-size:10px;color:#aaa;">← Back</div>
+            <div class="nav-title">How will you carry?</div>
+            <div></div>
+          </div>
+          <div class="content" style="gap:12px;">
+            <div style="font-size:9px;color:#888;line-height:1.5;">
+              When you pass someone using Freepath, your phone automatically exchanges content. Choose what you share.
+            </div>
+
+            <!-- Option 1 -->
+            <div class="card" style="border-color:#222; gap:6px;">
+              <div class="row" style="justify-content:space-between;">
+                <div style="font-size:11px;font-weight:700;">Starred only</div>
+                <div class="radio selected"></div>
+              </div>
+              <div style="font-size:8px;color:#888;">Only content you've explicitly starred propagates. Full control.</div>
+            </div>
+
+            <!-- Option 2 -->
+            <div class="card" style="gap:6px;">
+              <div class="row" style="justify-content:space-between;">
+                <div style="font-size:11px;font-weight:700;">Last N posts</div>
+                <div class="radio"></div>
+              </div>
+              <div style="font-size:8px;color:#888;">A rolling window of your most recent activity.</div>
+              <div class="row" style="gap:8px;opacity:0.4;">
+                <div style="font-size:9px;">N =</div>
+                <div class="input-field" style="flex:1;height:24px;font-size:9px;">20</div>
+              </div>
+            </div>
+
+            <!-- Option 3 -->
+            <div class="card" style="gap:6px;">
+              <div class="row" style="justify-content:space-between;">
+                <div style="font-size:11px;font-weight:700;">Everything</div>
+                <div class="radio"></div>
+              </div>
+              <div style="font-size:8px;color:#888;">Your full local store. Be an active carrier.</div>
+            </div>
+
+            <div style="flex:1;"></div>
+            <div class="btn btn-primary">Confirm &amp; Start</div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation">Onboarding step 2 of 2</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 3. FEED                                 -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">3 · Feed</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body">
+          <div class="nav-bar">
+            <div class="nav-title">Freepath</div>
+            <div class="row" style="gap:6px;">
+              <div class="badge">2</div>
+              <div class="nav-icon">✎</div>
+            </div>
+          </div>
+          <div class="content" style="gap:8px;">
+
+            <!-- Sync strip -->
+            <div style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;padding:5px 8px;display:flex;align-items:center;justify-content:space-between;">
+              <div style="font-size:8px;color:#777;">Last sync: 4 min ago · 3 devices</div>
+              <div style="display:flex;gap:2px;">
+                <span class="hop-dot filled"></span>
+                <span class="hop-dot filled"></span>
+                <span class="hop-dot filled"></span>
+                <span class="hop-dot"></span>
+                <span class="hop-dot"></span>
+              </div>
+            </div>
+
+            <!-- Post card 1 -->
+            <div class="card">
+              <div class="card-meta">
+                <div class="row">
+                  <div class="avatar avatar-sm">A</div>
+                  <div>
+                    <div style="font-size:9px;font-weight:700;">alice·7f3a</div>
+                    <div style="font-size:8px;color:#aaa;">2 hops · 18 min ago</div>
+                  </div>
+                </div>
+                <div class="pill">Trusted</div>
+              </div>
+              <div class="block block-w-full block-sm"></div>
+              <div class="block block-w-80 block-sm"></div>
+              <div class="block block-w-60 block-sm" style="margin-top:2px;"></div>
+              <div class="row" style="margin-top:2px;justify-content:space-between;">
+                <div style="font-size:8px;color:#bbb;">Read more</div>
+                <div style="font-size:10px;color:#aaa;">★</div>
+              </div>
+            </div>
+
+            <!-- Post card 2 -->
+            <div class="card">
+              <div class="card-meta">
+                <div class="row">
+                  <div class="avatar avatar-sm">?</div>
+                  <div>
+                    <div style="font-size:9px;font-weight:700;">unknown·c2b8</div>
+                    <div style="font-size:8px;color:#aaa;">5 hops · 2 h ago</div>
+                  </div>
+                </div>
+                <div class="pill">Stranger</div>
+              </div>
+              <div class="block block-w-full block-sm"></div>
+              <div class="block block-w-80 block-sm"></div>
+              <div class="row" style="margin-top:2px;justify-content:space-between;">
+                <div style="font-size:8px;color:#bbb;">Read more</div>
+                <div style="font-size:10px;color:#aaa;">★</div>
+              </div>
+            </div>
+
+            <!-- Post card 3 — hub content -->
+            <div class="card" style="border-style:dashed;">
+              <div class="card-meta">
+                <div class="row">
+                  <div class="avatar avatar-sm" style="border-radius:4px;">⬡</div>
+                  <div>
+                    <div style="font-size:9px;font-weight:700;">The Corner Bookshop</div>
+                    <div style="font-size:8px;color:#aaa;">Hub · collected 1 h ago</div>
+                  </div>
+                </div>
+                <div class="pill">Hub</div>
+              </div>
+              <div class="block block-w-full block-sm"></div>
+              <div class="block block-w-40 block-sm"></div>
+            </div>
+
+          </div>
+
+          <!-- Tab bar -->
+          <div class="tab-bar">
+            <div class="tab active">
+              <div class="tab-icon">☰</div>
+              Feed
+            </div>
+            <div class="tab">
+              <div class="tab-icon circle">◎</div>
+              Nearby
+            </div>
+            <div class="tab">
+              <div class="tab-icon">✦</div>
+              Hubs
+            </div>
+            <div class="tab">
+              <div class="tab-icon circle">◉</div>
+              Identity
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation">Main feed — trust-filtered, hop-annotated</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 4. POST DETAIL                          -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">4 · Post Detail</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body">
+          <div class="nav-bar">
+            <div style="font-size:10px;color:#aaa;">← Feed</div>
+            <div class="nav-title">Post</div>
+            <div style="font-size:10px;color:#aaa;">★</div>
+          </div>
+          <div class="content" style="gap:10px;">
+
+            <!-- Author -->
+            <div class="row" style="justify-content:space-between;">
+              <div class="row">
+                <div class="avatar">A</div>
+                <div>
+                  <div style="font-size:10px;font-weight:700;">alice·7f3a</div>
+                  <div style="font-size:8px;color:#aaa;">Trusted contact</div>
+                </div>
+              </div>
+              <div>
+                <div class="pill pill-dark">✓ Signed</div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Content blocks -->
+            <div style="display:flex;flex-direction:column;gap:5px;">
+              <div class="block block-w-full block-md"></div>
+              <div class="block block-w-full block-sm"></div>
+              <div class="block block-w-full block-sm"></div>
+              <div class="block block-w-80 block-sm"></div>
+              <div style="height:6px;"></div>
+              <div class="block block-w-full block-sm"></div>
+              <div class="block block-w-full block-sm"></div>
+              <div class="block block-w-60 block-sm"></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Provenance -->
+            <div>
+              <div class="section-title">Provenance</div>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:8px;color:#888;">Hops traveled</div>
+                  <div style="display:flex;gap:2px;">
+                    <span class="hop-dot filled"></span>
+                    <span class="hop-dot filled"></span>
+                    <span class="hop-dot"></span>
+                    <span class="hop-dot"></span>
+                    <span class="hop-dot"></span>
+                  </div>
+                </div>
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:8px;color:#888;">Created</div>
+                  <div style="font-size:8px;color:#555;">~2 h ago</div>
+                </div>
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:8px;color:#888;">Received from</div>
+                  <div style="font-size:8px;color:#555;">bob·a1f2</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Actions -->
+            <div style="display:flex;gap:8px;">
+              <div class="btn btn-primary" style="flex:1;font-size:9px;">★ Star to propagate</div>
+              <div class="btn btn-outline" style="width:36px;font-size:11px;">···</div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      <div class="annotation">Signed content, hop count, propagation action</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 5. COMPOSE                              -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">5 · Compose</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body">
+          <div class="nav-bar">
+            <div style="font-size:10px;color:#aaa;">✕ Cancel</div>
+            <div class="nav-title">New Post</div>
+            <div class="btn btn-primary btn-sm" style="width:48px;">Publish</div>
+          </div>
+          <div class="content" style="gap:10px;">
+
+            <!-- Author identity -->
+            <div class="row">
+              <div class="avatar">Y</div>
+              <div>
+                <div style="font-size:10px;font-weight:700;">you·3a7f</div>
+                <div style="font-size:8px;color:#aaa;">Publishing as your keypair</div>
+              </div>
+            </div>
+
+            <!-- Text area placeholder -->
+            <div style="flex:1;border:2px solid #ddd;border-radius:8px;padding:10px;background:#fafafa;min-height:120px;">
+              <div class="block block-w-60 block-sm" style="margin-bottom:6px;opacity:0.4;"></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Propagation choice -->
+            <div>
+              <div class="section-title">Propagation</div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:9px;">Include in carry strategy</div>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:9px;">Mark as starred</div>
+                  <div class="toggle"></div>
+                </div>
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:9px;">Expire after</div>
+                  <div style="font-size:9px;color:#888;">7 days ›</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Attachments -->
+            <div class="row" style="gap:8px;">
+              <div class="btn btn-outline btn-sm" style="flex:1;font-size:9px;">📎 Attach</div>
+              <div class="btn btn-outline btn-sm" style="flex:1;font-size:9px;">🖼 Image</div>
+            </div>
+
+            <div style="text-align:center;font-size:8px;color:#bbb;">
+              Signed with your key on publish
+            </div>
+
+          </div>
+        </div>
+      </div>
+      <div class="annotation">Compose with propagation options</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 6. NEARBY — SYNC IN PROGRESS            -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">6 · Nearby Devices</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body">
+          <div class="nav-bar">
+            <div class="nav-title">Nearby</div>
+            <div class="row" style="gap:4px;">
+              <div style="font-size:8px;color:#888;">Scanning</div>
+              <div style="width:8px;height:8px;border-radius:50%;background:#444;"></div>
+            </div>
+          </div>
+          <div class="content" style="gap:12px; align-items:center;">
+
+            <!-- Radar -->
+            <div class="bt-wave" style="width:110px;height:110px;margin:8px auto 0;">
+              <div class="bt-wave-ring" style="width:110px;height:110px;"></div>
+              <div class="bt-wave-ring" style="width:78px;height:78px;"></div>
+              <div class="bt-wave-ring" style="width:46px;height:46px;"></div>
+              <div class="bt-center">BT</div>
+              <div class="bt-device" style="top:4px;left:50px;">A</div>
+              <div class="bt-device" style="bottom:10px;right:8px;">?</div>
+              <div class="bt-device" style="bottom:6px;left:16px;">B</div>
+            </div>
+
+            <div style="font-size:9px;color:#888;text-align:center;">3 devices within range</div>
+
+            <!-- Device list -->
+            <div style="width:100%;display:flex;flex-direction:column;gap:6px;">
+
+              <div class="card" style="border-color:#222;">
+                <div class="row" style="justify-content:space-between;">
+                  <div class="row">
+                    <div class="avatar avatar-sm">A</div>
+                    <div>
+                      <div style="font-size:9px;font-weight:700;">alice·7f3a</div>
+                      <div style="font-size:8px;color:#aaa;">Trusted · Syncing…</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="signal-bars">
+                      <div class="signal-bar active" style="height:4px;"></div>
+                      <div class="signal-bar active" style="height:7px;"></div>
+                      <div class="signal-bar active" style="height:10px;"></div>
+                      <div class="signal-bar active" style="height:12px;"></div>
+                    </div>
+                  </div>
+                </div>
+                <div style="height:3px;background:#eee;border-radius:2px;overflow:hidden;">
+                  <div style="height:100%;width:65%;background:#333;border-radius:2px;"></div>
+                </div>
+                <div style="font-size:8px;color:#888;">+12 posts received · +3 sent</div>
+              </div>
+
+              <div class="card">
+                <div class="row" style="justify-content:space-between;">
+                  <div class="row">
+                    <div class="avatar avatar-sm">?</div>
+                    <div>
+                      <div style="font-size:9px;font-weight:700;">unknown·c2b8</div>
+                      <div style="font-size:8px;color:#aaa;">Stranger · Pending consent</div>
+                    </div>
+                  </div>
+                  <div class="btn btn-sm btn-outline" style="width:52px;font-size:8px;">Accept</div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="row" style="justify-content:space-between;">
+                  <div class="row">
+                    <div class="avatar avatar-sm">B</div>
+                    <div>
+                      <div style="font-size:9px;font-weight:700;">bob·a1f2</div>
+                      <div style="font-size:8px;color:#aaa;">Trusted · Done · 4 min ago</div>
+                    </div>
+                  </div>
+                  <div class="pill">✓</div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          <div class="tab-bar">
+            <div class="tab"><div class="tab-icon">☰</div>Feed</div>
+            <div class="tab active"><div class="tab-icon circle">◎</div>Nearby</div>
+            <div class="tab"><div class="tab-icon">✦</div>Hubs</div>
+            <div class="tab"><div class="tab-icon circle">◉</div>Identity</div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation">Bluetooth scan, live sync progress</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 7. HUB ENCOUNTER                        -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">7 · Hub Encounter</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body" style="position:relative;">
+          <!-- Background feed (blurred feel) -->
+          <div class="nav-bar">
+            <div class="nav-title">Freepath</div>
+            <div class="nav-icon">✎</div>
+          </div>
+          <div class="content" style="gap:8px;opacity:0.25;pointer-events:none;">
+            <div class="card"><div class="block block-w-full block-sm"></div><div class="block block-w-80 block-sm"></div></div>
+            <div class="card"><div class="block block-w-full block-sm"></div><div class="block block-w-60 block-sm"></div></div>
+          </div>
+
+          <!-- Modal sheet -->
+          <div class="modal-overlay">
+            <div class="modal-sheet">
+              <div class="modal-handle"></div>
+
+              <!-- Hub identity -->
+              <div class="row" style="gap:10px;">
+                <div class="avatar" style="border-radius:8px;width:40px;height:40px;font-size:16px;">⬡</div>
+                <div>
+                  <div class="modal-title">The Corner Bookshop</div>
+                  <div style="font-size:8px;color:#888;">Hub · 12 m away · Public</div>
+                </div>
+              </div>
+
+              <div style="font-size:9px;color:#777;line-height:1.5;">
+                This hub is broadcasting public content. You are within range and can collect what it carries.
+              </div>
+
+              <!-- Content preview -->
+              <div>
+                <div class="section-title">Available content</div>
+                <div style="display:flex;flex-direction:column;gap:5px;">
+                  <div class="row" style="justify-content:space-between;">
+                    <div style="font-size:9px;">📰 Weekly reading list</div>
+                    <div class="pill">Public</div>
+                  </div>
+                  <div class="row" style="justify-content:space-between;">
+                    <div style="font-size:9px;">📅 Upcoming events</div>
+                    <div class="pill">Public</div>
+                  </div>
+                  <div class="row" style="justify-content:space-between;">
+                    <div style="font-size:9px;">🔒 Members content</div>
+                    <div class="pill">Encrypted</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Hub fingerprint -->
+              <div class="fingerprint">hub·id: 8c4d·e291·7ab3·0015</div>
+
+              <!-- Actions -->
+              <div style="display:flex;gap:8px;">
+                <div class="btn btn-outline" style="flex:1;font-size:9px;">Ignore</div>
+                <div class="btn btn-primary" style="flex:2;font-size:9px;">Collect content</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation">Bottom sheet when entering hub range</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 8. TRUST / CONTACTS                     -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">8 · Trust &amp; Contacts</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body">
+          <div class="nav-bar">
+            <div class="nav-title">Trust</div>
+            <div class="nav-icon">+</div>
+          </div>
+          <div class="content" style="gap:10px;">
+
+            <!-- Add by QR -->
+            <div class="card" style="flex-direction:row;align-items:center;gap:10px;border-style:dashed;">
+              <div class="qr-placeholder" style="width:44px;height:44px;"></div>
+              <div>
+                <div style="font-size:10px;font-weight:700;">Add by QR</div>
+                <div style="font-size:8px;color:#888;">Scan another device's code to add them to your trust network.</div>
+              </div>
+            </div>
+
+            <!-- Trusted contacts -->
+            <div>
+              <div class="section-title">Trusted (2)</div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+
+                <div class="card">
+                  <div class="row" style="justify-content:space-between;">
+                    <div class="row">
+                      <div class="avatar avatar-sm">A</div>
+                      <div>
+                        <div style="font-size:9px;font-weight:700;">alice·7f3a</div>
+                        <div style="font-size:8px;color:#aaa;">Added 3 days ago · 14 posts carried</div>
+                      </div>
+                    </div>
+                    <div class="pill pill-dark">Trusted</div>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="row" style="justify-content:space-between;">
+                    <div class="row">
+                      <div class="avatar avatar-sm">B</div>
+                      <div>
+                        <div style="font-size:9px;font-weight:700;">bob·a1f2</div>
+                        <div style="font-size:8px;color:#aaa;">Added 1 week ago · 7 posts carried</div>
+                      </div>
+                    </div>
+                    <div class="pill pill-dark">Trusted</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Met once -->
+            <div>
+              <div class="section-title">Met once (1)</div>
+              <div class="card">
+                <div class="row" style="justify-content:space-between;">
+                  <div class="row">
+                    <div class="avatar avatar-sm">?</div>
+                    <div>
+                      <div style="font-size:9px;font-weight:700;">unknown·c2b8</div>
+                      <div style="font-size:8px;color:#aaa;">Encountered today on the bus</div>
+                    </div>
+                  </div>
+                  <div class="btn btn-sm btn-outline" style="width:44px;font-size:8px;">Trust</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Blocked -->
+            <div>
+              <div class="section-title">Blocked (1)</div>
+              <div class="card" style="opacity:0.5;">
+                <div class="row">
+                  <div class="avatar avatar-sm" style="background:#eee;">✕</div>
+                  <div style="font-size:9px;color:#aaa;">spam·0000 · Blocked</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="tab-bar">
+            <div class="tab"><div class="tab-icon">☰</div>Feed</div>
+            <div class="tab"><div class="tab-icon circle">◎</div>Nearby</div>
+            <div class="tab"><div class="tab-icon">✦</div>Hubs</div>
+            <div class="tab active"><div class="tab-icon circle">◉</div>Identity</div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation">Web of trust — add, trust, block</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 9. IDENTITY / SETTINGS                  -->
+    <!-- ═══════════════════════════════════════ -->
+    <div class="screen-wrap">
+      <div class="screen-label">9 · Identity &amp; Settings</div>
+      <div class="phone">
+        <div class="status-bar"><span>9:41</span><span>▲▲▲</span></div>
+        <div class="screen-body">
+          <div class="nav-bar">
+            <div class="nav-title">Identity</div>
+            <div></div>
+          </div>
+          <div class="content" style="gap:12px;">
+
+            <!-- Identity card -->
+            <div class="card" style="align-items:center;gap:8px;padding:14px 10px;">
+              <div class="avatar" style="width:44px;height:44px;font-size:16px;">Y</div>
+              <div style="font-size:11px;font-weight:700;">you·3a7f</div>
+              <div class="fingerprint" style="text-align:center;">3a7f·b2c1·09e4·fa83·<br/>22d6·8b0a·c71f·4e59</div>
+              <div class="qr-placeholder" style="margin-top:4px;"></div>
+              <div style="font-size:8px;color:#aaa;">Share this QR to let others add you</div>
+            </div>
+
+            <!-- Storage -->
+            <div>
+              <div class="section-title">Storage</div>
+              <div class="card" style="gap:6px;">
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:9px;">Used</div>
+                  <div style="font-size:9px;font-weight:700;">284 MB / 1 GB</div>
+                </div>
+                <div class="storage-bar">
+                  <div class="storage-fill" style="width:28%;"></div>
+                </div>
+                <div class="row" style="justify-content:space-between;margin-top:2px;">
+                  <div style="font-size:8px;color:#aaa;">Posts: 124</div>
+                  <div style="font-size:8px;color:#aaa;">Images: 18</div>
+                  <div style="font-size:8px;color:#aaa;">Other: 3</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Settings rows -->
+            <div>
+              <div class="section-title">Preferences</div>
+              <div class="card" style="gap:8px;">
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:9px;">Carry strategy</div>
+                  <div style="font-size:9px;color:#888;">Starred only ›</div>
+                </div>
+                <div class="divider"></div>
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:9px;">Auto-sync Bluetooth</div>
+                  <div class="toggle on"></div>
+                </div>
+                <div class="divider"></div>
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:9px;">Default content TTL</div>
+                  <div style="font-size:9px;color:#888;">7 days ›</div>
+                </div>
+                <div class="divider"></div>
+                <div class="row" style="justify-content:space-between;">
+                  <div style="font-size:9px;">Relay-only mode</div>
+                  <div class="toggle"></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="tab-bar">
+            <div class="tab"><div class="tab-icon">☰</div>Feed</div>
+            <div class="tab"><div class="tab-icon circle">◎</div>Nearby</div>
+            <div class="tab"><div class="tab-icon">✦</div>Hubs</div>
+            <div class="tab active"><div class="tab-icon circle">◉</div>Identity</div>
+          </div>
+        </div>
+      </div>
+      <div class="annotation">Keypair, QR code, storage, settings</div>
+    </div>
+
+  </div><!-- /screens -->
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const btn = document.getElementById('themeToggle');
+      const icon = document.getElementById('themeIcon');
+      const label = document.getElementById('themeLabel');
+
+      function systemDark() {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+
+      function effectiveTheme() {
+        return root.dataset.theme || (systemDark() ? 'dark' : 'light');
+      }
+
+      function applyTheme(theme) {
+        root.dataset.theme = theme;
+        localStorage.setItem('theme', theme);
+        updateButton(theme);
+      }
+
+      function updateButton(theme) {
+        if (theme === 'dark') {
+          icon.textContent  = '○';
+          label.textContent = 'Light mode';
+        } else {
+          icon.textContent  = '●';
+          label.textContent = 'Dark mode';
+        }
+      }
+
+      // Initialise button label (theme attr already set by <head> script)
+      updateButton(effectiveTheme());
+
+      btn.addEventListener('click', function () {
+        applyTheme(effectiveTheme() === 'dark' ? 'light' : 'dark');
+      });
+
+      // React to OS-level preference changes (when no manual override)
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+        if (!localStorage.getItem('theme')) {
+          updateButton(e.matches ? 'dark' : 'light');
+        }
+      });
+
+      // Show button only when near the top of the page
+      function updateVisibility() {
+        btn.classList.toggle('hidden', window.scrollY > 60);
+      }
+      window.addEventListener('scroll', updateVisibility, { passive: true });
+      updateVisibility();
+    })();
+  </script>
+
+</body>
+</html>
