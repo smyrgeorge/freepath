@@ -33,7 +33,18 @@ An information network that lives in your pocket and spreads through human conta
 - [Privacy and trust](#privacy-and-trust)
 - [Content](#content)
     - [Deletion](#deletion)
+- [Intelligence at the edge](#intelligence-at-the-edge)
+    - [Curation and filtering](#curation-and-filtering)
+    - [Smart storage management](#smart-storage-management)
+    - [Translation and accessibility](#translation-and-accessibility)
+    - [Spam and noise reduction](#spam-and-noise-reduction)
+    - [Intelligent propagation](#intelligent-propagation)
+    - [Writing assistance](#writing-assistance)
+    - [What this is not](#what-this-is-not)
 - [Where it could work](#where-it-could-work)
+- [Concepts worth exploring](#concepts-worth-exploring)
+    - [Messaging](#messaging)
+    - [Presence-based voting](#presence-based-voting)
 - [Where we are](#where-we-are)
 - [Get involved](#get-involved)
 
@@ -272,6 +283,93 @@ We find this concept deeply compelling. Deletion means something here. Content d
 somewhere, out of your reach and out of your control. What you choose to remove, you remove. What survives, survives
 because other people decided to keep it — not because a corporation did.
 
+## Intelligence at the edge
+
+Modern AI models are shrinking. What once required a data center can now run entirely on a phone — no internet
+connection,
+no API key, no data leaving your device. This creates an interesting possibility for Freepath: intelligence that is
+genuinely local, genuinely private, and genuinely yours.
+
+We think AI belongs in Freepath the same way everything else does — at the edge, under your control, serving you rather
+than serving someone's model training pipeline.
+
+### Curation and filtering
+
+The network doesn't impose a global ranking algorithm, and it never will. But that doesn't mean you have to read
+everything. A local model running on your device can help you make sense of what arrives — summarizing long articles,
+flagging content you've already seen in a different form, or surfacing posts that match your interests based on your
+reading patterns. The difference is that this curation happens entirely on your device, with no signal sent outward and
+no company learning from your choices.
+
+### Smart storage management
+
+Every device has limits. A local model can help decide what's worth keeping when space runs out — not by following a
+platform's opaque policy, but by learning your own priorities over time. What do you tend to read? What do you skip?
+What have you passed on? The model observes locally and acts locally. Nobody else sees any of this.
+
+### Translation and accessibility
+
+Freepath can carry content from communities that don't share your language. A local translation model means that a post
+written in one language can be read in another without routing that text through a cloud translation service. The author
+stays anonymous. The content stays private. The network stays decentralized.
+
+### Spam and noise reduction
+
+Without a central moderator, every device is responsible for its own signal quality. A local classifier — trained on
+what you've marked as noise, not on what a platform decided was acceptable — can quietly filter out junk before it
+reaches your reading queue. This is moderation that belongs to you, not to a trust-and-safety team in a building
+somewhere.
+
+### Intelligent propagation
+
+Earlier, we described the propagation strategies available to each user — Starred, Last N posts, Everything, and
+whatever else the model allows. These are intentional and human-driven. But AI can make them significantly smarter
+without removing that human intent.
+
+Rather than propagating a fixed window or a manually curated list, a local model can evaluate each piece of content
+against parameters you define: topics you care about, authors you trust, geographic relevance, recency, estimated
+quality, or even how many hops a post has already traveled. From this, it builds a dynamic selection — not a static
+rule, but a live judgment about what is worth carrying right now.
+
+Some examples of what this could look like in practice:
+
+- **Topic-aware carrying** — you set interests (local politics, hiking trails, independent music) and the model
+  prioritizes content that matches, letting unrelated content age out of your store first
+- **Trust-weighted propagation** — content from authors you've engaged with before, or that has traveled through people
+  you trust, is more likely to be carried forward
+- **Freshness and decay** — the model can factor in how old a post is and how widely it has already spread,
+  deprioritizing content that has likely reached saturation and making room for newer signals
+- **Ethical load** — you can instruct the model to avoid carrying content matching certain patterns you find harmful,
+  without requiring any external moderation infrastructure
+- **Bandwidth sensitivity** — when a sync window is short (a brief encounter on a bus), the model selects only the
+  highest-priority items; when time and proximity allow, it propagates more broadly
+
+This turns propagation from a blunt instrument into something expressive. The network still carries what people choose
+to carry — the principle doesn't change. But the choice can now be informed by a model that understands your
+preferences,
+applies them consistently, and does so entirely on your device.
+
+The parameters are yours. The model is yours. What travels, travels because you decided it should — just with better
+tools for making that decision.
+
+### Writing assistance
+
+Composing offline, without connectivity, doesn't mean composing without help. A small model on-device can assist with
+drafting, editing, or translating your own posts before they go anywhere. Nothing leaves your phone until you choose to
+share it.
+
+### What this is not
+
+Local AI in Freepath is not a recommendation engine optimizing for time-on-screen. It is not a classifier deciding what
+the network is allowed to carry. It is not surveillance dressed up as assistance. There is no training feedback loop
+feeding your behavior back to a model someone else controls.
+
+The models run on your hardware. The outputs stay on your device. The decisions remain yours.
+
+This is still an open area. The models available for on-device inference are improving rapidly, and what is practical
+today will be far more capable in a short time. We think this is a direction worth building toward deliberately — not
+as a feature added later, but as a design principle from the start.
+
 ## Where it could work
 
 Freepath is not designed for one specific use case. Any place where people gather, move, and share — without reliable
@@ -303,6 +401,67 @@ internet or without wanting to depend on it — is a place where this concept co
   infrastructure has failed
 
 This list is not exhaustive. Wherever people move, the network can follow.
+
+## Concepts worth exploring
+
+The ideas below are not part of the core design — they are extensions that feel natural given the foundation Freepath
+builds on. Some overlap with earlier sections; they are collected here because they deserve their own space.
+
+### Messaging
+
+Freepath is described primarily as a broadcast medium — you write something, it travels, people receive it. But the same
+infrastructure can carry private communication.
+
+A messaging subsystem built on Freepath would work the same way: **store, carry, forward**. You send a message to
+someone. Your phone holds it. The next time your device meets another Freepath device — a stranger on the street, a
+friend at a café — that message is silently forwarded, carried one hop closer to its destination. Eventually, through a
+chain of encounters you will never fully know, it arrives.
+
+This is not instant messaging. It makes no such promise. A message might arrive in minutes, or hours, or tomorrow. The
+delivery time depends entirely on the density and movement of the human mesh between sender and recipient.
+
+But this constraint is not a failure — it is a different model of communication. One where presence matters. One where
+the message arrives because people, physically, made it possible.
+
+Privacy is preserved end-to-end. Messages are encrypted for the recipient's public key — readable only by them, even as
+they pass through a dozen unknown devices. Intermediate carriers see nothing. The envelope is opaque. Only the
+destination can open it.
+
+This also changes how conversations feel. There is no read receipt, no typing indicator, no presence dot. You send, and
+then you wait — not anxiously refreshing a screen, but knowing the message is on its way through the world, carried by
+people going about their lives.
+
+### Presence-based voting
+
+Earlier, we touched on the idea of hubs collecting votes as people pass through. This deserves more careful development.
+
+The principle is simple: **to vote, you have to go to the place**. Not log in, not submit a form, not click a button
+from your sofa. You physically travel to a location — a hub, a public square, a community space — and your device
+registers your participation. The act of being there is itself meaningful.
+
+This is not just a technical mechanism. It is a statement about what voting should feel like. It reintroduces friction
+as a feature. It anchors a decision to a place and a moment. It requires something of the participant beyond a tap on a
+screen.
+
+How it could work:
+
+- A hub poses a question — a community proposal, a local decision, a neighbourhood referendum
+- Any device that comes within range receives the ballot
+- You review it and cast your response locally; your vote is signed with your cryptographic identity, so it cannot be
+  duplicated or forged
+- The hub collects responses silently as people arrive; other devices carry results outward as they leave
+- Tallying is distributed — no single server counts the votes; the result emerges from the network as it propagates
+
+The result is not instant. A vote cast at noon might not be fully aggregated until the end of the day, once enough
+devices have passed through and carried the partial tallies outward. But it is verifiable, tamper-resistant, and
+requires no central authority to run.
+
+Participation is bounded by physical presence. You cannot vote for a community you have never visited. You cannot cast
+ballots from a distance. The network enforces locality not through rules but through physics.
+
+This is still an open direction. Questions of eligibility, double-voting prevention, anonymity, and result verification
+are not yet resolved. But the direction feels right: governance that is local, physical, and grounded in the act of
+showing up.
 
 ## Where we are
 
