@@ -88,9 +88,12 @@ When a contact card arrives through any method, the app performs the following c
 
 1. **Schema check.** The card's `schema` field must be a version the app understands. An unknown or unsupported
    version is rejected with a user-visible error.
-2. **Signature verification.** The card must carry a valid signature from the `sigKey` included in it. A card that
-   fails verification is silently rejected and never stored.
-3. **Duplicate check.** If a card from the same Node ID is already in the contact list, the incoming card is
+2. **Node ID verification.** The app derives the Node ID locally from the included `sigKey` and compares it against
+   the transmitted `nodeId`. A mismatch means the card is malformed or tampered with — it is rejected and the user
+   is shown an error.
+3. **Signature verification.** The card must carry a valid signature from the `sigKey` included in it. A card that
+   fails verification is rejected, never stored, and the user is shown an error.
+4. **Duplicate check.** If a card from the same Node ID is already in the contact list, the incoming card is
    compared by `updatedAt`. If it is not strictly newer, it is ignored. If it is newer, it triggers a card update
    rather than a new contact creation (see [1-contact.md — Card updates](1-contact.md#card-updates)).
 

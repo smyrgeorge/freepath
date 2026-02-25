@@ -31,6 +31,7 @@ shared during a connection — no content, no message history, no device metadat
 ```
 {
   "schema":     <schema version, e.g. 1>,
+  "nodeId":     "<Base58-encoded Node ID>",
   "sigKey":     "<Base64-encoded Ed25519 public key>",
   "encKey":     "<Base64-encoded X25519 public key>",
   "updatedAt":  <Unix epoch milliseconds>,
@@ -41,22 +42,24 @@ shared during a connection — no content, no message history, no device metadat
 }
 ```
 
-| Field       | Required | Type     | Max size  | Description                                                                                                                                                   |
-|-------------|----------|----------|-----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `schema`    | Yes      | `int`    | —         | Schema version. Allows future evolution of the format.                                                                                                        |
-| `sigKey`    | Yes      | `string` | —         | Ed25519 public key, Base64-encoded. Used to verify the signature on this card and on all content attributed to this identity.                                 |
-| `encKey`    | Yes      | `string` | —         | X25519 public key, Base64-encoded. Used by senders to derive a shared secret when encrypting private messages for this user.                                  |
-| `updatedAt` | Yes      | `long`   | —         | Unix epoch timestamp in milliseconds of the last change to the card. Used by recipients to determine whether a re-received card is newer than the stored one. |
-| `name`      | No       | `string` | 64 chars  | A human-readable display name chosen by the owner. Not globally unique.                                                                                       |
-| `bio`       | No       | `string` | 256 chars | A short description the user writes about themselves.                                                                                                         |
-| `avatar`    | No       | `string` | 64 KB     | Base64-encoded WebP image, square, no larger than 512×512 px. Larger images are cropped to a square by the UI.                                                |
-| `location`  | No       | `string` | 128 chars | A free-text location hint (e.g. a city or region). Not a GPS coordinate. Never verified.                                                                      |
+| Field       | Required | Type     | Max size  | Description                                                                                                                                                         |
+|-------------|----------|----------|-----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `schema`    | Yes      | `int`    | —         | Schema version. Allows future evolution of the format.                                                                                                              |
+| `nodeId`    | Yes      | `string` | —         | Node ID of the owner. Included for convenience. The recipient must verify it matches the value derived locally from `sigKey` — a mismatch is grounds for rejection. |
+| `sigKey`    | Yes      | `string` | —         | Ed25519 public key, Base64-encoded. Used to verify the signature on this card and on all content attributed to this identity.                                       |
+| `encKey`    | Yes      | `string` | —         | X25519 public key, Base64-encoded. Used by senders to derive a shared secret when encrypting private messages for this user.                                        |
+| `updatedAt` | Yes      | `long`   | —         | Unix epoch timestamp in milliseconds of the last change to the card. Used by recipients to determine whether a re-received card is newer than the stored one.       |
+| `name`      | No       | `string` | 64 chars  | A human-readable display name chosen by the owner. Not globally unique.                                                                                             |
+| `bio`       | No       | `string` | 256 chars | A short description the user writes about themselves.                                                                                                               |
+| `avatar`    | No       | `string` | 64 KB     | Base64-encoded WebP image, square, no larger than 512×512 px. Larger images are cropped to a square by the UI.                                                      |
+| `location`  | No       | `string` | 128 chars | A free-text location hint (e.g. a city or region). Not a GPS coordinate. Never verified.                                                                            |
 
-All optional fields may be omitted entirely or set to null. A card containing only `schema`, `sigKey`, `encKey`, and
-`updatedAt` is valid.
+All optional fields may be omitted entirely or set to null. A card containing only `schema`, `nodeId`, `sigKey`,
+`encKey`, and `updatedAt` is valid.
 
 Before transmission the card is signed by the owner's Ed25519 private key. The recipient verifies the signature
-against the included `sigKey`. A card that fails verification is silently rejected and never stored.
+against the included `sigKey`. A card that fails verification is rejected, never stored, and the user is shown an
+error.
 
 ## Card updates
 
@@ -64,11 +67,14 @@ A contact card may be received more than once — through a second direct encoun
 intermediate device. When a card arrives for a Node ID that already exists in the local contact list, the application
 applies the following rules:
 
-1. **Verify the signature.** The incoming card must carry a valid signature from the same `sigKey` already on file.
-   A card signed by a different key for the same Node ID is a conflict and is silently rejected.
-2. **Compare timestamps.** The incoming card is accepted only if its `updatedAt` is strictly greater than the stored
+1. **Verify the Node ID.** The recipient derives the Node ID locally from the incoming `sigKey` and checks it
+   against the transmitted `nodeId`. A mismatch is rejected and the user is shown an error.
+2. **Verify the signature.** The incoming card must carry a valid signature from the same `sigKey` already on file.
+   A card signed by a different key for the same Node ID is a conflict — it is rejected and the user is shown an
+   error.
+3. **Compare timestamps.** The incoming card is accepted only if its `updatedAt` is strictly greater than the stored
    record's `updatedAt`. Equal or older timestamps are ignored — they are either duplicates or replays.
-3. **Merge.** If both checks pass, the stored record is updated field by field with the values from the incoming card.
+4. **Merge.** If both checks pass, the stored record is updated field by field with the values from the incoming card.
    Local-only fields (`trustLevel`, `addedAt`, `notes`, and any locally overridden display name) are never touched by
    an incoming card update.
 
@@ -82,8 +88,10 @@ A **Node ID** is a short, stable identifier that uniquely represents a user with
 system uses everywhere it needs to refer to a user — in content envelopes, message headers, routing tables, and the
 local contact list — without carrying the full public key around.
 
-The Node ID is never transmitted in a contact card. Instead, every device derives it independently and locally from
-the signing public key using a fixed, well-specified derivation:
+The Node ID is included in the contact card as the `nodeId` field for convenience — it allows the recipient to
+index and reference the contact immediately without computing it first. However, the transmitted value is never
+trusted blindly. Upon receiving a card, the recipient independently derives the Node ID from the included `sigKey`
+using the fixed derivation:
 
 ```
 nodeId = Base58( SHA-256(sigKey)[0..15] )
@@ -91,9 +99,8 @@ nodeId = Base58( SHA-256(sigKey)[0..15] )
 
 This produces a 22-character Base58 string (e.g. `4mXkR9qWzJvTsLpYcBnD2e`).
 
-Because the derivation is deterministic and identical on every device, there is no need to trust a Node ID received
-from the outside. No card, message, or third party can supply a mismatched or forged Node ID — every device will
-always arrive at the same value for a given signing key on its own.
+If the transmitted `nodeId` does not match the locally derived value, the card is rejected. The `sigKey` is always
+the source of truth — the `nodeId` in the card is a convenience field, not an authority.
 
 ### Where the Node ID is used
 
