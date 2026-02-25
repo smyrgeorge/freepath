@@ -116,3 +116,11 @@ If the user taps **Add**, a contact entry is created in the local store (see [2-
 with `trustLevel` defaulting to `TRUSTED`. The user may change the trust level immediately or at any later time.
 
 If the user taps **Ignore**, the card is discarded and nothing is stored. The other party's device is not notified.
+
+## References
+
+- [QR code — Wikipedia](https://en.wikipedia.org/wiki/QR_code)
+- [Near-field communication (NFC) — Wikipedia](https://en.wikipedia.org/wiki/Near-field_communication)
+- [NFC Data Exchange Format (NDEF) — Wikipedia](https://en.wikipedia.org/wiki/NFC_Data_Exchange_Format)
+- [Bluetooth Low Energy — Wikipedia](https://en.wikipedia.org/wiki/Bluetooth_Low_Energy)
+- [Key exchange — Wikipedia](https://en.wikipedia.org/wiki/Key_exchange)

@@ -48,3 +48,7 @@ described in the propagation spec.
 - **Export.** The contact's identity can be re-exported as a contact card (containing only the fields from the
   original card, with no local-only data) so the user can share a known contact's identity with someone else. This
   is a manual action and requires explicit user intent.
+
+## References
+
+- [Web of trust — Wikipedia](https://en.wikipedia.org/wiki/Web_of_trust)
