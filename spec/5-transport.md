@@ -354,6 +354,85 @@ that opens many partial messages and never completes them.
 > compromised in the future, an attacker who recorded past envelopes can decrypt them. This is an inherent
 > consequence of the stateless, no-handshake design and cannot be avoided without a prior interactive exchange.
 
+## Store-carry-forward routing
+
+Freepath is a store-carry-forward network. Devices are mobile, connectivity is intermittent, and two peers may never
+be online simultaneously. When a direct session between sender and recipient is unavailable, content can be relayed
+through intermediate nodes that carry it until a path to the destination opens.
+
+### Routing model
+
+The transport layer provides per-hop authenticated delivery. End-to-end confidentiality is the application layer's
+responsibility, using `StatelessEnvelope`.
+
+Consider a three-node example:
+
+- **Alice** wants to send content to **Charlie**.
+- **Bob** is reachable by both Alice and Charlie, but at different times — Alice and Charlie are never online
+  simultaneously.
+
+```
+Alice ──session──▶ Bob ──session──▶ Charlie
+      DATA(env)          DATA(env)
+```
+
+The relay path:
+
+1. Alice creates a `StatelessEnvelope` addressed to Charlie (`receiverId = Charlie's nodeId`, payload encrypted
+   with Charlie's `encKey` public key).
+2. Alice sends the envelope to Bob inside a `DATA` frame over the Alice–Bob session. Bob's frame AEAD verifies,
+   and Bob decrypts the frame — recovering the raw `StatelessEnvelope` bytes.
+3. Bob reads the `receiverId` field. Recognising Charlie as a known contact, Bob stores the envelope.
+4. When Bob later establishes a session with Charlie, Bob forwards the stored envelope inside a `DATA` frame over
+   the Bob–Charlie session.
+5. Charlie decrypts the `DATA` frame, recovers the `StatelessEnvelope`, verifies Alice's signature using Alice's
+   `sigKey` from Charlie's contact list, and decrypts the payload with Charlie's own `encKey` private key.
+
+The `StatelessEnvelope` is opaque to Bob at the encryption level: Bob can read `senderId` and `receiverId` for
+routing, but cannot decrypt the `payload`.
+
+### Contact requirements
+
+For the relay chain Alice → Bob → Charlie:
+
+- **Alice ↔ Bob**: mutual contacts. Alice holds Bob's transport keys for the session; Bob holds Alice's `sigKey`
+  for handshake verification.
+- **Bob ↔ Charlie**: mutual contacts. Bob holds Charlie's transport keys; Charlie holds Bob's `sigKey`.
+- **Alice → Charlie**: Alice must hold Charlie's `encKey` public key to encrypt the `StatelessEnvelope` payload,
+  and Charlie must hold Alice's `sigKey` to verify the signature. Both require prior contact exchange between
+  Alice and Charlie (see [3-contact-exchange.md](3-contact-exchange.md)), which can itself be mediated by an
+  intermediate node acting as a courier for their contact cards.
+
+The relay node does not need to be party to Alice and Charlie's contact relationship; it only needs working sessions
+with each of them.
+
+### Application-layer responsibility
+
+Store-carry-forward routing is an **application-layer concern**. The transport layer (this spec) provides:
+
+- Authenticated, per-hop delivery via Frame sessions (`StatefulProtocol`).
+- The `StatelessEnvelope` format for self-contained, end-to-end encrypted messages.
+
+The application layer is responsible for:
+
+- Identifying relay candidates for a given `receiverId`.
+- Storing envelopes indexed by `receiverId` and forwarding them when a matching session becomes available.
+- TTL / expiry enforcement: the `StatelessEnvelope` `timestamp` field and the receiver's replay-protection window
+  (default 7 days) give envelopes a natural expiry. Relay implementations SHOULD discard stored envelopes that
+  fall outside the expected acceptance window rather than carrying them indefinitely.
+- Multi-hop chains (Alice → Bob → Carol → Charlie) using the same mechanism recursively.
+
+### Security properties
+
+| Property                     | Guarantee                                                                                                                                                                      |
+|------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| End-to-end confidentiality   | Payload is encrypted for Charlie's `encKey`; no relay can decrypt it.                                                                                                          |
+| Sender authenticity          | Signature verifiable by Charlie from Alice's `sigKey` in Charlie's contact list; no relay can forge it.                                                                        |
+| Relay opacity                | A relay sees `senderId` and `receiverId` in plaintext for routing but cannot access the payload.                                                                               |
+| Replay protection            | Receiver applies the standard `(senderId, nonce)` replay window from [`StatelessEnvelope`](#statelessenvelope).                                                                |
+| Forward secrecy (per-hop)    | Each Frame session uses ephemeral keys; the relay leg has forward secrecy.                                                                                                     |
+| Forward secrecy (end-to-end) | The `StatelessEnvelope` key derives from static long-term `encKey` pairs — the same trade-off as all `StatelessEnvelope` usage (see the forward-secrecy note in that section). |
+
 ## Transports
 
 ### LAN

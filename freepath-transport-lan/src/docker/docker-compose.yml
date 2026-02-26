@@ -1,0 +1,42 @@
+services:
+
+  # Each container = one Freepath node.  Peer discovery is handled by mDNS — no
+  # hardcoded addresses or ports.  The OS assigns an ephemeral port to each node
+  # and JmDNS advertises it on the Docker bridge network.
+  #
+  # Add or remove node-* services freely — DemoApp accepts any peer whose NODE_INDEX
+  # falls within its pre-shared contact pool (indices 0..19).
+
+  node-0:
+    build:
+      context: ../../..
+      dockerfile: freepath-transport-lan/src/docker/Dockerfile
+    environment:
+      NODE_INDEX: "0"
+    restart: unless-stopped
+    networks:
+      - freepath-demo
+
+  node-1:
+    build:
+      context: ../../..
+      dockerfile: freepath-transport-lan/src/docker/Dockerfile
+    environment:
+      NODE_INDEX: "1"
+    restart: unless-stopped
+    networks:
+      - freepath-demo
+
+  node-2:
+    build:
+      context: ../../..
+      dockerfile: freepath-transport-lan/src/docker/Dockerfile
+    environment:
+      NODE_INDEX: "2"
+    restart: unless-stopped
+    networks:
+      - freepath-demo
+
+networks:
+  freepath-demo:
+    driver: bridge
