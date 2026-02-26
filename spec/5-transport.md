@@ -48,34 +48,34 @@ exactly as they are.
 
 ## Frame
 
-A **Frame** is the unit of data exchanged between the Framing Layer and the Link Adapter. Every Frame is:
+A **Frame** is the logical unit of data produced by the Framing Layer and consumed by the Link Adapter. Every
+Frame is:
 
 - Self-contained and independently parseable.
 - Sequence-numbered within a logical stream.
 - Versioned, so the framing format can evolve.
-- Optionally fragmented if the payload exceeds the transport's MTU.
+
+If a serialised Frame exceeds the transport's MTU, the Link Adapter splits it into chunks for transmission and
+reassembles them on the receiving side. Fragmentation metadata lives in the
+[Link Adapter Packet](#link-adapter-packet), not in the Frame itself.
 
 ```
 {
-  "schema":        <framing format version, e.g. 1>,
-  "streamId":      "<Base58-encoded stream identifier>",
-  "seq":           <sequence number, integer, starts at 0>,
-  "fragmentIndex": <fragment index within this seq, starting at 0>,
-  "fragmentCount": <total fragments for this seq>,
-  "type":          "<frame type, see below>",
-  "payload":       "<Base64-encoded bytes>"
+  "schema":   <framing format version, e.g. 1>,
+  "streamId": "<Base58-encoded stream identifier>",
+  "seq":      <sequence number, integer, starts at 0>,
+  "type":     "<frame type, see below>",
+  "payload":  "<Base64-encoded bytes>"
 }
 ```
 
-| Field           | Required | Type     | Description                                                                                      |
-|-----------------|----------|----------|--------------------------------------------------------------------------------------------------|
-| `schema`        | Yes      | `int`    | Framing format version. Allows the framing format to evolve without breaking existing receivers. |
-| `streamId`      | Yes      | `string` | Identifies the logical stream this Frame belongs to. Scoped to a single peer pair.               |
-| `seq`           | Yes      | `int`    | Sequence number of the logical message within this stream.                                       |
-| `fragmentIndex` | Yes      | `int`    | Zero-based index of this fragment within the fragmented message.                                 |
-| `fragmentCount` | Yes      | `int`    | Total number of fragments for this `seq`. `1` means the message was not fragmented.              |
-| `type`          | Yes      | `string` | Frame type. See [Frame types](#frame-types) below.                                               |
-| `payload`       | Yes      | `string` | Base64-encoded payload bytes. Interpreted according to `type`.                                   |
+| Field      | Required | Type     | Description                                                                                      |
+|------------|----------|----------|--------------------------------------------------------------------------------------------------|
+| `schema`   | Yes      | `int`    | Framing format version. Allows the framing format to evolve without breaking existing receivers. |
+| `streamId` | Yes      | `string` | Identifies the logical stream this Frame belongs to. Scoped to a single peer pair.               |
+| `seq`      | Yes      | `int`    | Sequence number of the logical message within this stream.                                       |
+| `type`     | Yes      | `string` | Frame type. See [Frame types](#frame-types) below.                                               |
+| `payload`  | Yes      | `string` | Base64-encoded payload bytes. Interpreted according to `type`.                                   |
 
 ### Frame types
 
@@ -85,6 +85,26 @@ A **Frame** is the unit of data exchanged between the Framing Layer and the Link
 | `DATA`      | Carries an encrypted application message.                                                        |
 | `ACK`       | Acknowledges receipt of a sequence number. Used on transports that support bidirectionality.     |
 | `CLOSE`     | Signals orderly session teardown.                                                                |
+
+### Link Adapter Packet
+
+The Link Adapter wraps each serialised Frame — or a fragment of one — in a binary packet before handing it to the
+transport. This is the actual unit transmitted on the wire or over the air.
+
+```
+SEQ (4 bytes, big-endian) | FRAG_INDEX (2 bytes, big-endian) | FRAG_COUNT (2 bytes, big-endian) | LENGTH (4 bytes, big-endian) | DATA (LENGTH bytes)
+```
+
+- `SEQ`: Sequence number matching the `seq` field of the Frame being transmitted. Allows the receiver to reassemble
+  fragments of the same logical message.
+- `FRAG_INDEX`: Zero-based index of this fragment. `0` if the Frame was not fragmented.
+- `FRAG_COUNT`: Total number of fragments for this `SEQ`. `1` means the Frame was not fragmented.
+- `LENGTH`: Byte length of `DATA`.
+- `DATA`: A contiguous chunk of the serialised Frame bytes.
+
+The receiver buffers incoming packets by `SEQ` and reassembles `DATA` chunks in `FRAG_INDEX` order before
+parsing the Frame. Packets with the same `SEQ` arriving from different streams are distinguished by the
+transport connection or channel — the packet format itself is scoped to a single peer pair.
 
 ### Handshake
 
@@ -104,7 +124,11 @@ over a bidirectional transport (LAN or BLE). Optical and other unidirectional tr
    Frame 1 containing the same fields.
 
 3. Both sides perform X25519 Diffie-Hellman between their own ephemeral private key and the peer's ephemeral public
-   key. They derive a session key using HKDF over the resulting shared secret.
+   key. They derive a session key using HKDF with:
+    - **IKM**: the X25519 shared secret.
+    - **Info**: the concatenation of the two serialised `HANDSHAKE` frames (initiator's first, responder's second),
+      binding the derived key to this specific exchange and preventing a MITM from manipulating handshake messages
+      undetected.
 
 4. All subsequent Frames in the session carry payloads encrypted with the session key using AES-GCM or
    ChaCha20-Poly1305.
@@ -132,29 +156,35 @@ keys locally.
 
 ```
 {
-  "schema":    <schema version, e.g. 1>,
-  "senderId":  "<Base58-encoded Node ID of the sender>",
-  "timestamp": <Unix epoch milliseconds>,
-  "nonce":     "<Base64-encoded random nonce, 12 bytes>",
-  "payload":   "<Base64-encoded encrypted bytes (AES-GCM or ChaCha20-Poly1305)>",
-  "signature": "<Base64-encoded Ed25519 signature over schema, senderId, timestamp, nonce, payload>"
+  "schema":         <schema version, e.g. 1>,
+  "senderId":       "<Base58-encoded Node ID of the sender>",
+  "receiverId":     "<Base58-encoded Node ID of the intended recipient>",
+  "timestamp":      <Unix epoch milliseconds>,
+  "nonce":          "<Base64-encoded random nonce, 12 bytes>",
+  "fragmentIndex":  <zero-based fragment index, 0 if not fragmented>,
+  "fragmentCount":  <total fragments, 1 if not fragmented>,
+  "payload":        "<Base64-encoded encrypted bytes (AES-GCM or ChaCha20-Poly1305)>",
+  "signature":      "<Base64-encoded Ed25519 signature over all other fields>"
 }
 ```
 
-| Field       | Required | Type     | Description                                                                                                          |
-|-------------|----------|----------|----------------------------------------------------------------------------------------------------------------------|
-| `schema`    | Yes      | `int`    | Schema version.                                                                                                      |
-| `senderId`  | Yes      | `string` | Node ID of the sender. The receiver looks up the sender's `sigKey` and `encKey` from their local contact list.       |
-| `timestamp` | Yes      | `long`   | Unix epoch milliseconds. Used for replay protection. Receivers reject envelopes older than a configurable threshold. |
-| `nonce`     | Yes      | `string` | Random 12-byte nonce, unique per envelope. Prevents ciphertext reuse.                                                |
-| `payload`   | Yes      | `string` | Encrypted content. Encrypted with a key derived from the sender's `encKey` and the receiver's `encKey` via X25519.   |
-| `signature` | Yes      | `string` | Ed25519 signature by the sender over all other fields. Verifiable without a handshake.                               |
+| Field           | Required | Type     | Description                                                                                                                         |
+|-----------------|----------|----------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `schema`        | Yes      | `int`    | Schema version.                                                                                                                     |
+| `senderId`      | Yes      | `string` | Node ID of the sender. The receiver looks up the sender's `sigKey` and `encKey` from their local contact list.                      |
+| `receiverId`    | Yes      | `string` | Node ID of the intended recipient. Binds the envelope to a specific receiver, preventing replay to a different contact.             |
+| `timestamp`     | Yes      | `long`   | Unix epoch milliseconds. Used for replay protection. Receivers reject envelopes older than a configurable threshold.                |
+| `nonce`         | Yes      | `string` | Random 12-byte nonce, unique per envelope. Prevents ciphertext reuse.                                                               |
+| `fragmentIndex` | Yes      | `int`    | Zero-based index of this fragment within a multi-envelope message. `0` if the message was not split.                                |
+| `fragmentCount` | Yes      | `int`    | Total number of envelopes in this message. `1` means the message was not split.                                                     |
+| `payload`       | Yes      | `string` | Encrypted content. Key derived from `X25519(sender_enc_private, receiver_enc_public)`, uniquely bound to this sender–receiver pair. |
+| `signature`     | Yes      | `string` | Ed25519 signature by the sender over all other fields. Verifiable without a handshake.                                              |
 
 Because a `StatelessEnvelope` is self-contained, it can be encoded in a QR code, displayed on screen, and scanned
 by any device that holds the sender's contact card. No session, no handshake, no reply channel required.
 
-If the content to be transmitted exceeds the QR code capacity, it must be split into a sequence of envelopes. Each
-envelope carries a fragment index and a total count. The receiver scans all fragments before attempting to decrypt.
+If the content to be transmitted exceeds the QR code capacity, it is split across multiple envelopes using
+`fragmentIndex` and `fragmentCount`. The receiver collects all fragments before attempting to decrypt.
 
 ## Transports
 
@@ -169,10 +199,12 @@ MAGIC (4 bytes) | VERSION (1 byte) | TYPE (1 byte) | LENGTH (4 bytes, big-endian
 ```
 
 - `MAGIC`: fixed bytes identifying the Freepath protocol.
-- `VERSION`: wire format version, currently `1`.
-- `TYPE`: maps to the Frame `type` field.
+- `VERSION`: wire envelope format version, currently `1`. Versions the binary layout of the envelope itself (field
+  order, header size). Distinct from the Frame's `schema` field, which versions the logical message format inside
+  `PAYLOAD`. The two can evolve independently.
+- `TYPE`: maps to the Frame `type` field, allowing routing without parsing the full Frame.
 - `LENGTH`: byte length of `PAYLOAD`.
-- `PAYLOAD`: a serialised Frame.
+- `PAYLOAD`: a serialised Link Adapter Packet.
 
 LAN peers discover each other via mDNS service advertisement. A device advertises its service only while it is
 willing to accept connections.
