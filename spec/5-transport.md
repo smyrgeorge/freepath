@@ -63,28 +63,28 @@ reassembles them on the receiving side. Fragmentation metadata lives in the
 {
   "schema":   <framing format version, e.g. 1>,
   "streamId": "<Base58-encoded stream identifier>",
-  "seq":      <sequence number, integer, starts at 0>,
+  "seq":      <sequence number, uint32, starts at 0>,
   "type":     "<frame type, see below>",
   "payload":  "<Base64-encoded bytes>"
 }
 ```
 
-| Field      | Required | Type     | Description                                                                                      |
-|------------|----------|----------|--------------------------------------------------------------------------------------------------|
-| `schema`   | Yes      | `int`    | Framing format version. Allows the framing format to evolve without breaking existing receivers. |
-| `streamId` | Yes      | `string` | Identifies the logical stream this Frame belongs to. Scoped to a single peer pair.               |
-| `seq`      | Yes      | `int`    | Sequence number of the logical message within this stream.                                       |
-| `type`     | Yes      | `string` | Frame type. See [Frame types](#frame-types) below.                                               |
-| `payload`  | Yes      | `string` | Base64-encoded payload bytes. Interpreted according to `type`.                                   |
+| Field      | Required | Type     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+|------------|----------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `schema`   | Yes      | `int`    | Framing format version. Allows the framing format to evolve without breaking existing receivers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `streamId` | Yes      | `string` | Identifies the logical stream this Frame belongs to. Scoped to a single peer pair.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `seq`      | Yes      | `uint32` | Sequence number of the logical message within this stream. Unsigned 32-bit integer, starts at 0. The monotonicity counter applies only to post-handshake frames (DATA, ACK, CLOSE) and is scoped to each direction independently; it is initialised fresh at session establishment (logically equivalent to "last accepted = −1", so the first DATA/ACK/CLOSE with `seq`=0 MUST be accepted). Receivers MUST reject any frame whose `seq` is not strictly greater than the last accepted `seq` in the same stream, preventing replay of captured frames. A session MUST be torn down and a new handshake performed before `seq` reaches `0xFFFFFFFF` to prevent nonce reuse. |
+| `type`     | Yes      | `string` | Frame type. See [Frame types](#frame-types) below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `payload`  | Yes      | `string` | Base64-encoded payload bytes. Interpreted according to `type`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ### Frame types
 
-| Type        | Description                                                                                      |
-|-------------|--------------------------------------------------------------------------------------------------|
-| `HANDSHAKE` | Carries handshake material (ephemeral public keys, identity proof). See [Handshake](#handshake). |
-| `DATA`      | Carries an encrypted application message.                                                        |
-| `ACK`       | Acknowledges receipt of a sequence number. Used on transports that support bidirectionality.     |
-| `CLOSE`     | Signals orderly session teardown.                                                                |
+| Type        | Description                                                                                                                                                                                                                                                                                                                                    |
+|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `HANDSHAKE` | Carries handshake material (ephemeral public keys, identity proof). See [Handshake](#handshake).                                                                                                                                                                                                                                               |
+| `DATA`      | Carries an encrypted application message.                                                                                                                                                                                                                                                                                                      |
+| `ACK`       | Acknowledges receipt of a sequence number. Used on transports that support bidirectionality. After the handshake completes, ACK frames MUST be encrypted and authenticated identically to DATA frames. The plaintext payload is the 4-byte big-endian `seq` value being acknowledged.                                                          |
+| `CLOSE`     | Signals orderly session teardown. After the handshake completes, CLOSE frames MUST be encrypted and authenticated identically to DATA frames. A CLOSE received after session establishment that fails authentication MUST be rejected. The plaintext payload is empty (0 bytes); its presence and successful AEAD verification are the signal. |
 
 ### Link Adapter Packet
 
@@ -106,6 +106,12 @@ The receiver buffers incoming packets by `SEQ` and reassembles `DATA` chunks in 
 parsing the Frame. Packets with the same `SEQ` arriving from different streams are distinguished by the
 transport connection or channel — the packet format itself is scoped to a single peer pair.
 
+Receivers MUST enforce an implementation-defined maximum on `FRAG_COUNT` and reject packets that exceed it.
+Receivers MUST also reject any packet where `FRAG_COUNT` is 0 or where `FRAG_INDEX >= FRAG_COUNT`.
+Reassembly state for a given `SEQ` MUST be discarded if all fragments have not arrived within an
+implementation-defined timeout, freeing the associated buffer. These limits are necessary to prevent memory
+exhaustion from malformed or malicious packets.
+
 ### Handshake
 
 The handshake establishes a shared session key between two peers and authenticates both identities. It takes place
@@ -118,24 +124,63 @@ over a bidirectional transport (LAN or BLE). Optical and other unidirectional tr
     - Ephemeral public key.
     - Own `nodeId`.
     - Own long-term `sigKey` public key.
-    - A signature over (ephemeral public key ∥ nodeId) using the long-term Ed25519 private key.
+    - A signature over `(EPHEMERAL_KEY ∥ NODEID_RAW)` as defined in
+      the [HANDSHAKE payload format](#handshake-payload-format), using the long-term Ed25519 private key.
 
-2. **Responder** verifies the signature, generates their own ephemeral X25519 key pair, and sends `HANDSHAKE`
-   Frame 1 containing the same fields.
+2. **Responder** looks up the claimed `nodeId` in their local contact list, verifies that the received `sigKey`
+   matches the key on file, and verifies the signature using the `sigKey` retrieved from the contact list — not
+   the received key. If no matching contact exists, the key does not match, or the signature is invalid, the
+   handshake MUST be aborted. The Responder then generates their own ephemeral X25519 key pair and sends
+   `HANDSHAKE` Frame 1 containing the same fields.
 
-3. Both sides perform X25519 Diffie-Hellman between their own ephemeral private key and the peer's ephemeral public
-   key. They derive a session key using HKDF with:
+3. **Initiator** applies the same checks on `HANDSHAKE` Frame 1: looks up the Responder's `nodeId`, verifies
+   the received `sigKey` matches the contact list, and verifies the signature using the `sigKey` from the contact
+   list. If any check fails, the handshake MUST be aborted.
+
+4. Both sides perform X25519 Diffie-Hellman between their own ephemeral private key and the peer's ephemeral public
+   key. Implementations MUST verify that the resulting shared secret is not the all-zeros value; a zero output
+   indicates the peer supplied a low-order point and the handshake MUST be aborted. They derive a session key
+   using HKDF-SHA-256 with:
     - **IKM**: the X25519 shared secret.
-    - **Info**: the concatenation of the two serialised `HANDSHAKE` frames (initiator's first, responder's second),
-      binding the derived key to this specific exchange and preventing a MITM from manipulating handshake messages
-      undetected.
+    - **Salt**: 32 zero bytes (the HKDF-SHA-256 default).
+    - **Info**: the concatenation of Frame 0's raw HANDSHAKE payload bytes and Frame 1's raw HANDSHAKE payload
+      bytes (the `payload` field of each Frame, Base64-decoded), binding the derived key to this specific exchange
+      and preventing a MITM from manipulating handshake messages undetected.
+    - **OKM length**: 32 bytes.
 
-4. All subsequent Frames in the session carry payloads encrypted with the session key using AES-GCM or
-   ChaCha20-Poly1305.
+5. All subsequent Frames in the session carry payloads encrypted with ChaCha20-Poly1305 using the session key.
+   The nonce for each Frame is the frame's `seq` value zero-padded to 12 bytes (big-endian), guaranteeing nonce
+   uniqueness for the lifetime of the session. The AEAD Additional Authenticated Data (AAD) is the concatenation
+   of `schema` (4-byte big-endian) ∥ `seq` (4-byte big-endian) ∥ `type` (1-byte length prefix + UTF-8 bytes)
+   ∥ `streamId` (UTF-8 bytes). Binding all header fields to the ciphertext ensures any modification to `schema`,
+   `seq`, `type`, or `streamId` in transit causes AEAD verification to fail. Schema version 1 mandates
+   ChaCha20-Poly1305; future schema versions may introduce cipher negotiation.
+
+Implementations MUST discard any DATA, ACK, or CLOSE frame received before the handshake has completed.
+Implementations MUST discard any HANDSHAKE frame received after the handshake has completed; a replayed or
+retransmitted HANDSHAKE MUST NOT cause re-derivation of the session key or any other change to session state.
+Implementations MUST also abandon incomplete handshake state and release all associated resources if the
+handshake is not completed within an implementation-defined timeout.
+
+#### HANDSHAKE payload format
+
+The `payload` field of a HANDSHAKE Frame (Base64-decoded) is a fixed-length binary structure:
+
+```
+EPHEMERAL_KEY (32 bytes) | SIGKEY (32 bytes) | NODEID_RAW (16 bytes) | SIGNATURE (64 bytes)
+```
+
+- `EPHEMERAL_KEY`: the sender's ephemeral X25519 public key.
+- `SIGKEY`: the sender's long-term Ed25519 public key.
+- `NODEID_RAW`: the raw 16-byte Node ID: `SHA-256(sigKey)[0..15]`.
+- `SIGNATURE`: Ed25519 signature over `(EPHEMERAL_KEY ∥ NODEID_RAW)` using the sender's long-term Ed25519
+  private key.
 
 Neither ephemeral private key is ever transmitted. The long-term identity keys authenticate the handshake but are
 not used for encryption — that role belongs to the ephemeral keys. A passive observer who records the session cannot
-decrypt it later even if they later obtain the long-term private keys.
+decrypt it later even if they later obtain the long-term private keys. Implementations MUST NOT cache or reuse
+session keys across handshakes; each new connection MUST perform a full handshake to derive a fresh session key,
+ensuring the `seq`-derived nonce sequence always begins at 0 under a distinct key.
 
 ### StatelessEnvelope
 
@@ -163,28 +208,54 @@ keys locally.
   "nonce":          "<Base64-encoded random nonce, 12 bytes>",
   "fragmentIndex":  <zero-based fragment index, 0 if not fragmented>,
   "fragmentCount":  <total fragments, 1 if not fragmented>,
-  "payload":        "<Base64-encoded encrypted bytes (AES-GCM or ChaCha20-Poly1305)>",
+  "payload":        "<Base64-encoded encrypted bytes (ChaCha20-Poly1305)>",
   "signature":      "<Base64-encoded Ed25519 signature over all other fields>"
 }
 ```
 
-| Field           | Required | Type     | Description                                                                                                                         |
-|-----------------|----------|----------|-------------------------------------------------------------------------------------------------------------------------------------|
-| `schema`        | Yes      | `int`    | Schema version.                                                                                                                     |
-| `senderId`      | Yes      | `string` | Node ID of the sender. The receiver looks up the sender's `sigKey` and `encKey` from their local contact list.                      |
-| `receiverId`    | Yes      | `string` | Node ID of the intended recipient. Binds the envelope to a specific receiver, preventing replay to a different contact.             |
-| `timestamp`     | Yes      | `long`   | Unix epoch milliseconds. Used for replay protection. Receivers reject envelopes older than a configurable threshold.                |
-| `nonce`         | Yes      | `string` | Random 12-byte nonce, unique per envelope. Prevents ciphertext reuse.                                                               |
-| `fragmentIndex` | Yes      | `int`    | Zero-based index of this fragment within a multi-envelope message. `0` if the message was not split.                                |
-| `fragmentCount` | Yes      | `int`    | Total number of envelopes in this message. `1` means the message was not split.                                                     |
-| `payload`       | Yes      | `string` | Encrypted content. Key derived from `X25519(sender_enc_private, receiver_enc_public)`, uniquely bound to this sender–receiver pair. |
-| `signature`     | Yes      | `string` | Ed25519 signature by the sender over all other fields. Verifiable without a handshake.                                              |
+| Field           | Required | Type     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+|-----------------|----------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `schema`        | Yes      | `int`    | Schema version.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `senderId`      | Yes      | `string` | Node ID of the sender. The receiver looks up the sender's `sigKey` and `encKey` from their local contact list.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `receiverId`    | Yes      | `string` | Node ID of the intended recipient. The receiver MUST verify this matches their own `nodeId` and reject the envelope if it does not. Binds the envelope to a specific receiver, preventing replay to a different contact.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `timestamp`     | Yes      | `long`   | Unix epoch milliseconds. Used for replay protection. Receivers MUST reject envelopes older than a configurable threshold. Receivers MUST also reject envelopes whose `timestamp` is more than a small clock-skew tolerance (e.g. 5 minutes) in the future, preventing senders from extending the validity window by setting future timestamps.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `nonce`         | Yes      | `string` | Random 12-byte nonce, unique per envelope. Prevents ciphertext reuse. Receivers MUST track seen `(senderId, nonce)` pairs within the replay-protection window and reject any envelope whose pair has already been processed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `fragmentIndex` | Yes      | `int`    | Zero-based index of this fragment within a multi-envelope message. `0` if the message was not split. Receivers MUST reject any envelope where `fragmentIndex >= fragmentCount`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `fragmentCount` | Yes      | `int`    | Total number of envelopes in this message. `1` means the message was not split. Receivers MUST reject any envelope where `fragmentCount` is 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `payload`       | Yes      | `string` | ChaCha20-Poly1305 encrypted content (schema version 1). Encryption key derived via HKDF-SHA-256(IKM=X25519(sender\_enc\_private, receiver\_enc\_public), Salt=32 zero bytes, Info="freepath-stateless-v1" ∥ senderId\_raw ∥ receiverId\_raw, OKM=32 bytes), where senderId\_raw and receiverId\_raw are the Base58-decoded Node ID bytes. Implementations MUST verify the X25519 output is not all-zeros before calling HKDF; a zero result indicates a low-order sender encKey and the envelope MUST be rejected. The `nonce` field is used directly as the ChaCha20-Poly1305 nonce. The AAD is the concatenation of signature input fields 1–7 (encoded as in the signature input table): `schema` ∥ senderId\_raw ∥ receiverId\_raw ∥ `timestamp` ∥ nonce\_raw ∥ `fragmentIndex` ∥ `fragmentCount`. This binds the ciphertext to its envelope context at the AEAD layer, complementing the Ed25519 signature. |
+| `signature`     | Yes      | `string` | Ed25519 signature by the sender over all other fields using the canonical input defined below. Verifiable without a handshake.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+
+**Signature input:** The Ed25519 signature is computed over the following byte sequence (fields concatenated in this
+order, no separators):
+
+| # | Field           | Encoding                            | Size     |
+|---|-----------------|-------------------------------------|----------|
+| 1 | `schema`        | 4-byte big-endian integer           | 4 bytes  |
+| 2 | `senderId`      | Base58-decoded Node ID bytes        | 16 bytes |
+| 3 | `receiverId`    | Base58-decoded Node ID bytes        | 16 bytes |
+| 4 | `timestamp`     | 8-byte big-endian integer           | 8 bytes  |
+| 5 | `nonce`         | Base64-decoded raw bytes            | 12 bytes |
+| 6 | `fragmentIndex` | 4-byte big-endian integer           | 4 bytes  |
+| 7 | `fragmentCount` | 4-byte big-endian integer           | 4 bytes  |
+| 8 | `payload`       | Base64-decoded raw ciphertext bytes | variable |
+
+All fixed-length fields precede the variable-length `payload`, making the input unambiguous without length prefixes.
 
 Because a `StatelessEnvelope` is self-contained, it can be encoded in a QR code, displayed on screen, and scanned
 by any device that holds the sender's contact card. No session, no handshake, no reply channel required.
 
 If the content to be transmitted exceeds the QR code capacity, it is split across multiple envelopes using
-`fragmentIndex` and `fragmentCount`. The receiver collects all fragments before attempting to decrypt.
+`fragmentIndex` and `fragmentCount`. Upon receiving each fragment, the receiver MUST verify its Ed25519 signature
+before buffering the payload; fragments that fail verification MUST be discarded immediately. Once all fragments have
+arrived and their signatures verified, the receiver decrypts each fragment's `payload`
+independently using that fragment's `nonce`, then concatenates the resulting plaintexts in `fragmentIndex` order.
+
+> [!NOTE]
+> **Forward secrecy trade-off.** The `StatelessEnvelope` encryption key is derived from the static long-term
+> `encKey` pair of both parties. Unlike the session key established by the handshake (which uses ephemeral
+> keys and is discarded after the session), this key is persistent. If either party's `encKey` private key is
+> compromised in the future, an attacker who recorded past envelopes can decrypt them. This is an inherent
+> consequence of the stateless, no-handshake design and cannot be avoided without a prior interactive exchange.
 
 ## Transports
 
@@ -198,12 +269,18 @@ platforms without special OS permissions.
 MAGIC (4 bytes) | VERSION (1 byte) | TYPE (1 byte) | LENGTH (4 bytes, big-endian) | PAYLOAD (LENGTH bytes)
 ```
 
-- `MAGIC`: fixed bytes identifying the Freepath protocol.
+- `MAGIC`: the 4-byte sequence `0x46 0x52 0x45 0x45` (`FREE` in ASCII), uniquely identifying the Freepath
+  protocol. Receivers MUST close the connection immediately if the magic bytes do not match, without reading
+  any further fields.
 - `VERSION`: wire envelope format version, currently `1`. Versions the binary layout of the envelope itself (field
   order, header size). Distinct from the Frame's `schema` field, which versions the logical message format inside
-  `PAYLOAD`. The two can evolve independently.
-- `TYPE`: maps to the Frame `type` field, allowing routing without parsing the full Frame.
-- `LENGTH`: byte length of `PAYLOAD`.
+  `PAYLOAD`. The two can evolve independently. Receivers MUST close the connection immediately upon receiving an
+  unsupported `VERSION` value, without reading any further fields.
+- `TYPE`: unauthenticated routing hint that maps to the Frame `type` field, allowing routing without parsing
+  the full Frame. Receivers MUST NOT act on this value — including closing the connection — before the inner
+  Frame has passed AEAD verification.
+- `LENGTH`: byte length of `PAYLOAD`. Receivers MUST enforce an implementation-defined maximum and close the
+  connection immediately if it is exceeded, without reading `PAYLOAD`.
 - `PAYLOAD`: a serialised Link Adapter Packet.
 
 LAN peers discover each other via mDNS service advertisement. A device advertises its service only while it is
@@ -238,13 +315,15 @@ Adapter that produces and consumes Frames. Neither requires changes to any layer
 
 ## References
 
+- [Store and forward — Wikipedia](https://en.wikipedia.org/wiki/Store_and_forward)
 - [Bluetooth Low Energy — Wikipedia](https://en.wikipedia.org/wiki/Bluetooth_Low_Energy)
 - [QR code — Wikipedia](https://en.wikipedia.org/wiki/QR_code)
 - [Multicast DNS (mDNS) — Wikipedia](https://en.wikipedia.org/wiki/Multicast_DNS)
 - [Diffie–Hellman key exchange — Wikipedia](https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange)
 - [Curve25519 — Wikipedia](https://en.wikipedia.org/wiki/Curve25519)
+- [Ed25519 — Wikipedia](https://en.wikipedia.org/wiki/EdDSA)
 - [HKDF — Wikipedia](https://en.wikipedia.org/wiki/HKDF)
-- [AES-GCM (Galois/Counter Mode) — Wikipedia](https://en.wikipedia.org/wiki/Galois/Counter_Mode)
+- [Authenticated encryption — Wikipedia](https://en.wikipedia.org/wiki/Authenticated_encryption)
 - [ChaCha20-Poly1305 — Wikipedia](https://en.wikipedia.org/wiki/ChaCha20-Poly1305)
 - [Forward secrecy — Wikipedia](https://en.wikipedia.org/wiki/Forward_secrecy)
 - [Packet fragmentation — Wikipedia](https://en.wikipedia.org/wiki/IP_fragmentation)
