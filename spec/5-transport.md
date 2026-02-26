@@ -273,7 +273,7 @@ decrypt it later even if they later obtain the long-term private keys. Implement
 session keys across handshakes; each new connection MUST perform a full handshake to derive a fresh session key,
 ensuring the `seq`-derived nonce sequence always begins at 0 under a distinct key.
 
-### StatelessEnvelope
+## StatelessEnvelope
 
 > [!NOTE]
 > **Scope note.** Contact exchange (QR codes carrying raw contact cards, NFC session tokens bootstrapping BLE) is a
@@ -359,51 +359,26 @@ that opens many partial messages and never completes them.
 ### LAN
 
 LAN is the primary development transport. It is reliable, high-throughput, bidirectional, and works across all
-platforms without special OS permissions.
-**Wire envelope:**
+platforms without special OS permissions. Peers discover each other via mDNS / DNS-SD service advertisement
+and communicate over TCP using a binary wire envelope that wraps Link Adapter Packets.
 
-```
-MAGIC (4 bytes) | VERSION (1 byte) | TYPE (1 byte) | LENGTH (4 bytes, big-endian) | PAYLOAD (LENGTH bytes)
-```
-
-- `MAGIC`: the 4-byte sequence `0x46 0x52 0x45 0x45` (`FREE` in ASCII), uniquely identifying the Freepath
-  protocol. Receivers MUST close the connection immediately if the magic bytes do not match, without reading
-  any further fields.
-- `VERSION`: wire envelope format version, currently `1`. Versions the binary layout of the envelope itself (field
-  order, header size). Distinct from the Frame's `schema` field, which versions the logical message format inside
-  `PAYLOAD`. The two can evolve independently. Receivers MUST close the connection immediately upon receiving an
-  unsupported `VERSION` value, without reading any further fields.
-- `TYPE`: unauthenticated routing hint that maps to the Frame `type` field, allowing routing without parsing
-  the full Frame. Receivers MUST NOT act on this value — including closing the connection — before the inner
-  Frame has passed AEAD verification.
-- `LENGTH`: byte length of `PAYLOAD`. Receivers MUST enforce an implementation-defined maximum and close the
-  connection immediately if it is exceeded, without reading `PAYLOAD`.
-- `PAYLOAD`: a serialised Link Adapter Packet.
-
-LAN peers discover each other via mDNS service advertisement. A device advertises its service only while it is
-willing to accept connections.
+Full specification — peer discovery, TXT record fields, wire envelope format, connection management, and
+security considerations — is in [6-transport-lan.md](6-transport-lan.md).
 
 ### Bluetooth LE
 
-BLE is packet-based, low-throughput, and subject to OS-imposed background restrictions. It is used for both the
-contact exchange bootstrap (see [3-contact-exchange.md](3-contact-exchange.md)) and for general message propagation
-when LAN is unavailable.
+BLE is packet-based, low-throughput, and subject to OS-imposed background restrictions. It is used for both
+the contact exchange bootstrap and for general message propagation when LAN is unavailable. Frames must be
+fragmented at the Link Adapter level due to the small ATT MTU.
 
-Because BLE imposes a small ATT MTU, Frames must be fragmented at the Link Adapter level. The reassembly buffer is
-maintained per `streamId`. Frames arriving out of order are buffered until the complete message can be reassembled.
-
-On iOS, background BLE operation is restricted. When the app is backgrounded, the Link Adapter must queue pending
-outbound Frames and flush them when the app returns to the foreground or the OS grants a background task slot.
+Full specification is in [7-transport-bluetooth.md](7-transport-bluetooth.md).
 
 ### Optical (screen-to-camera)
 
-Optical transport is unidirectional: one device displays a visual code, the other scans it. It is used for:
+Optical transport is unidirectional: one device displays a visual code, the other scans it. It cannot
+support a live handshake and uses [`StatelessEnvelope`](#statelessenvelope) instead.
 
-- Bootstrapping a connection when no other transport is available.
-- Identity and key exchange where QR code capacity is sufficient.
-- Small critical messages in environments where all radio transports are unavailable.
-
-Optical transport cannot support a live handshake. Instead, it uses a [StatelessEnvelope](#statelessenvelope).
+Full specification is in [8-transport-optical.md](8-transport-optical.md).
 
 ### Other transports
 

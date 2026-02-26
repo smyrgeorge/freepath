@@ -13,13 +13,16 @@ A spec-only repository — no code yet. All work is in `spec/` (Markdown documen
 
 ## Spec files
 
-| File                         | Covers                                                                               |
-|------------------------------|--------------------------------------------------------------------------------------|
-| `spec/1-contact.md`          | Contact card structure, keys, Node ID derivation, card updates                       |
-| `spec/2-contact-entry.md`    | Local-only contact metadata: trust level, name override, tags, mute, pin             |
-| `spec/3-contact-exchange.md` | QR (unidirectional), NFC + Bluetooth (bidirectional), card validation flow           |
-| `spec/4-content.md`          | Content types, envelope, editing chain, comments, reactions, expiry, visibility      |
-| `spec/5-transport.md`        | Transport layers: Frame, Handshake, StatelessEnvelope, LAN/BLE/optical transports    |
+| File                            | Covers                                                                            |
+|---------------------------------|-----------------------------------------------------------------------------------|
+| `spec/1-contact.md`             | Contact card structure, keys, Node ID derivation, card updates                    |
+| `spec/2-contact-entry.md`       | Local-only contact metadata: trust level, name override, tags, mute, pin          |
+| `spec/3-contact-exchange.md`    | QR (unidirectional), NFC + Bluetooth (bidirectional), card validation flow        |
+| `spec/4-content.md`             | Content types, envelope, editing chain, comments, reactions, expiry, visibility   |
+| `spec/5-transport.md`           | Transport layers: Frame, Handshake, StatelessEnvelope, LAN/BLE/optical transports |
+| `spec/6-transport-lan.md`       | LAN transport detail: mDNS peer discovery, wire envelope, connection management   |
+| `spec/7-transport-bluetooth.md` | BLE transport: fragmentation, iOS background restrictions (stub — to be expanded) |
+| `spec/8-transport-optical.md`   | Optical transport: QR / screen-to-camera, StatelessEnvelope usage (stub)          |
 
 ## Spec conventions
 
