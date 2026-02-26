@@ -9,36 +9,60 @@ connects them. Everything above is the Application Layer and is specified separa
 
 ## Layer model
 
+The diagram below shows the four layers and the transformations that happen at each one as a message travels
+from the application down to the wire.
+
 ```
-┌───────────────────────────────┐
-│       Application Layer       │
-│  Chat, hub, AI, UX            │
-└───────────────────────────────┘
-                ▲
-┌───────────────────────────────┐
-│    Protocol / Framing Layer   │
-│  Frames, versioning, types    │
-└───────────────────────────────┘
-                ▲
-┌───────────────────────────────┐
-│       Link Adapter Layer      │
-│  Fragmentation / reassembly   │
-│  Sequence numbers             │
-│  Retry / ACKs                 │
-│  Handles unidirectional       │
-└───────────────────────────────┘
-                ▲
-┌───────────────────────────────┐
-│      Transport / Physical     │
-│  ┌─────────┬───────────────┐  │
-│  │ LAN     │ Reliable      │  │
-│  │ BLE     │ connections   │  │
-│  │ QR      │ Unidirectional│  │
-│  │ Screen  │ transport     │  │
-│  │ USB     │ file transfer │  │
-│  │ Sound   │ audio pulses  │  │
-│  └─────────┴───────────────┘  │
-└───────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                       Application Layer                         │
+│                  Chat, hub, AI, UX                              │
+│                                                                 │
+│  { type: "post", body: "Hello!", authorId: "abc123", ... }      │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │  raw content object
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Protocol / Framing Layer                     │
+│             Frames, versioning, encryption                      │
+│                                                                 │
+│  - assigns streamId and seq number                              │
+│  - encrypts content with session key (ChaCha20-Poly1305)        │
+│  - wraps everything into a Frame                                │
+│                                                                 │
+│  { schema: 1, streamId: "xKj9...", seq: 4,                      │
+│    type: "DATA", payload: "<encrypted bytes>" }                 │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │  one Frame
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Link Adapter Layer                         │
+│         Fragmentation / reassembly, seq numbers, ACKs           │
+│                                                                 │
+│  Frame fits in MTU?                                             │
+│                                                                 │
+│  YES → single packet          NO → split into N packets         │
+│  ┌──────────────────┐         ┌────────┐ ┌────────┐ ┌────────┐  │
+│  │SEQ=4 IDX=0 CNT=1 │         │SEQ=4   │ │SEQ=4   │ │SEQ=4   │  │
+│  │data: <full frame>│         │IDX=0   │ │IDX=1   │ │IDX=2   │  │
+│  └──────────────────┘         │CNT=3   │ │CNT=3   │ │CNT=3   │  │
+│                               │data:.. │ │data:.. │ │data:.. │  │
+│                               └────────┘ └────────┘ └────────┘  │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │  one or more Link Adapter Packets
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     Transport / Physical                        │
+│                                                                 │
+│       LAN (TCP)          BLE              Optical (QR)          │
+│   ┌────────────┐    ┌──────────┐    ┌──────────────────┐        │
+│   │MAGIC|VER   │    │ATT write │    │ StatelessEnvelope│        │
+│   │TYPE |LEN   │    │packets   │    │ (no handshake,   │        │
+│   │PAYLOAD     │    │          │    │  self-contained) │        │
+│   └────────────┘    └──────────┘    └──────────────────┘        │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │  bytes on the wire / air / screen
+                               ▼
+                            peer
 ```
 
 Each transport is implemented as a Link Adapter — a self-contained component that fragments outbound Frames to fit
