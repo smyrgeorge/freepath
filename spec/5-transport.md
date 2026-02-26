@@ -9,61 +9,80 @@ connects them. Everything above is the Application Layer and is specified separa
 
 ## Layer model
 
-The diagram below shows the four layers and the transformations that happen at each one as a message travels
-from the application down to the wire.
+The diagram below shows the layers and the transformations that happen at each one as a message travels from
+the application down to the wire. Unidirectional transports (optical, sound, USB) bypass the normal Frame stack
+entirely and use `StatelessEnvelope` instead — a deliberate breach of the layering model made necessary by the
+physical impossibility of a handshake on those transports.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       Application Layer                         │
-│                  Chat, hub, AI, UX                              │
-│                                                                 │
-│  { type: "post", body: "Hello!", authorId: "abc123", ... }      │
-└──────────────────────────────┬──────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                       Application Layer                  │
+│                                                          │
+│   Posts       Messages      Reactions      Comments      │
+│   ┌────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│   │type    │  │type      │  │type      │  │type      │   │
+│   │body    │  │body      │  │emoji     │  │body      │   │
+│   │authorId│  │authorId  │  │authorId  │  │authorId  │   │
+│   │...     │  │...       │  │...       │  │...       │   │
+│   └────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└──────────────────────────────┬───────────────────────────┘
                                │  raw content object
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Protocol / Framing Layer                     │
-│             Frames, versioning, encryption                      │
-│                                                                 │
-│  - assigns streamId and seq number                              │
-│  - encrypts content with session key (ChaCha20-Poly1305)        │
-│  - wraps everything into a Frame                                │
-│                                                                 │
-│  { schema: 1, streamId: "xKj9...", seq: 4,                      │
-│    type: "DATA", payload: "<encrypted bytes>" }                 │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │  one Frame
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Link Adapter Layer                         │
-│         Fragmentation / reassembly, seq numbers, ACKs           │
-│                                                                 │
-│  Frame fits in MTU?                                             │
-│                                                                 │
-│  YES → single packet          NO → split into N packets         │
-│  ┌──────────────────┐         ┌────────┐ ┌────────┐ ┌────────┐  │
-│  │SEQ=4 IDX=0 CNT=1 │         │SEQ=4   │ │SEQ=4   │ │SEQ=4   │  │
-│  │data: <full frame>│         │IDX=0   │ │IDX=1   │ │IDX=2   │  │
-│  └──────────────────┘         │CNT=3   │ │CNT=3   │ │CNT=3   │  │
-│                               │data:.. │ │data:.. │ │data:.. │  │
-│                               └────────┘ └────────┘ └────────┘  │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │  one or more Link Adapter Packets
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Transport / Physical                        │
-│                                                                 │
-│       LAN (TCP)          BLE              Optical (QR)          │
-│   ┌────────────┐    ┌──────────┐    ┌──────────────────┐        │
-│   │MAGIC|VER   │    │ATT write │    │ StatelessEnvelope│        │
-│   │TYPE |LEN   │    │packets   │    │ (no handshake,   │        │
-│   │PAYLOAD     │    │          │    │  self-contained) │        │
-│   └────────────┘    └──────────┘    └──────────────────┘        │
-└──────────────────────────────┬──────────────────────────────────┘
+           ┌───────────────────┴───────────────────┐
+           │ bidirectional transport?              │
+          YES                                      NO
+           │                                       │
+           ▼                                       ▼
+┌────────────────────────────┐       ┌─────────────────────────────┐
+│  Protocol / Framing Layer  │       │      StatelessEnvelope      │
+│                            │       │                             │
+│  - assigns streamId, seq   │       │  - derives key from static  │
+│  - encrypts with session   │       │    long-term encKey pair    │
+│    key (ChaCha20-Poly1305  │       │  - random nonce per msg     │
+│  - wraps into a Frame      │       │  - Ed25519 signature        │
+│                            │       │  - built-in fragmentation   │
+│  { schema, streamId,       │       │    (fragmentIndex/Count)    │
+│    seq, type, payload }    │       │  - replay via timestamp     │
+└────────────┬───────────────┘       │    + (senderId, nonce)      │
+             │  one Frame            └──────────────┬──────────────┘
+             ▼                                      │  one or more envelopes
+┌───────────────────────────┐                       │
+│   Link Adapter Layer      │                       │
+│                           │                       │
+│  Frame fits in MTU?       │                       │
+│                           │                       │
+│  YES → single packet      │                       │
+│  NO  → split into N       │                       │
+│  ┌─────────┐ ┌─────────┐  │                       │
+│  │SEQ IDX  │ │SEQ IDX  │  │                       │
+│  │CNT data │ │CNT data │  │                       │
+│  └─────────┘ └─────────┘  │                       │
+└────────────┬──────────────┘                       │
+             │  Link Adapter Packets                │
+             └──────────────┬───────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Transport / Physical                    │
+│                                                             │
+│       LAN (TCP)          BLE              Optical (QR)      │
+│   ┌────────────┐    ┌──────────┐    ┌───────────────────┐   │
+│   │MAGIC|VER   │    │ATT write │    │ StatelessEnvelope │   │
+│   │TYPE |LEN   │    │packets   │    │ displayed as QR   │   │
+│   │PAYLOAD     │    │          │    │                   │   │
+│   └────────────┘    └──────────┘    └───────────────────┘   │
+└──────────────────────────────┬──────────────────────────────┘
                                │  bytes on the wire / air / screen
                                ▼
                             peer
 ```
+
+> [!NOTE]
+> **Layering trade-off.** `StatelessEnvelope` is a deliberate exception to the transport-agnostic design: because
+> unidirectional transports cannot perform a handshake, encryption key derivation, authentication, fragmentation,
+> and replay protection all differ from the normal Frame path. The alternative — requiring a bidirectional channel
+> for all communication — would make optical and similar transports impossible. The forward secrecy guarantee is
+> also weaker: the session key in the Frame path is ephemeral and discarded after the session, while the
+> `StatelessEnvelope` key is derived from static long-term keys and is persistent.
 
 Each transport is implemented as a Link Adapter — a self-contained component that fragments outbound Frames to fit
 the transport's MTU, reassembles inbound fragments, and handles retries where the transport supports them. Adding a
@@ -109,6 +128,15 @@ reassembles them on the receiving side. Fragmentation metadata lives in the
 | `DATA`      | Carries an encrypted application message.                                                                                                                                                                                                                                                                                                      |
 | `ACK`       | Acknowledges receipt of a sequence number. Used on transports that support bidirectionality. After the handshake completes, ACK frames MUST be encrypted and authenticated identically to DATA frames. The plaintext payload is the 4-byte big-endian `seq` value being acknowledged.                                                          |
 | `CLOSE`     | Signals orderly session teardown. After the handshake completes, CLOSE frames MUST be encrypted and authenticated identically to DATA frames. A CLOSE received after session establishment that fails authentication MUST be rejected. The plaintext payload is empty (0 bytes); its presence and successful AEAD verification are the signal. |
+
+**Payload summary by frame type:**
+
+| Type        | Payload content                                      | Encrypted |
+|-------------|------------------------------------------------------|-----------|
+| `HANDSHAKE` | `EPHEMERAL_KEY \| SIGKEY \| NODEID_RAW \| SIGNATURE` | No        |
+| `DATA`      | Application message ciphertext                       | Yes       |
+| `ACK`       | 4-byte big-endian `seq` being acknowledged           | Yes       |
+| `CLOSE`     | Empty (0 bytes) — presence alone is the signal       | Yes       |
 
 ### Link Adapter Packet
 
