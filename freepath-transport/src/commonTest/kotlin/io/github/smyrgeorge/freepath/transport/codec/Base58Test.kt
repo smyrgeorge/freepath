@@ -26,19 +26,19 @@ class Base58Test {
     }
 
     @Test
-    fun `0x39 (57) encodes to 'z'`() {
+    fun `0x39 hex57 encodes to z`() {
         // 57 = last index in the BTC alphabet
         assertEquals("z", Base58.encode(byteArrayOf(0x39)))
     }
 
     @Test
-    fun `0x3A (58) encodes to '21'`() {
+    fun `0x3A hex58 encodes to 21`() {
         // 58 = 1*58 + 0 → '2' '1'
         assertEquals("21", Base58.encode(byteArrayOf(0x3A)))
     }
 
     @Test
-    fun `0xFF (255) encodes to '5Q'`() {
+    fun `0xFF hex255 encodes to 5Q`() {
         // 255 = 4*58 + 23 → alphabet[4]='5', alphabet[23]='Q'
         assertEquals("5Q", Base58.encode(byteArrayOf(0xFF.toByte())))
     }
@@ -151,6 +151,7 @@ class Base58Test {
 
     // ---- alphabet: excluded characters -----------------------------------
 
+    @OptIn(kotlin.experimental.ExperimentalNativeApi::class)
     @Test
     fun `encoded output never contains excluded characters`() {
         val excluded = setOf('0', 'O', 'I', 'l')
@@ -168,22 +169,22 @@ class Base58Test {
     // ---- invalid input ---------------------------------------------------
 
     @Test
-    fun `decode throws on character '0' (excluded from alphabet)`() {
+    fun `decode throws on excluded char 0`() {
         assertFailsWith<IllegalStateException> { Base58.decode("0") }
     }
 
     @Test
-    fun `decode throws on character 'O' (excluded from alphabet)`() {
+    fun `decode throws on excluded char O`() {
         assertFailsWith<IllegalStateException> { Base58.decode("O") }
     }
 
     @Test
-    fun `decode throws on character 'I' (excluded from alphabet)`() {
+    fun `decode throws on excluded char I`() {
         assertFailsWith<IllegalStateException> { Base58.decode("I") }
     }
 
     @Test
-    fun `decode throws on character 'l' (excluded from alphabet)`() {
+    fun `decode throws on excluded char l`() {
         assertFailsWith<IllegalStateException> { Base58.decode("l") }
     }
 }

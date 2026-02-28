@@ -1,6 +1,5 @@
 package io.github.smyrgeorge.freepath.transport.crypto
 
-import io.github.smyrgeorge.freepath.transport.model.KeyPair
 import org.bouncycastle.crypto.agreement.X25519Agreement
 import org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator
 import org.bouncycastle.crypto.generators.HKDFBytesGenerator

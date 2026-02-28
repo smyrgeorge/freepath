@@ -148,7 +148,7 @@ class StatelessEnvelopeCodecTest {
     }
 
     @Test
-    fun `open fails with wrong receiver enc key (wrong contact encKeyPublic)`() {
+    fun `open fails with wrong receiver enc key wrong encKeyPublic`() {
         val alice = makeIdentity()
         val bob = makeIdentity()
         val wrongKey = makeIdentity()

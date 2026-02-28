@@ -1,7 +1,5 @@
 package io.github.smyrgeorge.freepath.transport.crypto
 
-import io.github.smyrgeorge.freepath.transport.model.KeyPair
-
 @Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 expect object CryptoProvider {
     fun generateX25519KeyPair(): KeyPair

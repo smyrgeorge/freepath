@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android)
 }
 
@@ -14,7 +13,7 @@ kotlin {
         }
     }
     android {
-        namespace = "io.github.smyrgeorge.freepath.transport"
+        namespace = "io.github.smyrgeorge.freepath.transport.crypto"
         compileSdk = 36
         minSdk = 26
     }
@@ -27,24 +26,22 @@ kotlin {
         configureEach {
             languageSettings.progressiveMode = true
         }
-        commonMain {
-            dependencies {
-                api(project(":freepath-transport-crypto"))
-                implementation(libs.log4k)
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.serialization.json)
-                implementation(libs.bignum)
-            }
-        }
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)
             }
         }
-        jvmMain {
+        val jvmAndroidMain by creating {
+            dependsOn(commonMain.get())
             dependencies {
-                implementation(libs.log4k.slf4j)
+                implementation(libs.bouncycastle)
             }
+        }
+        jvmMain {
+            dependsOn(jvmAndroidMain)
+        }
+        androidMain {
+            dependsOn(jvmAndroidMain)
         }
     }
 }
