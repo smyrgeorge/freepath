@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve project root (3 levels up from freepath-transport-lan-demo/src/docker/)
+# Resolve project root (3 levels up from examples/transport-lan/src/docker/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/../../.."
+cd "$SCRIPT_DIR/../../../.."
 
-COMPOSE_FILE="freepath-transport-lan-demo/src/docker/docker-compose.yml"
+COMPOSE_FILE="examples/transport-lan/src/docker/docker-compose.yml"
 
 cleanup() {
     echo "==> Cleaning up containers..."
@@ -14,7 +14,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "==> Building fat JAR..."
-./gradlew :freepath-transport-lan-demo:fatJar --no-daemon
+./gradlew :examples:transport-lan:fatJar --no-daemon
 
 echo "==> Building Docker image and starting nodes..."
 docker compose -f "$COMPOSE_FILE" up --build

@@ -9,8 +9,8 @@ services:
 
   node-0:
     build:
-      context: ../../..
-      dockerfile: freepath-transport-lan-demo/src/docker/Dockerfile
+      context: ../../../..
+      dockerfile: examples/transport-lan/src/docker/Dockerfile
     environment:
       NODE_INDEX: "0"
     restart: unless-stopped
@@ -19,8 +19,8 @@ services:
 
   node-1:
     build:
-      context: ../../..
-      dockerfile: freepath-transport-lan-demo/src/docker/Dockerfile
+      context: ../../../..
+      dockerfile: examples/transport-lan/src/docker/Dockerfile
     environment:
       NODE_INDEX: "1"
     restart: unless-stopped
@@ -29,8 +29,8 @@ services:
 
   node-2:
     build:
-      context: ../../..
-      dockerfile: freepath-transport-lan-demo/src/docker/Dockerfile
+      context: ../../../..
+      dockerfile: examples/transport-lan/src/docker/Dockerfile
     environment:
       NODE_INDEX: "2"
     restart: unless-stopped
