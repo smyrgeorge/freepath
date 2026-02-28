@@ -54,7 +54,7 @@ class LanLinkAdapter(
     private val connectionMutex = Mutex()
 
     /** The local TCP port the server is bound to. Only valid after [start]. */
-    internal val localPort: Int get() = server.localPort
+    val localPort: Int get() = server.localPort
 
     // ---- Lifecycle -------------------------------------------------------
 

@@ -1,19 +1,20 @@
 # Freepath
 
 Protocol specification and reference implementation. Specs live in `spec/`; Kotlin Multiplatform implementation in
-`freepath-transport` and `freepath-transport-lan`.
+`freepath-transport`, `freepath-transport-lan`, and `freepath-transport-lan-demo`.
 
 ## Repository structure
 
-| Path                      | Purpose                                                        |
-|---------------------------|----------------------------------------------------------------|
-| `spec/`                   | Protocol and data model specifications                         |
-| `freepath-transport/`     | Protocol core: handshake, session, frame codec, crypto         |
-| `freepath-transport-lan/` | LAN adapter: TCP + mDNS peer discovery, Docker demo            |
-| `build-logic/`            | Reusable Gradle convention plugins (KMP target auto-discovery) |
-| `docs/`                   | Published HTML documentation                                   |
-| `tools/`                  | Pandoc templates and Lua filters for PDF/HTML generation       |
-| `README.md`               | Project vision and concept overview                            |
+| Path                           | Purpose                                                        |
+|--------------------------------|----------------------------------------------------------------|
+| `spec/`                        | Protocol and data model specifications                         |
+| `freepath-transport/`          | Protocol core: handshake, session, frame codec, crypto         |
+| `freepath-transport-lan/`      | LAN adapter library: TCP + mDNS peer discovery (JVM + Android) |
+| `freepath-transport-lan-demo/` | JVM demo app: multi-node heartbeat demo + Docker setup         |
+| `build-logic/`                 | Gradle convention plugin (`freepath.dokka`)                    |
+| `docs/`                        | Published HTML documentation                                   |
+| `tools/`                       | Pandoc templates and Lua filters for PDF/HTML generation       |
+| `README.md`                    | Project vision and concept overview                            |
 
 ## Spec files
 
@@ -81,20 +82,27 @@ Kotlin Multiplatform library targeting JVM and Android (minSdk 26). Implements:
 - **`MdnsPeerDiscovery` (JVM)** — JmDNS; service type `_freepath._tcp.`; TXT record `v=1` + nodeId
 - **`MdnsPeerDiscovery` (Android)** — `NsdManager`; API 34+ uses `registerServiceInfoCallback`; API 26–33 uses legacy
   `resolveService` with serial resolve channel
-- **`DemoApp`** — 20-node deterministic contact pool (SHA-256-seeded SHA1PRNG → Ed25519 + X25519); periodic heartbeat
-  sends; SIGTERM shutdown hook
-- **Docker** — `src/docker/` with `Dockerfile`, `docker-compose.yml`, `run.sh`; builds fatJar then `docker compose up`
 
 **Key dependencies:** `project(":freepath-transport")`, `ktor-network`, `jmdns` (JVM), `log4k`
 
+### `freepath-transport-lan-demo` — LAN demo app
+
+JVM-only module (not a library). Implements:
+
+- **`DemoApp`** — 20-node deterministic contact pool (SHA-256-seeded SHA1PRNG → Ed25519 + X25519); periodic heartbeat
+  sends; SIGTERM shutdown hook
+- **Docker** — `src/docker/` with `Dockerfile`, `docker-compose.yml`, `run.sh`; run `src/docker/run.sh` from the
+  project root to build the fatJar and launch nodes via `docker compose`
+
+**Key dependencies:** `project(":freepath-transport-lan")`, `kotlinx-coroutines-core`, `log4k-slf4j`
+
 ### Build system
 
-- `build-logic/` defines three convention plugins:
-    - `io.github.smyrgeorge.freepath.multiplatform` — KMP with OS/arch-aware target resolution from `targets` Gradle
-      property
-    - `io.github.smyrgeorge.freepath.multiplatform.binaries` — binary generation
-    - `io.github.smyrgeorge.freepath.dokka` — Dokka API docs
-- JVM target: 21; progressive Kotlin mode enabled; parallel builds + config-cache enabled
+- All modules use `alias(libs.plugins.kotlin.multiplatform)` directly — no custom KMP convention plugins
+- `build-logic/` defines one convention plugin: `io.github.smyrgeorge.freepath.dokka` (Dokka source links)
+- JVM target: 21; `-Xjsr305=strict`; progressive Kotlin mode enabled; parallel builds + config-cache enabled
+- `CryptoProvider` actual lives in `jvmAndroidMain` (manually created intermediate source set); BouncyCastle
+  satisfies both `jvm` and `android` targets from one implementation
 
 ## Key design decisions (apply across all specs and implementation)
 

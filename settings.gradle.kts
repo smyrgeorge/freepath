@@ -12,3 +12,4 @@ pluginManagement {
 
 include(":freepath-transport")
 include(":freepath-transport-lan")
+include(":freepath-transport-lan-demo")

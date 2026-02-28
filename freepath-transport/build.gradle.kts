@@ -1,15 +1,24 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    id("io.github.smyrgeorge.freepath.multiplatform")
+    alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android)
 }
 
 kotlin {
+    jvm {
+        compilerOptions {
+            freeCompilerArgs.set(listOf("-Xjsr305=strict"))
+            jvmTarget.set(JvmTarget.JVM_21)
+        }
+    }
     android {
         namespace = "io.github.smyrgeorge.freepath.transport"
         compileSdk = 36
         minSdk = 26
     }
+    applyDefaultHierarchyTemplate()
 
     sourceSets {
         configureEach {
