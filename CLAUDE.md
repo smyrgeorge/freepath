@@ -1,15 +1,19 @@
 # Freepath
 
-A spec-only repository — no code yet. All work is in `spec/` (Markdown documents).
+Protocol specification and reference implementation. Specs live in `spec/`; Kotlin Multiplatform implementation in
+`freepath-transport` and `freepath-transport-lan`.
 
 ## Repository structure
 
-| Path        | Purpose                                                  |
-|-------------|----------------------------------------------------------|
-| `docs/`     | Published HTML documentation                             |
-| `spec/`     | Protocol and data model specifications                   |
-| `tools/`    | Pandoc templates and Lua filters for PDF/HTML generation |
-| `README.md` | Project vision and concept overview                      |
+| Path                      | Purpose                                                        |
+|---------------------------|----------------------------------------------------------------|
+| `spec/`                   | Protocol and data model specifications                         |
+| `freepath-transport/`     | Protocol core: handshake, session, frame codec, crypto         |
+| `freepath-transport-lan/` | LAN adapter: TCP + mDNS peer discovery, Docker demo            |
+| `build-logic/`            | Reusable Gradle convention plugins (KMP target auto-discovery) |
+| `docs/`                   | Published HTML documentation                                   |
+| `tools/`                  | Pandoc templates and Lua filters for PDF/HTML generation       |
+| `README.md`               | Project vision and concept overview                            |
 
 ## Spec files
 
@@ -41,10 +45,63 @@ A spec-only repository — no code yet. All work is in `spec/` (Markdown documen
 - QR code exchange is unidirectional by default; NFC and Bluetooth are bidirectional by default
 - NFC bootstraps a Bluetooth connection (iOS cannot push NDEF); actual card exchange happens over BLE
 
-## Key design decisions (apply across all specs)
+## Implementation modules
+
+### `freepath-transport` — Protocol core
+
+Kotlin Multiplatform library (default target: JVM). Implements:
+
+- **`Frame` / `FrameCodec`** — JSON-serialized wire frames (schema, streamId, seq, wireType, payload)
+- **`AeadCodec`** — ChaCha20-Poly1305 encryption with AAD derived from frame metadata
+- **`HandshakeHandler`** — Two-frame handshake; derives session key via X25519 + HKDF-SHA256; verifies peer identity
+  against contact list (no TOFU)
+- **`StatefulProtocol`** — Session state machine: seq tracking, rollover guard (teardown before `0xFFFFFFF0`), ACK/CLOSE
+  handling, 300 ms disconnect grace period
+- **`StatelessEnvelopeCodec`** — Seal/open envelopes for unidirectional transports; X25519 HKDF-SHA256 key derivation;
+  Ed25519 signing over ciphertext
+- **`WireEnvelopeCodec`** — TCP wire framing: magic `"FREE"` + version + type + 4-byte length; max 16 MiB payload
+- **`LinkAdapterCodec`** — `LinkAdapterPacket` header (seq, fragIndex, fragCount) for fragmentation/reassembly
+- **`Base58`** / **`BinaryCodec`** — Encoding utilities
+- **`CryptoProvider`** — `expect`/`actual` crypto interface; JVM actual uses BouncyCastle
+
+**Key interfaces:** `Protocol`, `LinkAdapter`, `PeerDiscovery`
+
+**Key dependencies:** `kotlinx-coroutines-core`, `kotlinx-serialization-json`, `ktor-network`, `bouncycastle` (JVM),
+`bignum`, `log4k`
+
+### `freepath-transport-lan` — LAN adapter
+
+Kotlin Multiplatform library targeting JVM and Android (minSdk 26). Implements:
+
+- **`LanLinkAdapter`** — TCP connections; duplicate-connection resolution (lexicographically smaller nodeId wins);
+  concurrent outbound connect guard; `LINK_MTU` = 16 KiB
+- **`LanServer`** — TCP server; OS-assigned port; max 8 inbound connections
+- **`LanConnection`** — Per-socket Ktor read/write channels; fragmentation at MTU; reassembly keyed by seq with 30 s
+  timeout and max 64 concurrent slots
+- **`MdnsPeerDiscovery` (JVM)** — JmDNS; service type `_freepath._tcp.`; TXT record `v=1` + nodeId
+- **`MdnsPeerDiscovery` (Android)** — `NsdManager`; API 34+ uses `registerServiceInfoCallback`; API 26–33 uses legacy
+  `resolveService` with serial resolve channel
+- **`DemoApp`** — 20-node deterministic contact pool (SHA-256-seeded SHA1PRNG → Ed25519 + X25519); periodic heartbeat
+  sends; SIGTERM shutdown hook
+- **Docker** — `src/docker/` with `Dockerfile`, `docker-compose.yml`, `run.sh`; builds fatJar then `docker compose up`
+
+**Key dependencies:** `project(":freepath-transport")`, `ktor-network`, `jmdns` (JVM), `log4k`
+
+### Build system
+
+- `build-logic/` defines three convention plugins:
+    - `io.github.smyrgeorge.freepath.multiplatform` — KMP with OS/arch-aware target resolution from `targets` Gradle
+      property
+    - `io.github.smyrgeorge.freepath.multiplatform.binaries` — binary generation
+    - `io.github.smyrgeorge.freepath.dokka` — Dokka API docs
+- JVM target: 21; progressive Kotlin mode enabled; parallel builds + config-cache enabled
+
+## Key design decisions (apply across all specs and implementation)
 
 - Two-key identity model: `sigKey` (Ed25519) for signing, `encKey` (X25519) for encryption — both derived from one seed
 - `nodeId` is transmitted for convenience but always verified locally: `Base58(SHA-256(sigKey)[0..15])`
+- HandshakeHandler looks up sigKey from contact list — never trusts the received key directly; unknown peers are
+  rejected (no TOFU)
 - Content IDs are derived from body hash — never assigned externally
 - Visibility has three levels: public, private (single recipient), access-controlled (symmetric key for hubs)
 - All content supports editing via `version` / `prevId` chain; comments are first-class content
