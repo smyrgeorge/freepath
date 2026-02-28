@@ -1,14 +1,15 @@
 plugins {
     id("io.github.smyrgeorge.freepath.multiplatform")
-}
-
-// Each test class runs in its own JVM so that JmDNS multicast-socket state from one
-// class (e.g. LanLinkAdapterMdnsTest) does not pollute subsequent classes.
-tasks.withType<Test> {
-    forkEvery = 1
+    alias(libs.plugins.android)
 }
 
 kotlin {
+    android {
+        namespace = "io.github.smyrgeorge.freepath.transport.lan"
+        compileSdk = 36
+        minSdk = 26
+    }
+
     sourceSets {
         configureEach {
             languageSettings.progressiveMode = true
@@ -28,7 +29,7 @@ kotlin {
         jvmMain {
             dependencies {
                 implementation(libs.log4k.slf4j)
-                implementation("org.jmdns:jmdns:3.6.3")
+                implementation(libs.jmdns)
             }
         }
     }

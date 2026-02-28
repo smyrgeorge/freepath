@@ -26,8 +26,18 @@ package io.github.smyrgeorge.freepath.transport
 interface PeerDiscovery {
 
     /**
-     * Starts the discovery mechanism and registers [onPeerDiscovered] as the callback to
-     * invoke when a new peer is found.
+     * The Base58-encoded local Node ID that this implementation advertises on the medium.
+     * [LinkAdapter] reads this property to identify itself without requiring a separate
+     * constructor parameter.
+     */
+    val nodeId: String
+
+    /**
+     * Starts advertising this node on [port] and begins discovering remote peers.
+     * Registers [onPeerDiscovered] as the callback to invoke when a new peer is found.
+     *
+     * [port] is the local TCP port the [LinkAdapter]'s server is bound to; it is only
+     * known after the server starts, so it cannot be passed at construction time.
      *
      * [onPeerDiscovered] receives:
      * - `nodeId`: Base58-encoded Node ID extracted from the peer's advertisement.
@@ -43,11 +53,11 @@ interface PeerDiscovery {
      * or thread internally. [onPeerDiscovered] is a suspend function and MUST be invoked
      * from a coroutine context.
      */
-    fun start(onPeerDiscovered: suspend (nodeId: String, address: String) -> Unit)
+    suspend fun start(port: Int, onPeerDiscovered: suspend (nodeId: String, address: String) -> Unit)
 
     /**
      * Stops the discovery mechanism and releases all associated resources (sockets, scan
      * sessions, threads). After [stop] returns, `onPeerDiscovered` MUST NOT be invoked again.
      */
-    fun stop()
+    suspend fun stop()
 }

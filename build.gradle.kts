@@ -5,9 +5,11 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.pubhish) apply false
     alias(libs.plugins.dokka) apply false
+    alias(libs.plugins.android) apply false
 }
 
 repositories {
+    google()
     mavenCentral()
 }
 
@@ -16,6 +18,7 @@ subprojects {
     version = rootProject.version
 
     repositories {
+        google()
         mavenCentral()
         // IMPORTANT: must be last.
         mavenLocal()

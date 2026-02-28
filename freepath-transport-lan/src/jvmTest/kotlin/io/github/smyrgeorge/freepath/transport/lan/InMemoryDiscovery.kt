@@ -6,7 +6,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
 @OptIn(DelicateCoroutinesApi::class)
-class InMemoryDiscovery : PeerDiscovery {
+class InMemoryDiscovery(override val nodeId: String = "") : PeerDiscovery {
 
     private val peers = mutableMapOf<String, String>()
     private val listeners = mutableListOf<suspend (String, String) -> Unit>()
@@ -20,7 +20,7 @@ class InMemoryDiscovery : PeerDiscovery {
         }
     }
 
-    override fun start(onPeerDiscovered: suspend (String, String) -> Unit) {
+    override suspend fun start(port: Int, onPeerDiscovered: suspend (String, String) -> Unit) {
         listeners += onPeerDiscovered
         peers.forEach { (id, address) ->
             GlobalScope.launch {
@@ -29,5 +29,5 @@ class InMemoryDiscovery : PeerDiscovery {
         }
     }
 
-    override fun stop() {}
+    override suspend fun stop() {}
 }

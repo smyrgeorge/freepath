@@ -34,14 +34,12 @@ class LanLinkAdapterTest {
         received: Channel<Pair<String, ByteArray>>,
         peerDiscovery: PeerDiscovery,
     ): Pair<StatefulProtocol, LanLinkAdapter> {
-        val nodeId = nodeIdString(identity)
         val knownNodeIds = knownPeers.map { nodeIdString(it) }.toSet()
 
         // protocol is a lateinit-style holder so the lambdas can reference it
         var protocol: StatefulProtocol? = null
 
         val linkAdapter = LanLinkAdapter(
-            nodeId = nodeId,
             peerDiscovery = peerDiscovery,
             onPeerDisconnected = { peerId ->
                 protocol?.closeSession(peerId)
@@ -80,9 +78,9 @@ class LanLinkAdapterTest {
         val receivedByB = Channel<Pair<String, ByteArray>>(capacity = 10)
         val receivedByC = Channel<Pair<String, ByteArray>>(capacity = 10)
 
-        val discoveryA = InMemoryDiscovery()
-        val discoveryB = InMemoryDiscovery()
-        val discoveryC = InMemoryDiscovery()
+        val discoveryA = InMemoryDiscovery(nodeIdString(identityA))
+        val discoveryB = InMemoryDiscovery(nodeIdString(identityB))
+        val discoveryC = InMemoryDiscovery(nodeIdString(identityC))
 
         val (protocolA, adapterA) = buildProtocol(identityA, allIdentities, receivedByA, discoveryA)
         val (protocolB, adapterB) = buildProtocol(identityB, allIdentities, receivedByB, discoveryB)

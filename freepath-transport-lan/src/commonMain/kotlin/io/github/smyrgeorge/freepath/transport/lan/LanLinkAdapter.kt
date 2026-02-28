@@ -22,7 +22,6 @@ import kotlinx.coroutines.withTimeout
 import kotlin.io.encoding.Base64
 
 class LanLinkAdapter(
-    internal val nodeId: String,  // Base58-encoded local Node ID
     private val peerDiscovery: PeerDiscovery,
     private val onPeerDisconnected: suspend (peerId: String) -> Unit,
     /**
@@ -40,9 +39,10 @@ class LanLinkAdapter(
 
     private var inboundFrameHandler: (suspend (peerId: String, frame: Frame) -> Unit)? = null
 
+    internal val nodeId: String get() = peerDiscovery.nodeId
+
     private val server = LanServer()
 
-    private var advertiser: MdnsAdvertiser? = null
     private var selectorManager: SelectorManager? = null
     private var scope: CoroutineScope? = null
 
@@ -79,17 +79,13 @@ class LanLinkAdapter(
         }
 
         // Advertise and discover
-        val adv = MdnsAdvertiser(nodeId, server.localPort)
-        advertiser = adv
-        sc.launch { adv.start() }
-        peerDiscovery.start { peerNodeId, address ->
+        peerDiscovery.start(server.localPort) { peerNodeId, address ->
             val (host, port) = LanPeerAddress.decode(address)
             sc.launch { connectToDiscoveredPeer(peerNodeId, host, port) }
         }
     }
 
     override suspend fun stop() {
-        advertiser?.stop()
         peerDiscovery.stop()
         server.stop()
         connectionMutex.withLock {

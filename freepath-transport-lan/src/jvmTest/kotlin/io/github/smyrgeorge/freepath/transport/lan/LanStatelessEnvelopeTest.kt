@@ -39,8 +39,7 @@ class LanStatelessEnvelopeTest {
         var protocol: StatefulProtocol? = null
 
         val adapter = LanLinkAdapter(
-            nodeId = nodeId,
-            peerDiscovery = InMemoryDiscovery(),
+            peerDiscovery = InMemoryDiscovery(nodeId),
             onPeerDisconnected = { peerId -> protocol?.closeSession(peerId) },
             isKnownPeer = { peerId -> peerId in knownNodeIds },
             onConnectionEstablished = { peerId -> protocol?.initiateHandshake(peerId) },

@@ -43,8 +43,7 @@ object DemoApp {
         var protocol: StatefulProtocol? = null
 
         val adapter = LanLinkAdapter(
-            nodeId = nodeId,
-            peerDiscovery = MdnsPeerDiscovery(),
+            peerDiscovery = MdnsPeerDiscovery(nodeId),
             onPeerDisconnected = { peerId ->
                 val idx = nodeIdToIndex[peerId]
                 log.warn { "Peer node-$idx (${peerId.take(12)}...) disconnected" }

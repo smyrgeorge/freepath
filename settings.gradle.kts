@@ -2,6 +2,7 @@ rootProject.name = "freepath"
 
 pluginManagement {
     repositories {
+        google()
         mavenCentral()
         gradlePluginPortal()
     }

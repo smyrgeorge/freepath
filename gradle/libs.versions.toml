@@ -27,11 +27,17 @@ ktoml = "0.7.1"
 ksp = "2.3.5"
 # https://github.com/arrow-kt/arrow
 arrow = "2.2.1.1"
+# https://github.com/jmdns/jmdns
+jmdns = "3.6.3"
+# https://developer.android.com/studio/releases/gradle-plugin
+android-gradle-plugin = "9.0.1"
 
 [libraries]
 gradle-kotlin-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 gradle-publish-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "publish" }
 gradle-dokka-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
+gradle-android-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle-plugin" }
+jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
@@ -60,3 +66,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 pubhish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+android = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle-plugin" }
