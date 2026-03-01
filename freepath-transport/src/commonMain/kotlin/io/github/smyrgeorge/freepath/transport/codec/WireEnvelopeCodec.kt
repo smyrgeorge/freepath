@@ -35,6 +35,7 @@ object WireEnvelopeCodec {
             require(buf[offset + i] == MAGIC[i]) { "Invalid magic bytes — not a Freepath connection" }
         }
         val version = buf[offset + 4]
+        require(version == WIRE_VERSION) { "Unsupported wire envelope version: $version" }
         val typeByte = buf[offset + 5]
         val length = ((buf[offset + 6].toLong() and 0xFF) shl 24 or
                 ((buf[offset + 7].toLong() and 0xFF) shl 16) or

@@ -21,6 +21,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.io.encoding.Base64
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 class LanLinkAdapter(
     private val peerDiscovery: PeerDiscovery,
@@ -36,6 +38,12 @@ class LanLinkAdapter(
      * (e.g. call StatefulProtocol.initiateHandshake(peerId)).
      */
     private val onConnectionEstablished: suspend (peerId: String) -> Unit,
+    /**
+     * Called when a connection has been idle for [IDLE_TIMEOUT_MS]. The callback should
+     * send a CLOSE frame (e.g. via StatefulProtocol.closeSession()) before the connection
+     * is closed.
+     */
+    private val onIdleTimeout: suspend (peerId: String) -> Unit = {},
 ) : LinkAdapter {
 
     private var inboundFrameHandler: (suspend (peerId: String, frame: Frame) -> Unit)? = null
@@ -49,6 +57,9 @@ class LanLinkAdapter(
 
     /** Active connections keyed by peer nodeId (Base58-encoded). */
     private val connections = mutableMapOf<String, LanConnection>()
+
+    /** Tracks last activity time for each connection (for idle timeout). */
+    private val lastActivity = mutableMapOf<String, TimeSource.Monotonic.ValueTimeMark>()
 
     /** Peer nodeIds for which an outbound TCP connect is in progress (not yet registered). */
     private val connecting = mutableSetOf<String>()
@@ -79,6 +90,14 @@ class LanLinkAdapter(
             handleInbound(connection)
         }
 
+        // Idle timeout checker: periodically scan for connections that have exceeded the idle timeout.
+        sc.launch {
+            while (true) {
+                delay(IDLE_TIMEOUT_MS.milliseconds / 2)
+                checkIdleTimeouts()
+            }
+        }
+
         // Advertise and discover
         peerDiscovery.start(server.localPort) { peerNodeId, address ->
             val (host, port) = LanPeerAddress.decode(address)
@@ -103,8 +122,9 @@ class LanLinkAdapter(
     // ---- Send ------------------------------------------------------------
 
     override suspend fun sendFrame(peerId: String, frame: Frame) {
-        val connection = connectionMutex.withLock { connections[peerId] }
-            ?: error("No active connection for peer $peerId")
+        val connection = connectionMutex.withLock {
+            connections[peerId]?.also { lastActivity[peerId] = TimeSource.Monotonic.markNow() }
+        } ?: error("No active connection for peer $peerId")
         connection.sendFrame(frame)
     }
 
@@ -113,8 +133,9 @@ class LanLinkAdapter(
     /**
      * Called for every connection accepted by the server.
      * The first frame must be a HANDSHAKE frame 0. We read it within [HANDSHAKE_TIMEOUT_MS],
-     * extract the peer's Base58-encoded nodeId from the payload, register the connection,
-     * then hand the frame to the protocol layer and continue reading in [receiveLoop].
+     * extract the peer's Base58-encoded nodeId from the payload, verify the peer is in the
+     * contact list, register the connection, then hand the frame to the protocol layer and
+     * continue reading in [receiveLoop].
      */
     private suspend fun handleInbound(connection: LanConnection) {
         try {
@@ -123,12 +144,22 @@ class LanLinkAdapter(
             // Reject anything else before touching the payload to avoid registering a connection
             // under a garbage peerId derived from a non-handshake payload.
             if (firstFrame.type != FrameType.HANDSHAKE) return
+            // Spec: seq MUST start at 0 for HANDSHAKE frames.
+            if (firstFrame.seq != 0L) return
             // Extract sender nodeId from the handshake payload (bytes 64..80 per HandshakeHandler:
-            // EPHEMERAL_KEY(32) | SIGKEY(32) | NODEID_RAW(16) | SIGNATURE(64))
+            // EPHEMERAL_KEY(32) | SIGKEY(32) | NODEID_RAW(16) | SIGNATURE(64) = 144 bytes total)
             val rawPayload = Base64.decode(firstFrame.payload)
-            if (rawPayload.size < 80) return
+            if (rawPayload.size != 144) return
             val nodeIdRaw = rawPayload.copyOfRange(64, 80)
             val peerId = Base58.encode(nodeIdRaw)  // Base58 to match the rest of the system
+
+            // Spec (Security considerations): the handshake requires both peers to be in each
+            // other's contact lists. Reject inbound connections from unknown peers at the
+            // handshake stage without revealing any session material.
+            if (!isKnownPeer(peerId)) {
+                connection.close()
+                return
+            }
 
             if (!registerConnection(peerId, connection)) return  // duplicate; new conn closed
             inboundFrameHandler?.invoke(peerId, firstFrame)
@@ -197,8 +228,14 @@ class LanLinkAdapter(
         try {
             while (true) {
                 val frame = connection.receiveFrame() ?: break
+                // Update last activity time on each received frame.
+                connectionMutex.withLock {
+                    lastActivity[peerId] = TimeSource.Monotonic.markNow()
+                }
                 inboundFrameHandler?.invoke(peerId, frame)
             }
+        } catch (_: Exception) {
+            // I/O error or channel closed — treat as peer disconnect; fall through to finally.
         } finally {
             // Only notify the protocol layer if this connection is still the active one.
             // If registerConnection replaced it with a newer connection, the stale loop
@@ -240,6 +277,7 @@ class LanLinkAdapter(
                 }
             }
             connections[peerId] = connection
+            lastActivity[peerId] = TimeSource.Monotonic.markNow()
             return true
         }
     }
@@ -254,15 +292,44 @@ class LanLinkAdapter(
         connectionMutex.withLock {
             if (connections[peerId] === connection) {
                 connections.remove(peerId)
+                lastActivity.remove(peerId)
                 true
             } else {
                 false
             }
         }
 
+    /**
+     * Scans all active connections and closes those that have exceeded the idle timeout.
+     * Before closing the socket, invokes [onIdleTimeout] to allow the protocol layer to send
+     * a CLOSE frame. The connection is always closed afterwards regardless of whether CLOSE
+     * was sent.
+     */
+    private suspend fun checkIdleTimeouts() {
+        val timeout = IDLE_TIMEOUT_MS.milliseconds
+        // Capture connection references inside the mutex so we close the exact instance that was
+        // idle at scan time — not a newer connection that may be registered after onIdleTimeout
+        // suspends.
+        val toClose = mutableListOf<Pair<String, LanConnection>>()
+        connectionMutex.withLock {
+            for ((peerId, mark) in lastActivity) {
+                if (mark.elapsedNow() > timeout) {
+                    connections[peerId]?.let { toClose.add(peerId to it) }
+                }
+            }
+        }
+        for ((peerId, connection) in toClose) {
+            // Best-effort: allow the protocol layer to send a CLOSE frame before we close the
+            // socket. If the callback throws or returns false, we still close the connection.
+            onIdleTimeout(peerId)
+            connection.close()
+        }
+    }
+
     companion object {
         const val LINK_MTU = 65_536
         const val MAX_INBOUND_CONNECTIONS = 128
         const val HANDSHAKE_TIMEOUT_MS = 10_000L
+        const val IDLE_TIMEOUT_MS = 300_000L  // 5 minutes
     }
 }

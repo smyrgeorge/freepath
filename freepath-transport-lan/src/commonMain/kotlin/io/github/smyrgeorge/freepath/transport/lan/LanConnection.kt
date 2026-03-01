@@ -60,19 +60,14 @@ class LanConnection(
 
     suspend fun receiveFrame(): Frame? {
         val headerBuf = ByteArray(WireEnvelopeCodec.HEADER_SIZE)
-        return try {
-            readChannel.readFully(headerBuf)
-            val header = WireEnvelopeCodec.decodeHeader(headerBuf)
-            require(header.version == WireEnvelopeCodec.WIRE_VERSION) {
-                "Unsupported wire version: ${header.version}"
-            }
-            val payloadBuf = ByteArray(header.length)
-            readChannel.readFully(payloadBuf)
-            val (packet, _) = LinkAdapterCodec.decode(payloadBuf)
-            reassembleAndDecode(packet)
-        } catch (_: Exception) {
-            null
-        }
+        // Read header — validation exceptions (MAGIC, VERSION, LENGTH) propagate to close connection.
+        readChannel.readFully(headerBuf)
+        val header = WireEnvelopeCodec.decodeHeader(headerBuf)
+        // Read payload — I/O errors propagate to close connection.
+        val payloadBuf = ByteArray(header.length)
+        readChannel.readFully(payloadBuf)
+        val (packet, _) = LinkAdapterCodec.decode(payloadBuf)
+        return reassembleAndDecode(packet)
     }
 
     private fun reassembleAndDecode(packet: LinkAdapterPacket): Frame? {

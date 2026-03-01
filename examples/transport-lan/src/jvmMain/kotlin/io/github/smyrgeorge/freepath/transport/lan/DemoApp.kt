@@ -55,6 +55,11 @@ object DemoApp {
                 log.info { "TCP connected to node-$idx (${peerId.take(12)}...) — starting handshake" }
                 protocol?.initiateHandshake(peerId)
             },
+            onIdleTimeout = { peerId ->
+                val idx = nodeIdToIndex[peerId]
+                log.info { "Idle timeout for node-$idx (${peerId.take(12)}...) — sending CLOSE" }
+                protocol?.closeSession(peerId)
+            },
         )
 
         val proto = StatefulProtocol(

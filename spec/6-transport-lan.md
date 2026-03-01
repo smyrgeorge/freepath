@@ -14,6 +14,11 @@ Devices discover each other using Multicast DNS (mDNS) / DNS-SD service advertis
 its presence by registering a service of type `_freepath._tcp.local.` and includes its Node ID in the TXT
 record. Discovering devices use this information to decide whether to initiate a connection.
 
+> [!NOTE]
+> **Implementation note.** mDNS advertisement and discovery logic is delegated to `PeerDiscovery`, a
+> separate component. `LinkAdapter` orchestrates the lifecycle (`start()` / `stop()`) and reacts to
+> discovery events via callback, but does not implement mDNS directly.
+
 ### Service advertisement
 
 A device MUST advertise its service only when it is willing to accept inbound connections. It MUST withdraw
@@ -65,6 +70,11 @@ Each Link Adapter Packet is wrapped in a binary wire envelope before being sent 
 stream protocol, framing relies entirely on the `LENGTH` field — there are no message boundaries in the
 stream. Receivers MUST read exactly `LENGTH` bytes for `PAYLOAD` after reading the fixed 10-byte header.
 
+> [!NOTE]
+> **Implementation note.** Wire envelope parsing (MAGIC, VERSION, LENGTH validation) is handled by the
+> connection layer (`LanConnection` / `LanServer`), not by `LinkAdapter`. The `LinkAdapter` receives
+> already-parsed `Frame` objects.
+
 ```
 MAGIC (4 bytes) | VERSION (1 byte) | TYPE (1 byte) | LENGTH (4 bytes, big-endian) | PAYLOAD (LENGTH bytes)
 ```
@@ -85,6 +95,11 @@ peer disconnection promptly, avoiding stale session state.
 **Reconnection.** If a TCP connection drops and the peer is still discoverable via mDNS, the Session
 Dispatcher MAY initiate a new TCP connection and perform a fresh handshake. The new session MUST use a fresh
 `streamId` and reset `seq` to 0, as required by [5-transport.md](5-transport.md).
+
+> [!NOTE]
+> **Implementation note.** Reconnection logic (fresh `streamId`, `seq=0` reset) is handled by the protocol
+> layer (`StatefulProtocol` / Session Dispatcher), not by `LinkAdapter`. The `LinkAdapter` only manages
+> the TCP connection lifecycle and frame transport.
 
 **Idle timeout.** Implementations MAY close connections that have carried no traffic for an
 implementation-defined idle period. A CLOSE frame MUST be sent before closing an idle connection so the peer

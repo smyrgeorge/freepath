@@ -44,6 +44,7 @@ class LanLinkAdapterTest {
             onConnectionEstablished = { peerId ->
                 protocol?.initiateHandshake(peerId)
             },
+            onIdleTimeout = { peerId -> protocol?.closeSession(peerId) },
         )
 
         protocol = StatefulProtocol(

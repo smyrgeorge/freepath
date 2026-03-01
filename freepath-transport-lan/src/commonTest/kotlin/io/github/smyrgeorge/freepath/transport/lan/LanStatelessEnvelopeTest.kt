@@ -39,6 +39,7 @@ class LanStatelessEnvelopeTest {
             onPeerDisconnected = { peerId -> protocol?.closeSession(peerId) },
             isKnownPeer = { peerId -> peerId in knownNodeIds },
             onConnectionEstablished = { peerId -> protocol?.initiateHandshake(peerId) },
+            onIdleTimeout = { peerId -> protocol?.closeSession(peerId) },
         )
 
         protocol = StatefulProtocol(
