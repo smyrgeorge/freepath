@@ -120,7 +120,7 @@ JVM-only module (not a library). Implements:
 
 - All modules use `alias(libs.plugins.kotlin.multiplatform)` directly — no custom KMP convention plugins
 - JVM target: 21; `-Xjsr305=strict`; progressive Kotlin mode enabled; parallel builds + config-cache enabled
-- `freepath-transport-lan` targets JVM + Android only (`Dispatchers.IO` and `jmdns` are JVM-specific; no iOS actuals)
+- `freepath-transport-lan` targets JVM, Android, and iOS
 
 **`build-logic/` convention plugins** — precompiled script plugins (no `gradlePlugin { }` registration needed; plugin
 ID = file name):

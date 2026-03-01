@@ -37,6 +37,7 @@ NS_ASSUME_NONNULL_BEGIN
                     message:(NSData *)message
                   signature:(NSData *)signature;
 
++ (NSData *)sha256:(NSData *)input;
 + (NSData *)randomBytes:(NSInteger)size;
 
 @end

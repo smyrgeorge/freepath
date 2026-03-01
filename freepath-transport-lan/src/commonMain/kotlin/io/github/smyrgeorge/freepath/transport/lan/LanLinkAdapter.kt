@@ -11,6 +11,7 @@ import io.ktor.network.sockets.InetSocketAddress
 import io.ktor.network.sockets.aSocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -70,9 +71,9 @@ class LanLinkAdapter(
     override suspend fun start() {
         checkNotNull(inboundFrameHandler) { "setInboundFrameHandler must be called before start()" }
         val job = SupervisorJob()
-        val sc = CoroutineScope(Dispatchers.Default + job)
+        val sc = CoroutineScope(Dispatchers.IO + job)
         scope = sc
-        selectorManager = SelectorManager(Dispatchers.Default)
+        selectorManager = SelectorManager(Dispatchers.IO)
 
         server.start(sc) { connection ->
             handleInbound(connection)

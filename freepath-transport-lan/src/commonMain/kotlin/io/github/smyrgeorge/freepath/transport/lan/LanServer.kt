@@ -7,6 +7,7 @@ import io.ktor.network.sockets.ServerSocket
 import io.ktor.network.sockets.aSocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -30,12 +31,12 @@ class LanServer(
     suspend fun start(scope: CoroutineScope, onConnection: suspend (LanConnection) -> Unit) {
         mutex.withLock {
             check(serverSocket == null) { "Server already started" }
-            val sm = SelectorManager(Dispatchers.Default)
+            val sm = SelectorManager(Dispatchers.IO)
             selectorManager = sm
             val srv = aSocket(sm).tcp().bind(bindHost, bindPort)
             serverSocket = srv
 
-            acceptJob = scope.launch {
+            acceptJob = scope.launch(Dispatchers.IO) {
                 while (true) {
                     val socket = try {
                         srv.accept()
@@ -53,7 +54,7 @@ class LanServer(
                             return@withLock
                         }
                         connectionCount++
-                        launch {
+                        launch(Dispatchers.IO) {
                             try {
                                 onConnection(LanConnection(socket))
                             } finally {

@@ -1,0 +1,23 @@
+language = Objective-C
+package = MdnsBridge
+---
+#import <Foundation/Foundation.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+@interface MdnsBridge : NSObject
+
+- (instancetype)initWithNodeId:(NSString *)nodeId;
+
+/// Starts advertising this node and browsing for peers.
+/// `onPeerDiscovered` is called on a background thread for each resolved peer;
+/// it receives (peerNodeId, "host:port").
+- (void)startWithPort:(int32_t)port
+    onPeerDiscovered:(void (^)(NSString * _Nullable, NSString * _Nullable))onPeerDiscovered;
+
+/// Stops advertising and browsing.
+- (void)stop;
+
+@end
+
+NS_ASSUME_NONNULL_END

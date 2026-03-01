@@ -71,5 +71,7 @@ actual object CryptoProvider {
         CryptoBridge.verifyWithPublicKey(publicKey.toNSData(), message.toNSData(), signature.toNSData())
 
     actual fun randomBytes(size: Int): ByteArray = CryptoBridge.randomBytes(size.toLong()).toByteArray()
+
+    actual fun sha256(input: ByteArray): ByteArray = CryptoBridge.sha256(input.toNSData()).toByteArray()
 }
 

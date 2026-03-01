@@ -129,6 +129,15 @@ import Foundation
         return pub.isValidSignature(signature as Data, for: message as Data)
     }
 
+    // MARK: - SHA-256
+
+    @objc public static func sha256(_ input: NSData) -> NSData {
+        let digest = SHA256.hash(data: input as Data)
+        return Data(digest) as NSData
+    }
+
+    // MARK: - Random
+
     @objc public static func randomBytes(_ size: Int) -> NSData {
         guard size > 0 else { return NSData() }
         var data = Data(count: size)

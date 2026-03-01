@@ -11,4 +11,5 @@ expect object CryptoProvider {
     fun ed25519Sign(privateKey: ByteArray, message: ByteArray): ByteArray
     fun ed25519Verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean
     fun randomBytes(size: Int): ByteArray
+    fun sha256(input: ByteArray): ByteArray
 }

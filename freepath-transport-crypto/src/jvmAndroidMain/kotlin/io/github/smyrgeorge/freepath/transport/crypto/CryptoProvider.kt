@@ -104,5 +104,13 @@ actual object CryptoProvider {
         return bytes
     }
 
+    actual fun sha256(input: ByteArray): ByteArray {
+        val digest = DigestFactory.createSHA256()
+        digest.update(input, 0, input.size)
+        val out = ByteArray(digest.digestSize)
+        digest.doFinal(out, 0)
+        return out
+    }
+
     private const val MAC_BITS = 128  // Poly1305 tag size in bits
 }

@@ -11,7 +11,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import java.security.MessageDigest
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -19,13 +18,10 @@ import kotlin.test.assertEquals
 
 class LanStatelessEnvelopeTest {
 
-    private fun sha256(bytes: ByteArray): ByteArray =
-        MessageDigest.getInstance("SHA-256").digest(bytes)
-
     private fun createIdentity(): LocalIdentity {
         val sigKp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val nodeIdRaw = sha256(sigKp.publicKey).copyOf(16)
+        val nodeIdRaw = CryptoProvider.sha256(sigKp.publicKey).copyOf(16)
         return LocalIdentity(nodeIdRaw, sigKp.publicKey, sigKp.privateKey, encKp.publicKey, encKp.privateKey)
     }
 

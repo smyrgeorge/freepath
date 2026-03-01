@@ -11,6 +11,7 @@ import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
 import io.github.smyrgeorge.freepath.transport.model.SessionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -51,12 +52,12 @@ class StatefulProtocol(
     private val pendingInitiators = mutableMapOf<String, PendingInitiator>()
     private val initiatorMutex = Mutex()
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override suspend fun start() {
         linkAdapter.setInboundFrameHandler(::handleInboundFrame)
         linkAdapter.start()
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             while (isActive) {
                 delay(handshakeTimeout / 2)
                 evictExpiredHandshakes()
