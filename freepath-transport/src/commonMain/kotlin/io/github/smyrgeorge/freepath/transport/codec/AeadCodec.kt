@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.transport.codec
 
-import io.github.smyrgeorge.freepath.transport.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.transport.model.Frame
 
 object AeadCodec {

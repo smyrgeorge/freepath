@@ -3,7 +3,7 @@ package io.github.smyrgeorge.freepath.transport.lan
 import io.github.smyrgeorge.freepath.transport.PeerDiscovery
 import io.github.smyrgeorge.freepath.transport.StatefulProtocol
 import io.github.smyrgeorge.freepath.transport.codec.Base58
-import io.github.smyrgeorge.freepath.transport.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay

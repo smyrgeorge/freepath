@@ -1,14 +1,14 @@
 # Freepath
 
 Protocol specification and reference implementation. Specs live in `spec/`; Kotlin Multiplatform implementation in
-`freepath-transport-crypto`, `freepath-transport`, `freepath-transport-lan`, and `freepath-transport-lan-demo`.
+`freepath-crypto`, `freepath-transport`, `freepath-transport-lan`, and `freepath-transport-lan-demo`.
 
 ## Repository structure
 
 | Path                           | Purpose                                                                                                   |
 |--------------------------------|-----------------------------------------------------------------------------------------------------------|
 | `spec/`                        | Protocol and data model specifications                                                                    |
-| `freepath-transport-crypto/`   | Crypto primitives: `CryptoProvider` expect/actual (JVM+Android via BouncyCastle, iOS via Swift/CryptoKit) |
+| `freepath-crypto/`             | Crypto primitives: `CryptoProvider` expect/actual (JVM+Android via BouncyCastle, iOS via Swift/CryptoKit) |
 | `freepath-transport/`          | Protocol core: handshake, session, frame codec, crypto                                                    |
 | `freepath-transport-lan/`      | LAN adapter library: TCP + mDNS peer discovery (JVM + Android)                                            |
 | `freepath-transport-lan-demo/` | JVM demo app: multi-node heartbeat demo + Docker setup                                                    |
@@ -49,7 +49,7 @@ Protocol specification and reference implementation. Specs live in `spec/`; Kotl
 
 ## Implementation modules
 
-### `freepath-transport-crypto` — Crypto primitives
+### `freepath-crypto` — Crypto primitives
 
 Kotlin Multiplatform library (JVM, Android, iOS). Provides the `CryptoProvider` expect/actual interface:
 
@@ -83,11 +83,11 @@ Kotlin Multiplatform library (JVM, Android, iOS). Implements:
 - **`WireEnvelopeCodec`** — TCP wire framing: magic `"FREE"` + version + type + 4-byte length; max 16 MiB payload
 - **`LinkAdapterCodec`** — `LinkAdapterPacket` header (seq, fragIndex, fragCount) for fragmentation/reassembly
 - **`Base58`** / **`BinaryCodec`** — Encoding utilities
-- **`CryptoProvider`** — `expect`/`actual` crypto interface; actuals live in `freepath-transport-crypto`
+- **`CryptoProvider`** — `expect`/`actual` crypto interface; actuals live in `freepath-crypto`
 
 **Key interfaces:** `Protocol`, `LinkAdapter`, `PeerDiscovery`
 
-**Key dependencies:** `project(":freepath-transport-crypto")`, `kotlinx-coroutines-core`, `kotlinx-serialization-json`,
+**Key dependencies:** `project(":freepath-crypto")`, `kotlinx-coroutines-core`, `kotlinx-serialization-json`,
 `bignum`, `log4k`
 
 ### `freepath-transport-lan` — LAN adapter

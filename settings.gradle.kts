@@ -10,7 +10,7 @@ pluginManagement {
     includeBuild("build-logic")
 }
 
-include("freepath-transport-crypto")
+include("freepath-crypto")
 include("freepath-transport")
 include("freepath-transport-lan")
 include("examples:transport-lan")
