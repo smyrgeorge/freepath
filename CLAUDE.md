@@ -1,20 +1,21 @@
 # Freepath
 
 Protocol specification and reference implementation. Specs live in `spec/`; Kotlin Multiplatform implementation in
-`freepath-transport`, `freepath-transport-lan`, and `freepath-transport-lan-demo`.
+`freepath-transport-crypto`, `freepath-transport`, `freepath-transport-lan`, and `freepath-transport-lan-demo`.
 
 ## Repository structure
 
-| Path                           | Purpose                                                        |
-|--------------------------------|----------------------------------------------------------------|
-| `spec/`                        | Protocol and data model specifications                         |
-| `freepath-transport/`          | Protocol core: handshake, session, frame codec, crypto         |
-| `freepath-transport-lan/`      | LAN adapter library: TCP + mDNS peer discovery (JVM + Android) |
-| `freepath-transport-lan-demo/` | JVM demo app: multi-node heartbeat demo + Docker setup         |
-| `build-logic/`                 | Gradle convention plugin (`freepath.dokka`)                    |
-| `docs/`                        | Published HTML documentation                                   |
-| `tools/`                       | Pandoc templates and Lua filters for PDF/HTML generation       |
-| `README.md`                    | Project vision and concept overview                            |
+| Path                           | Purpose                                                                                                   |
+|--------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `spec/`                        | Protocol and data model specifications                                                                    |
+| `freepath-transport-crypto/`   | Crypto primitives: `CryptoProvider` expect/actual (JVM+Android via BouncyCastle, iOS via Swift/CryptoKit) |
+| `freepath-transport/`          | Protocol core: handshake, session, frame codec, crypto                                                    |
+| `freepath-transport-lan/`      | LAN adapter library: TCP + mDNS peer discovery (JVM + Android)                                            |
+| `freepath-transport-lan-demo/` | JVM demo app: multi-node heartbeat demo + Docker setup                                                    |
+| `build-logic/`                 | Gradle convention plugins (`freepath.dokka`, `freepath.swift.interop`)                                    |
+| `docs/`                        | Published HTML documentation                                                                              |
+| `tools/`                       | Pandoc templates and Lua filters for PDF/HTML generation                                                  |
+| `README.md`                    | Project vision and concept overview                                                                       |
 
 ## Spec files
 
@@ -48,9 +49,28 @@ Protocol specification and reference implementation. Specs live in `spec/`; Kotl
 
 ## Implementation modules
 
+### `freepath-transport-crypto` — Crypto primitives
+
+Kotlin Multiplatform library (JVM, Android, iOS). Provides the `CryptoProvider` expect/actual interface:
+
+- **Primitives** — `randomBytes`, X25519 key agreement, HKDF-SHA256, ChaCha20-Poly1305 AEAD, Ed25519 sign/verify
+- **JVM + Android actual** — `jvmAndroidMain` shared source set; BouncyCastle satisfies both targets from one
+  implementation
+- **iOS actual** — cinterop to a Swift `@objc CryptoBridge` class backed by Apple CryptoKit (iOS 14+)
+
+**iOS build pipeline:**
+
+- `src/swift/` — Swift Package Manager package (`Package.swift` + `Sources/CryptoBridge/CryptoBridge.swift`)
+- `src/nativeInterop/cinterop/CryptoBridge.def` — static template with ObjC interface; the build injects
+  `staticLibraries`/`libraryPaths`/`linkerOpts` at build time
+- `build-logic` plugin `io.github.smyrgeorge.freepath.swift.interop` drives the Swift build and def-file generation;
+  linker opts are embedded in the klib and propagate automatically to transitive consumers
+
+**Key dependencies:** `bouncycastle` (JVM/Android), Apple `CryptoKit` (iOS)
+
 ### `freepath-transport` — Protocol core
 
-Kotlin Multiplatform library (default target: JVM). Implements:
+Kotlin Multiplatform library (JVM, Android, iOS). Implements:
 
 - **`Frame` / `FrameCodec`** — JSON-serialized wire frames (schema, streamId, seq, wireType, payload)
 - **`AeadCodec`** — ChaCha20-Poly1305 encryption with AAD derived from frame metadata
@@ -63,11 +83,11 @@ Kotlin Multiplatform library (default target: JVM). Implements:
 - **`WireEnvelopeCodec`** — TCP wire framing: magic `"FREE"` + version + type + 4-byte length; max 16 MiB payload
 - **`LinkAdapterCodec`** — `LinkAdapterPacket` header (seq, fragIndex, fragCount) for fragmentation/reassembly
 - **`Base58`** / **`BinaryCodec`** — Encoding utilities
-- **`CryptoProvider`** — `expect`/`actual` crypto interface; JVM actual uses BouncyCastle
+- **`CryptoProvider`** — `expect`/`actual` crypto interface; actuals live in `freepath-transport-crypto`
 
 **Key interfaces:** `Protocol`, `LinkAdapter`, `PeerDiscovery`
 
-**Key dependencies:** `kotlinx-coroutines-core`, `kotlinx-serialization-json`, `ktor-network`, `bouncycastle` (JVM),
+**Key dependencies:** `project(":freepath-transport-crypto")`, `kotlinx-coroutines-core`, `kotlinx-serialization-json`,
 `bignum`, `log4k`
 
 ### `freepath-transport-lan` — LAN adapter
@@ -99,10 +119,30 @@ JVM-only module (not a library). Implements:
 ### Build system
 
 - All modules use `alias(libs.plugins.kotlin.multiplatform)` directly — no custom KMP convention plugins
-- `build-logic/` defines one convention plugin: `io.github.smyrgeorge.freepath.dokka` (Dokka source links)
 - JVM target: 21; `-Xjsr305=strict`; progressive Kotlin mode enabled; parallel builds + config-cache enabled
-- `CryptoProvider` actual lives in `jvmAndroidMain` (manually created intermediate source set); BouncyCastle
-  satisfies both `jvm` and `android` targets from one implementation
+- `freepath-transport-lan` targets JVM + Android only (`Dispatchers.IO` and `jmdns` are JVM-specific; no iOS actuals)
+
+**`build-logic/` convention plugins** — precompiled script plugins (no `gradlePlugin { }` registration needed; plugin
+ID = file name):
+
+| Plugin ID                                     | File                                                     | Purpose                                                                                                                 |
+|-----------------------------------------------|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| `io.github.smyrgeorge.freepath.dokka`         | `io.github.smyrgeorge.freepath.dokka.gradle.kts`         | Applies Dokka + configures GitHub source links                                                                          |
+| `io.github.smyrgeorge.freepath.swift.interop` | `io.github.smyrgeorge.freepath.swift.interop.gradle.kts` | Builds a Swift Package, generates the cinterop `.def` with embedded linker opts, wires up cinterops for all iOS targets |
+
+**`swift.interop` plugin DSL** — configure in any module that has iOS targets and a Swift package:
+
+```kotlin
+swiftInterop {
+    packageName = "CryptoBridge"       // SPM target name and cinterop name — required
+    frameworks = listOf("CryptoKit")  // Apple system frameworks to link
+    // swiftSourceDir = "src/swift"    // default: directory containing Package.swift
+    // templateDefFile = "src/nativeInterop/cinterop/<packageName>.def"  // default
+}
+```
+
+Helper classes (`BuildSwiftPackageTask`, `GenerateDefFileTask`, `SwiftInteropExtension`) live in
+`build-logic/src/main/kotlin/io/github/smyrgeorge/freepath/swift/`.
 
 ## Key design decisions (apply across all specs and implementation)
 
