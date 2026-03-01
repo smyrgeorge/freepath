@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.transport.codec
+package io.github.smyrgeorge.freepath.util
 
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.transport
 
 import io.github.smyrgeorge.freepath.transport.codec.AeadCodec
-import io.github.smyrgeorge.freepath.transport.codec.Base58
+import io.github.smyrgeorge.freepath.util.Base58
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.transport.crypto.HandshakeHandler
 import io.github.smyrgeorge.freepath.transport.model.ContactLookup

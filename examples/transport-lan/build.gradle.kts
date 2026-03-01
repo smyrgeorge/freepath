@@ -20,6 +20,7 @@ kotlin {
         jvmMain {
             dependencies {
                 implementation(project(":freepath-transport-lan"))
+                implementation(project(":freepath-util"))
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.log4k.slf4j)
             }

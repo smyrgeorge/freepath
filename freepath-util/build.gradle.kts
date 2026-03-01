@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android)
 }
 
@@ -14,7 +13,7 @@ kotlin {
         }
     }
     android {
-        namespace = "io.github.smyrgeorge.freepath.transport"
+        namespace = "io.github.smyrgeorge.freepath.util"
         compileSdk = 36
         minSdk = 26
     }
@@ -29,21 +28,12 @@ kotlin {
         }
         commonMain {
             dependencies {
-                api(project(":freepath-crypto"))
-                implementation(project(":freepath-util"))
-                implementation(libs.log4k)
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.bignum)
             }
         }
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)
-            }
-        }
-        jvmMain {
-            dependencies {
-                implementation(libs.log4k.slf4j)
             }
         }
     }

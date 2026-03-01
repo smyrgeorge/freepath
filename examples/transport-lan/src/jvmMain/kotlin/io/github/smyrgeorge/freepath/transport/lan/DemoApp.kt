@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.transport.lan
 
 import io.github.smyrgeorge.freepath.transport.StatefulProtocol
-import io.github.smyrgeorge.freepath.transport.codec.Base58
+import io.github.smyrgeorge.freepath.util.Base58
 import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.Job

@@ -1,6 +1,7 @@
 package io.github.smyrgeorge.freepath.transport.codec
 
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.Base58
 import io.github.smyrgeorge.freepath.transport.model.ContactInfo
 import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
 import kotlin.io.encoding.Base64

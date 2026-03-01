@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.transport.codec
+package io.github.smyrgeorge.freepath.util
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.ionspin.kotlin.bignum.integer.Sign

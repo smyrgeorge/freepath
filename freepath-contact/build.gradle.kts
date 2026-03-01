@@ -14,7 +14,7 @@ kotlin {
         }
     }
     android {
-        namespace = "io.github.smyrgeorge.freepath.transport"
+        namespace = "io.github.smyrgeorge.freepath.contact"
         compileSdk = 36
         minSdk = 26
     }
@@ -31,19 +31,12 @@ kotlin {
             dependencies {
                 api(project(":freepath-crypto"))
                 implementation(project(":freepath-util"))
-                implementation(libs.log4k)
-                implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
             }
         }
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)
-            }
-        }
-        jvmMain {
-            dependencies {
-                implementation(libs.log4k.slf4j)
             }
         }
     }

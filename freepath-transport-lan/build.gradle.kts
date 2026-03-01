@@ -30,6 +30,7 @@ kotlin {
         commonMain {
             dependencies {
                 api(project(":freepath-transport"))
+                implementation(project(":freepath-util"))
                 implementation(libs.log4k)
                 implementation(libs.ktor.network)
             }

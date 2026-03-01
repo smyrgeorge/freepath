@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.transport.crypto
 
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.transport.codec.Base58
+import io.github.smyrgeorge.freepath.util.Base58
 import io.github.smyrgeorge.freepath.transport.model.ContactLookup
 import io.github.smyrgeorge.freepath.transport.model.Frame
 import io.github.smyrgeorge.freepath.transport.model.FrameType
