@@ -5,10 +5,6 @@ package = CryptoBridge
 
 NS_ASSUME_NONNULL_BEGIN
 
-// ObjC projection of CryptoBridge.swift (@objc class).
-// Method names follow Swift→ObjC bridging rules:
-//   func foo(label: T)        → + fooWithLabel:(T)label
-//   func foo(_ arg: T) throws → + foo:(T)arg error:(NSError**)e
 @interface CryptoBridge : NSObject
 
 + (NSArray<NSData *> *)generateX25519KeyPair;
