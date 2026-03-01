@@ -16,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -58,8 +59,17 @@ class LanLinkAdapter(
     /** Active connections keyed by peer nodeId (Base58-encoded). */
     private val connections = mutableMapOf<String, LanConnection>()
 
-    /** Tracks last activity time for each connection (for idle timeout). */
-    private val lastActivity = mutableMapOf<String, TimeSource.Monotonic.ValueTimeMark>()
+    /**
+     * A shared, unbounded channel used to handle activity or state changes within the LanLinkAdapter.
+     * This channel is used for exchanging text-based messages or signals, represented as strings.
+     *
+     * The channel serves as a mechanism for internal coordination or notification,
+     * allowing coroutine-based communication between various components of LanLinkAdapter.
+     *
+     * Note: The channel operates with unlimited capacity, meaning it can buffer as many messages as needed
+     * without suspending the sender. Proper management is required to avoid excessive memory use.
+     */
+    private val activityChannel = Channel<String>(Channel.UNLIMITED)
 
     /** Peer nodeIds for which an outbound TCP connect is in progress (not yet registered). */
     private val connecting = mutableSetOf<String>()
@@ -90,11 +100,38 @@ class LanLinkAdapter(
             handleInbound(connection)
         }
 
-        // Idle timeout checker: periodically scan for connections that have exceeded the idle timeout.
+        // Idle-timeout actor: owns lastActivity entirely — no mutex needed for the map itself.
+        // Drains the activityChannel each cycle, then closes connections that have been silent
+        // for IDLE_TIMEOUT_MS. Stale entries for disconnected peers are evicted automatically.
         sc.launch {
+            val lastActivity = mutableMapOf<String, TimeSource.Monotonic.ValueTimeMark>()
+            val timeout = IDLE_TIMEOUT_MS.milliseconds
             while (true) {
-                delay(IDLE_TIMEOUT_MS.milliseconds / 2)
-                checkIdleTimeouts()
+                delay(timeout / 2)
+                // Drain all pending activity signals (non-blocking).
+                while (true) {
+                    val peerId = activityChannel.tryReceive().getOrNull() ?: break
+                    lastActivity[peerId] = TimeSource.Monotonic.markNow()
+                }
+                // Find and close idle connections; evict stale entries.
+                val toClose = mutableListOf<Pair<String, LanConnection>>()
+                connectionMutex.withLock {
+                    val iter = lastActivity.iterator()
+                    while (iter.hasNext()) {
+                        val (peerId, mark) = iter.next()
+                        if (!connections.containsKey(peerId)) {
+                            iter.remove()
+                        } else if (mark.elapsedNow() > timeout) {
+                            connections[peerId]?.let { toClose.add(peerId to it) }
+                        }
+                    }
+                }
+                for ((peerId, connection) in toClose) {
+                    // Best-effort: let the protocol layer send a CLOSE frame before the socket
+                    // is closed. The connection is always closed regardless.
+                    onIdleTimeout(peerId)
+                    connection.close()
+                }
             }
         }
 
@@ -123,7 +160,7 @@ class LanLinkAdapter(
 
     override suspend fun sendFrame(peerId: String, frame: Frame) {
         val connection = connectionMutex.withLock {
-            connections[peerId]?.also { lastActivity[peerId] = TimeSource.Monotonic.markNow() }
+            connections[peerId]?.also { activityChannel.trySend(peerId) }
         } ?: error("No active connection for peer $peerId")
         connection.sendFrame(frame)
     }
@@ -228,10 +265,7 @@ class LanLinkAdapter(
         try {
             while (true) {
                 val frame = connection.receiveFrame() ?: break
-                // Update last activity time on each received frame.
-                connectionMutex.withLock {
-                    lastActivity[peerId] = TimeSource.Monotonic.markNow()
-                }
+                activityChannel.trySend(peerId)  // non-blocking; idle-timeout actor drains this
                 inboundFrameHandler?.invoke(peerId, frame)
             }
         } catch (_: Exception) {
@@ -277,7 +311,7 @@ class LanLinkAdapter(
                 }
             }
             connections[peerId] = connection
-            lastActivity[peerId] = TimeSource.Monotonic.markNow()
+            activityChannel.trySend(peerId)
             return true
         }
     }
@@ -292,39 +326,11 @@ class LanLinkAdapter(
         connectionMutex.withLock {
             if (connections[peerId] === connection) {
                 connections.remove(peerId)
-                lastActivity.remove(peerId)
                 true
             } else {
                 false
             }
         }
-
-    /**
-     * Scans all active connections and closes those that have exceeded the idle timeout.
-     * Before closing the socket, invokes [onIdleTimeout] to allow the protocol layer to send
-     * a CLOSE frame. The connection is always closed afterwards regardless of whether CLOSE
-     * was sent.
-     */
-    private suspend fun checkIdleTimeouts() {
-        val timeout = IDLE_TIMEOUT_MS.milliseconds
-        // Capture connection references inside the mutex so we close the exact instance that was
-        // idle at scan time — not a newer connection that may be registered after onIdleTimeout
-        // suspends.
-        val toClose = mutableListOf<Pair<String, LanConnection>>()
-        connectionMutex.withLock {
-            for ((peerId, mark) in lastActivity) {
-                if (mark.elapsedNow() > timeout) {
-                    connections[peerId]?.let { toClose.add(peerId to it) }
-                }
-            }
-        }
-        for ((peerId, connection) in toClose) {
-            // Best-effort: allow the protocol layer to send a CLOSE frame before we close the
-            // socket. If the callback throws or returns false, we still close the connection.
-            onIdleTimeout(peerId)
-            connection.close()
-        }
-    }
 
     companion object {
         const val LINK_MTU = 65_536
