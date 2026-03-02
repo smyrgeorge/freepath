@@ -17,7 +17,7 @@ kotlin {
         compileSdk = 36
         minSdk = 26
     }
-    iosX64()
+//    iosX64()
     iosArm64()
     iosSimulatorArm64()
     applyDefaultHierarchyTemplate()
@@ -29,6 +29,7 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(libs.bignum)
+                implementation(libs.sqlx4k)
                 implementation(libs.kotlinx.serialization.json)
             }
         }

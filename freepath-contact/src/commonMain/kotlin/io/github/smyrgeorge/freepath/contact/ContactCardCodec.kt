@@ -1,8 +1,8 @@
 package io.github.smyrgeorge.freepath.contact
 
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.util.Base58
-import io.github.smyrgeorge.freepath.util.JsonCodec
+import io.github.smyrgeorge.freepath.util.codec.Base58
+import io.github.smyrgeorge.freepath.util.codec.JsonCodec
 import kotlin.io.encoding.Base64
 
 object ContactCardCodec {

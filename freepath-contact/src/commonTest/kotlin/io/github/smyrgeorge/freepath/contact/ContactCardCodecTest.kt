@@ -1,6 +1,7 @@
 package io.github.smyrgeorge.freepath.contact
 
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.crypto.KeyPair
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,11 +13,7 @@ class ContactCardCodecTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun makeCard(
-        sigKp: io.github.smyrgeorge.freepath.crypto.KeyPair,
-        encKp: io.github.smyrgeorge.freepath.crypto.KeyPair,
-        updatedAt: Long = 1_000L,
-    ): ContactCard = ContactCard(
+    private fun makeCard(sigKp: KeyPair, encKp: KeyPair, updatedAt: Long = 1_000L): ContactCard = ContactCard(
         schema = ContactCardCodec.SCHEMA,
         nodeId = ContactCardCodec.deriveNodeId(sigKp.publicKey),
         sigKey = Base64.encode(sigKp.publicKey),

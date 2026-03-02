@@ -2,7 +2,7 @@ package io.github.smyrgeorge.freepath.transport.lan
 
 import io.github.smyrgeorge.freepath.transport.LinkAdapter
 import io.github.smyrgeorge.freepath.transport.PeerDiscovery
-import io.github.smyrgeorge.freepath.util.Base58
+import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.freepath.transport.lan.LanLinkAdapter.Companion.HANDSHAKE_TIMEOUT_MS
 import io.github.smyrgeorge.freepath.transport.model.Frame
 import io.github.smyrgeorge.freepath.transport.model.FrameType

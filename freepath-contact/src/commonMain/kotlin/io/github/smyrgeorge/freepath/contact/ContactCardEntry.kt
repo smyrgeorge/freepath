@@ -1,7 +1,18 @@
 package io.github.smyrgeorge.freepath.contact
 
+import io.github.smyrgeorge.freepath.util.db.Auditable
+import io.github.smyrgeorge.sqlx4k.annotation.Id
+import io.github.smyrgeorge.sqlx4k.annotation.Table
+import kotlin.time.Clock
+import kotlin.time.Instant
+
+@Table("contact")
 data class ContactCardEntry(
-    /** Primary key. Derived locally from the contact's sigKey. */
+    @Id
+    override val id: Long = 0,
+    override var createdAt: Instant = Clock.System.now(),
+    override var updatedAt: Instant = Clock.System.now(),
+    /** Unique key. Derived locally from the contact's sigKey. */
     val nodeId: String,
     /** The accepted contact card. */
     val card: ContactCard,
@@ -19,16 +30,15 @@ data class ContactCardEntry(
     val pinned: Boolean = false,
     /** If true, no notifications are generated for content from this contact. */
     val muted: Boolean = false,
-    /** User-defined labels for organising contacts. Max 10 tags, 32 chars each. */
+    /** User-defined labels for organising contacts. Max 16 tags, 32 chars each. */
     val tags: List<String> = emptyList(),
-) {
+) : Auditable<Long> {
     init {
+        require(id >= 0) { "id must be non-negative" }
         require(notes == null || notes.length <= MAX_NOTES_LENGTH) {
             "notes exceeds maximum length of $MAX_NOTES_LENGTH characters"
         }
-        require(tags.size <= MAX_TAGS_COUNT) {
-            "tags list exceeds maximum count of $MAX_TAGS_COUNT"
-        }
+        require(tags.size <= MAX_TAGS_COUNT) { "tags list exceeds maximum count of $MAX_TAGS_COUNT" }
         tags.forEachIndexed { index, tag ->
             require(tag.length <= MAX_TAG_LENGTH) {
                 "tag at index $index exceeds maximum length of $MAX_TAG_LENGTH characters"
@@ -64,7 +74,7 @@ data class ContactCardEntry(
 
     companion object {
         const val MAX_NOTES_LENGTH = 1024
-        const val MAX_TAGS_COUNT = 10
+        const val MAX_TAGS_COUNT = 16
         const val MAX_TAG_LENGTH = 32
     }
 }

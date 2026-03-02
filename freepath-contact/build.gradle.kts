@@ -18,7 +18,7 @@ kotlin {
         compileSdk = 36
         minSdk = 26
     }
-    iosX64()
+//    iosX64()
     iosArm64()
     iosSimulatorArm64()
     applyDefaultHierarchyTemplate()
@@ -32,6 +32,7 @@ kotlin {
                 implementation(project(":freepath-crypto"))
                 implementation(project(":freepath-util"))
                 implementation(libs.kotlinx.serialization.json)
+                implementation(libs.sqlx4k)
             }
         }
         commonTest {

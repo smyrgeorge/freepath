@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.util
+package io.github.smyrgeorge.freepath.util.codec
 
 import kotlinx.serialization.json.Json
 

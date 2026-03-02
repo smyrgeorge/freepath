@@ -1,5 +1,6 @@
 package io.github.smyrgeorge.freepath.util
 
+import io.github.smyrgeorge.freepath.util.codec.Base58
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
