@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.contact
 
-data class ContactEntry(
+data class ContactCardEntry(
     /** Primary key. Derived locally from the contact's sigKey. */
     val nodeId: String,
     /** The accepted contact card. */
@@ -45,11 +45,11 @@ data class ContactEntry(
      *   are never modified by the merge.
      *
      * @param incoming The incoming contact entry with an updated card.
-     * @return A new [ContactEntry] with the incoming card and all local-only fields preserved.
+     * @return A new [ContactCardEntry] with the incoming card and all local-only fields preserved.
      * @throws IllegalArgumentException if `incoming.nodeId` does not match this entry's [nodeId].
      * @throws IllegalArgumentException if `incoming.card` is not newer than the current card.
      */
-    fun merge(incoming: ContactEntry): ContactEntry {
+    fun merge(incoming: ContactCardEntry): ContactCardEntry {
         require(incoming.nodeId == nodeId) {
             "Cannot merge entries with different Node IDs: ${incoming.nodeId} != $nodeId"
         }

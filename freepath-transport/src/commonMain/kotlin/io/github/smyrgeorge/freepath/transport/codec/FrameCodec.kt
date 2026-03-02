@@ -1,6 +1,7 @@
 package io.github.smyrgeorge.freepath.transport.codec
 
 import io.github.smyrgeorge.freepath.transport.model.Frame
+import io.github.smyrgeorge.freepath.util.JsonCodec
 
 object FrameCodec {
     fun encode(frame: Frame): ByteArray = JsonCodec.json.encodeToString(frame).encodeToByteArray()

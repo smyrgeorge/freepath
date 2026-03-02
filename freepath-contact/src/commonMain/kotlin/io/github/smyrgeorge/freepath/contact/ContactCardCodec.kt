@@ -2,17 +2,12 @@ package io.github.smyrgeorge.freepath.contact
 
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.Base58
-import kotlinx.serialization.json.Json
+import io.github.smyrgeorge.freepath.util.JsonCodec
 import kotlin.io.encoding.Base64
 
 object ContactCardCodec {
 
     const val SCHEMA = 1
-
-    private val json = Json {
-        encodeDefaults = false
-        explicitNulls = false
-    }
 
     // ── Node ID ───────────────────────────────────────────────────────────────
 
@@ -41,15 +36,15 @@ object ContactCardCodec {
         return CryptoProvider.ed25519Verify(sigKeyBytes, encode(card), signatureBytes)
     }
 
-    /** Creates a [SignedContactCard] by signing [card] with [sigKeyPrivate]. */
-    fun seal(card: ContactCard, sigKeyPrivate: ByteArray): SignedContactCard =
-        SignedContactCard(card, Base64.encode(sign(card, sigKeyPrivate)))
+    /** Creates a [ContactCardSigned] by signing [card] with [sigKeyPrivate]. */
+    fun seal(card: ContactCard, sigKeyPrivate: ByteArray): ContactCardSigned =
+        ContactCardSigned(card, Base64.encode(sign(card, sigKeyPrivate)))
 
     /**
      * Verifies the signature on [signed] and validates the Node ID.
      * Returns the inner [ContactCard] on success, or throws [IllegalStateException] on failure.
      */
-    fun open(signed: SignedContactCard): ContactCard {
+    fun open(signed: ContactCardSigned): ContactCard {
         val sigBytes = Base64.decode(signed.signature)
         check(verify(signed.card, sigBytes)) { "Invalid signature on contact card" }
         check(validateNodeId(signed.card)) { "nodeId mismatch in contact card" }
@@ -77,14 +72,14 @@ object ContactCardCodec {
     // ── JSON encode/decode ────────────────────────────────────────────────────
 
     /** Encodes [card] to UTF-8 JSON bytes. */
-    fun encode(card: ContactCard): ByteArray = json.encodeToString(card).encodeToByteArray()
+    fun encode(card: ContactCard): ByteArray = JsonCodec.json.encodeToString(card).encodeToByteArray()
 
     /** Decodes a [ContactCard] from UTF-8 JSON [bytes]. */
-    fun decode(bytes: ByteArray): ContactCard = json.decodeFromString(bytes.decodeToString())
+    fun decode(bytes: ByteArray): ContactCard = JsonCodec.json.decodeFromString(bytes.decodeToString())
 
     /** Encodes [signed] to UTF-8 JSON bytes. */
-    fun encode(signed: SignedContactCard): ByteArray = json.encodeToString(signed).encodeToByteArray()
+    fun encode(signed: ContactCardSigned): ByteArray = JsonCodec.json.encodeToString(signed).encodeToByteArray()
 
-    /** Decodes a [SignedContactCard] from UTF-8 JSON [bytes]. */
-    fun decodeSigned(bytes: ByteArray): SignedContactCard = json.decodeFromString(bytes.decodeToString())
+    /** Decodes a [ContactCardSigned] from UTF-8 JSON [bytes]. */
+    fun decodeSigned(bytes: ByteArray): ContactCardSigned = JsonCodec.json.decodeFromString(bytes.decodeToString())
 }

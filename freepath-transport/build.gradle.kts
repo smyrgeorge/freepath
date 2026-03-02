@@ -29,7 +29,7 @@ kotlin {
         }
         commonMain {
             dependencies {
-                api(project(":freepath-crypto"))
+                implementation(project(":freepath-crypto"))
                 implementation(project(":freepath-util"))
                 implementation(libs.log4k)
                 implementation(libs.kotlinx.coroutines.core)

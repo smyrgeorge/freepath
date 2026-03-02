@@ -29,6 +29,7 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(libs.bignum)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
         commonTest {

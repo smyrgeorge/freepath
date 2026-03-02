@@ -5,6 +5,7 @@ import io.github.smyrgeorge.freepath.util.Base58
 import io.github.smyrgeorge.freepath.transport.model.ContactInfo
 import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
 import io.github.smyrgeorge.freepath.transport.model.StatelessEnvelope
+import io.github.smyrgeorge.freepath.util.JsonCodec
 import kotlin.io.encoding.Base64
 
 object StatelessEnvelopeCodec {

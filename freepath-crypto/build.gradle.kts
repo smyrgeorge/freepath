@@ -27,6 +27,11 @@ kotlin {
         configureEach {
             languageSettings.progressiveMode = true
         }
+        commonMain {
+            dependencies {
+                implementation(project(":freepath-util"))
+            }
+        }
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)

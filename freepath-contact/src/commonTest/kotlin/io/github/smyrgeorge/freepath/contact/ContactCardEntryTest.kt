@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 
-class ContactEntryTest {
+class ContactCardEntryTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -22,7 +22,7 @@ class ContactEntryTest {
         pinned: Boolean = false,
         muted: Boolean = false,
         tags: List<String> = emptyList(),
-    ): ContactEntry {
+    ): ContactCardEntry {
         val actualCard = card ?: run {
             val kp = CryptoProvider.generateEd25519KeyPair()
             val encKp = CryptoProvider.generateX25519KeyPair()
@@ -34,7 +34,7 @@ class ContactEntryTest {
                 updatedAt = 1_000L,
             )
         }
-        return ContactEntry(
+        return ContactCardEntry(
             nodeId = nodeId,
             card = actualCard,
             trustLevel = trustLevel,
@@ -58,14 +58,14 @@ class ContactEntryTest {
 
     @Test
     fun contactEntry_validation_acceptsMaxNotesLength() {
-        val maxNotes = "a".repeat(ContactEntry.MAX_NOTES_LENGTH)
+        val maxNotes = "a".repeat(ContactCardEntry.MAX_NOTES_LENGTH)
         val entry = makeEntry(notes = maxNotes)
-        assertEquals(ContactEntry.MAX_NOTES_LENGTH, entry.notes?.length)
+        assertEquals(ContactCardEntry.MAX_NOTES_LENGTH, entry.notes?.length)
     }
 
     @Test
     fun contactEntry_validation_rejectsNotesTooLong() {
-        val longNotes = "a".repeat(ContactEntry.MAX_NOTES_LENGTH + 1)
+        val longNotes = "a".repeat(ContactCardEntry.MAX_NOTES_LENGTH + 1)
         assertFails {
             makeEntry(notes = longNotes)
         }
@@ -81,14 +81,14 @@ class ContactEntryTest {
 
     @Test
     fun contactEntry_validation_acceptsMaxTagsCount() {
-        val maxTags = List(ContactEntry.MAX_TAGS_COUNT) { "tag$it" }
+        val maxTags = List(ContactCardEntry.MAX_TAGS_COUNT) { "tag$it" }
         val entry = makeEntry(tags = maxTags)
-        assertEquals(ContactEntry.MAX_TAGS_COUNT, entry.tags.size)
+        assertEquals(ContactCardEntry.MAX_TAGS_COUNT, entry.tags.size)
     }
 
     @Test
     fun contactEntry_validation_rejectsTooManyTags() {
-        val tooManyTags = List(ContactEntry.MAX_TAGS_COUNT + 1) { "tag$it" }
+        val tooManyTags = List(ContactCardEntry.MAX_TAGS_COUNT + 1) { "tag$it" }
         assertFails {
             makeEntry(tags = tooManyTags)
         }
@@ -96,14 +96,14 @@ class ContactEntryTest {
 
     @Test
     fun contactEntry_validation_acceptsMaxTagLength() {
-        val maxTag = "a".repeat(ContactEntry.MAX_TAG_LENGTH)
+        val maxTag = "a".repeat(ContactCardEntry.MAX_TAG_LENGTH)
         val entry = makeEntry(tags = listOf(maxTag))
-        assertEquals(ContactEntry.MAX_TAG_LENGTH, entry.tags.first().length)
+        assertEquals(ContactCardEntry.MAX_TAG_LENGTH, entry.tags.first().length)
     }
 
     @Test
     fun contactEntry_validation_rejectsTagTooLong() {
-        val longTag = "a".repeat(ContactEntry.MAX_TAG_LENGTH + 1)
+        val longTag = "a".repeat(ContactCardEntry.MAX_TAG_LENGTH + 1)
         assertFails {
             makeEntry(tags = listOf(longTag))
         }
