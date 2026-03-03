@@ -7,6 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 class ContactCardEntryTest {
@@ -14,10 +15,9 @@ class ContactCardEntryTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun makeEntry(
-        nodeId: String = "testNodeId",
+        nodeId: String = "4mXkR9qWzJvTsLpYcBnD2e",
         card: ContactCard? = null,
         trustLevel: TrustLevel = TrustLevel.TRUSTED,
-        addedAt: Instant = Clock.System.now(),
         name: String? = null,
         lastSeenAt: Instant? = null,
         notes: String? = null,
@@ -33,14 +33,13 @@ class ContactCardEntryTest {
                 nodeId = nodeId,
                 sigKey = Base64.encode(kp.publicKey),
                 encKey = Base64.encode(encKp.publicKey),
-                updatedAt = 1_000L,
+                updatedAt = Clock.System.now(),
             )
         }
         return ContactCardEntry(
             nodeId = nodeId,
             card = actualCard,
             trustLevel = trustLevel,
-            addedAt = addedAt,
             name = name,
             lastSeenAt = lastSeenAt,
             notes = notes,
@@ -117,23 +116,25 @@ class ContactCardEntryTest {
     fun merge_returnsNewEntryWithIncomingCard() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
+        val now = Clock.System.now()
+        val nodeId = "4mXkR9qWzJvTsLpYcBnD2e"
         val storedCard = ContactCard(
             schema = ContactCard.SCHEMA,
-            nodeId = "testId",
+            nodeId = nodeId,
             sigKey = Base64.encode(kp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
-            updatedAt = 1_000L,
+            updatedAt = now,
             name = "Old Name",
             bio = "Old bio",
         )
-        val stored = makeEntry(nodeId = "testId", card = storedCard, name = "Local Name", notes = "My notes")
+        val stored = makeEntry(nodeId = nodeId, card = storedCard, name = "Local Name", notes = "My notes")
 
         val incomingCard = storedCard.copy(
-            updatedAt = 2_000L,
+            updatedAt = now + 1000.milliseconds,
             name = "New Name",
             bio = "New bio",
         )
-        val incoming = makeEntry(nodeId = "testId", card = incomingCard, name = "Other Local Name")
+        val incoming = makeEntry(nodeId = nodeId, card = incomingCard, name = "Other Local Name")
 
         val merged = stored.merge(incoming)
 
@@ -146,18 +147,19 @@ class ContactCardEntryTest {
     fun merge_preservesLocalOnlyFields() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
+        val now = Clock.System.now()
+        val nodeId = "4mXkR9qWzJvTsLpYcBnD2e"
         val storedCard = ContactCard(
             schema = ContactCard.SCHEMA,
-            nodeId = "testId",
+            nodeId = nodeId,
             sigKey = Base64.encode(kp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
-            updatedAt = 1_000L,
+            updatedAt = now,
         )
         val stored = makeEntry(
-            nodeId = "testId",
+            nodeId = nodeId,
             card = storedCard,
             trustLevel = TrustLevel.KNOWN,
-            addedAt = Clock.System.now(),
             name = "Local Name",
             lastSeenAt = Clock.System.now(),
             notes = "My notes",
@@ -166,8 +168,8 @@ class ContactCardEntryTest {
             tags = listOf("family"),
         )
 
-        val incomingCard = storedCard.copy(updatedAt = 2_000L, name = "New Name")
-        val incoming = makeEntry(nodeId = "testId", card = incomingCard)
+        val incomingCard = storedCard.copy(updatedAt = now + 1000.milliseconds, name = "New Name")
+        val incoming = makeEntry(nodeId = nodeId, card = incomingCard)
 
         val merged = stored.merge(incoming)
 
@@ -175,7 +177,6 @@ class ContactCardEntryTest {
         assertEquals("New Name", merged.card.name)
         // Local-only fields preserved
         assertEquals(TrustLevel.KNOWN, merged.trustLevel)
-        assertEquals(stored.addedAt, merged.addedAt)
         assertEquals("Local Name", merged.name)
         assertEquals(stored.lastSeenAt, merged.lastSeenAt)
         assertEquals("My notes", merged.notes)
@@ -188,17 +189,20 @@ class ContactCardEntryTest {
     fun merge_throwsForDifferentNodeId() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
+        val now = Clock.System.now()
+        val nodeId1 = "4mXkR9qWzJvTsLpYcBnD2e"
+        val nodeId2 = "5nYkS1rXaKwUtMqZdCoE3g"
         val storedCard = ContactCard(
             schema = ContactCard.SCHEMA,
-            nodeId = "testId1",
+            nodeId = nodeId1,
             sigKey = Base64.encode(kp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
-            updatedAt = 1_000L,
+            updatedAt = now,
         )
-        val stored = makeEntry(nodeId = "testId1", card = storedCard)
+        val stored = makeEntry(nodeId = nodeId1, card = storedCard)
 
-        val incomingCard = storedCard.copy(nodeId = "testId2", updatedAt = 2_000L)
-        val incoming = makeEntry(nodeId = "testId2", card = incomingCard)
+        val incomingCard = storedCard.copy(nodeId = nodeId2, updatedAt = now + 1000.milliseconds)
+        val incoming = makeEntry(nodeId = nodeId2, card = incomingCard)
 
         assertFailsWith<IllegalArgumentException> {
             stored.merge(incoming)
@@ -209,17 +213,19 @@ class ContactCardEntryTest {
     fun merge_throwsForSameUpdatedAt() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
+        val now = Clock.System.now()
+        val nodeId = "4mXkR9qWzJvTsLpYcBnD2e"
         val storedCard = ContactCard(
             schema = ContactCard.SCHEMA,
-            nodeId = "testId",
+            nodeId = nodeId,
             sigKey = Base64.encode(kp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
-            updatedAt = 1_000L,
+            updatedAt = now,
         )
-        val stored = makeEntry(nodeId = "testId", card = storedCard)
+        val stored = makeEntry(nodeId = nodeId, card = storedCard)
 
-        val incomingCard = storedCard.copy(updatedAt = 1_000L)
-        val incoming = makeEntry(nodeId = "testId", card = incomingCard)
+        val incomingCard = storedCard.copy(updatedAt = now)
+        val incoming = makeEntry(nodeId = nodeId, card = incomingCard)
 
         assertFailsWith<IllegalArgumentException> {
             stored.merge(incoming)
@@ -230,17 +236,19 @@ class ContactCardEntryTest {
     fun merge_throwsForOlderUpdatedAt() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
+        val now = Clock.System.now()
+        val nodeId = "4mXkR9qWzJvTsLpYcBnD2e"
         val storedCard = ContactCard(
             schema = ContactCard.SCHEMA,
-            nodeId = "testId",
+            nodeId = nodeId,
             sigKey = Base64.encode(kp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
-            updatedAt = 2_000L,
+            updatedAt = now,
         )
-        val stored = makeEntry(nodeId = "testId", card = storedCard)
+        val stored = makeEntry(nodeId = nodeId, card = storedCard)
 
-        val incomingCard = storedCard.copy(updatedAt = 1_000L)
-        val incoming = makeEntry(nodeId = "testId", card = incomingCard)
+        val incomingCard = storedCard.copy(updatedAt = now - 1000.milliseconds)
+        val incoming = makeEntry(nodeId = nodeId, card = incomingCard)
 
         assertFailsWith<IllegalArgumentException> {
             stored.merge(incoming)

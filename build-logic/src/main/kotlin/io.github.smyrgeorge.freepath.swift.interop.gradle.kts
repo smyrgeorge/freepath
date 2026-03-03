@@ -38,17 +38,8 @@ fun Project.configureSwiftTarget(
     }
 
     val pkgDir = layout.projectDirectory.dir(extension.swiftSourceDir)
-    val spmOutDir = layout.buildDirectory.dir("swift-spm/${target.konanTarget.name}")
-
-    val spmLibDir = providers.exec {
-        commandLine(
-            "swift", "build",
-            "--package-path", pkgDir.asFile.absolutePath,
-            "--configuration", "release",
-            "--build-path", spmOutDir.get().asFile.absolutePath,
-            "--show-bin-path",
-        )
-    }.standardOutput.asText.map { it.trim() }
+    val swiftOutDir = layout.buildDirectory.dir("swift-spm/${target.konanTarget.name}")
+    val swiftLibDir = swiftOutDir.map { "${it.asFile.absolutePath}/release" }
 
     val templateDef = extension.templateDefFile ?: "src/nativeInterop/cinterop/${packageName}.def"
 
@@ -63,16 +54,17 @@ fun Project.configureSwiftTarget(
         "buildSwiftPackage_${target.konanTarget.name}",
     ) {
         swiftPackageDir.set(pkgDir)
-        outputDir.set(spmOutDir)
+        outputDir.set(swiftOutDir)
         sdk.set(sdkName)
         swiftTarget.set(swiftTriple)
+        this.packageName.set(packageName)
     }
 
     val generateDefTask = tasks.register<GenerateDefFileTask>(
         "generateSwiftInteropDef_${packageName}_${target.konanTarget.name}",
     ) {
         templateDefFile.set(layout.projectDirectory.file(templateDef))
-        libraryPath.set(spmLibDir)
+        libraryPath.set(swiftLibDir)
         linkerOpts.set(computedLinkerOpts)
         defFile.set(layout.buildDirectory.file("generated-def/${target.konanTarget.name}/${packageName}.def"))
         dependsOn(buildSwiftTask)

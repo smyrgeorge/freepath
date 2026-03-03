@@ -13,19 +13,21 @@ data class ContactCardEntry(
     /** Primary key. */
     @Id
     override val id: Long = 0,
+//    @Converter(InstantConverter::class)
     override var createdAt: Instant = Clock.System.now(),
+//    @Converter(InstantConverter::class)
     override var updatedAt: Instant = Clock.System.now(),
     /** Unique key. Derived locally from the contact's sigKey. */
     val nodeId: String,
     /** The accepted contact card. */
+    @Converter(ContactCardCoverter::class)
     val card: ContactCard,
     /** Controls how content from this contact is handled. */
     val trustLevel: TrustLevel = TrustLevel.TRUSTED,
-    /** Unix epoch milliseconds when the contact card was first accepted. */
-    val addedAt: Instant,
     /** Local override for the contact's display name. Shown instead of card.name when set. */
     val name: String? = null,
     /** Unix epoch milliseconds when content or a card from this contact was last received. */
+//    @Converter(InstantConverter::class)
     val lastSeenAt: Instant? = null,
     /** Free-text field for the user's own reference. Never shared. Max 1024 chars. */
     val notes: String? = null,
@@ -39,13 +41,17 @@ data class ContactCardEntry(
 ) : Auditable<Long> {
     init {
         require(id >= 0) { "id must be non-negative" }
+        require(nodeId.matches(BASE58_REGEX)) {
+            "nodeId must be a 22-character Base58 string"
+        }
+        require(notes.isNullOrEmpty() || notes.isNotBlank()) { "notes cannot be blank" }
         require(notes == null || notes.length <= MAX_NOTES_LENGTH) {
             "notes exceeds maximum length of $MAX_NOTES_LENGTH characters"
         }
         require(tags.size <= MAX_TAGS_COUNT) { "tags list exceeds maximum count of $MAX_TAGS_COUNT" }
         tags.forEachIndexed { index, tag ->
-            require(tag.length <= MAX_TAG_LENGTH) {
-                "tag at index $index exceeds maximum length of $MAX_TAG_LENGTH characters"
+            require(tag.isNotEmpty() && tag.length <= MAX_TAG_LENGTH) {
+                "tag at index $index must be non-empty and not exceed $MAX_TAG_LENGTH characters"
             }
         }
     }
@@ -55,7 +61,7 @@ data class ContactCardEntry(
      *
      * Per spec 1 Card updates:
      * - The incoming card is accepted only if its `updatedAt` is strictly greater.
-     * - Local-only fields ([trustLevel], [addedAt], [name], [lastSeenAt], [notes], [pinned], [muted], [tags])
+     * - Local-only fields ([trustLevel], [name], [lastSeenAt], [notes], [pinned], [muted], [tags])
      *   are never modified by the merge.
      *
      * @param incoming The incoming contact entry with an updated card.
@@ -80,5 +86,6 @@ data class ContactCardEntry(
         const val MAX_NOTES_LENGTH = 1024
         const val MAX_TAGS_COUNT = 16
         const val MAX_TAG_LENGTH = 32
+        private val BASE58_REGEX = Regex("[1-9A-HJ-NP-Za-km-z]{22}")
     }
 }

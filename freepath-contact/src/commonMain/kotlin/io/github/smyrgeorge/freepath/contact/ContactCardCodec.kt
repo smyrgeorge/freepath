@@ -13,7 +13,7 @@ object ContactCardCodec {
 
     /** Derives the Node ID from a raw Ed25519 public key per spec 1. */
     fun deriveNodeId(sigKeyPublicBytes: ByteArray): String =
-        Base58.encode(CryptoProvider.sha256(sigKeyPublicBytes).copyOfRange(0, 16))
+        Base58.encode(CryptoProvider.sha256(sigKeyPublicBytes).copyOfRange(0, 16)).padStart(22, '1')
 
     /** Returns `true` if [card].nodeId matches the value derived locally from [card].sigKey. */
     fun validateNodeId(card: ContactCard): Boolean {
@@ -74,8 +74,14 @@ object ContactCardCodec {
     /** Encodes [card] to UTF-8 JSON bytes. */
     fun encode(card: ContactCard): ByteArray = JsonCodec.json.encodeToString(card).encodeToByteArray()
 
+    /** Encodes [card] to UTF-8 JSON string. */
+    fun encodeToString(card: ContactCard): String = JsonCodec.json.encodeToString(card)
+
     /** Decodes a [ContactCard] from UTF-8 JSON [bytes]. */
     fun decode(bytes: ByteArray): ContactCard = JsonCodec.json.decodeFromString(bytes.decodeToString())
+
+    /** Decodes a [ContactCard] from UTF-8 JSON [str]. */
+    fun decode(str: String): ContactCard = JsonCodec.json.decodeFromString(str)
 
     /** Encodes [signed] to UTF-8 JSON bytes. */
     fun encode(signed: ContactCardSigned): ByteArray = JsonCodec.json.encodeToString(signed).encodeToByteArray()

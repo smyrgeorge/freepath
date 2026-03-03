@@ -8,18 +8,22 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 
 class ContactCardCodecTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun makeCard(sigKp: KeyPair, encKp: KeyPair, updatedAt: Long = 1_000L): ContactCard = ContactCard(
-        schema = ContactCardCodec.SCHEMA,
-        nodeId = ContactCardCodec.deriveNodeId(sigKp.publicKey),
-        sigKey = Base64.encode(sigKp.publicKey),
-        encKey = Base64.encode(encKp.publicKey),
-        updatedAt = updatedAt,
-    )
+    private fun makeCard(sigKp: KeyPair, encKp: KeyPair, updatedAt: Instant = Clock.System.now()): ContactCard =
+        ContactCard(
+            schema = ContactCardCodec.SCHEMA,
+            nodeId = ContactCardCodec.deriveNodeId(sigKp.publicKey),
+            sigKey = Base64.encode(sigKp.publicKey),
+            encKey = Base64.encode(encKp.publicKey),
+            updatedAt = updatedAt,
+        )
 
     // ── deriveNodeId ──────────────────────────────────────────────────────────
 
@@ -94,7 +98,7 @@ class ContactCardCodecTest {
         val encKp = CryptoProvider.generateX25519KeyPair()
         val card = makeCard(kp, encKp)
         val sig = ContactCardCodec.sign(card, kp.privateKey)
-        assertFalse(ContactCardCodec.verify(card.copy(updatedAt = card.updatedAt + 1), sig))
+        assertFalse(ContactCardCodec.verify(card.copy(updatedAt = card.updatedAt + 1.milliseconds), sig))
     }
 
     @Test
@@ -135,8 +139,9 @@ class ContactCardCodecTest {
     fun shouldUpdate_trueForNewerUpdatedAt() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val stored = makeCard(kp, encKp, updatedAt = 1_000L)
-        val incoming = makeCard(kp, encKp, updatedAt = 2_000L)
+        val now = Clock.System.now()
+        val stored = makeCard(kp, encKp, updatedAt = now)
+        val incoming = makeCard(kp, encKp, updatedAt = now + 1000.milliseconds)
         assertTrue(ContactCardCodec.shouldUpdate(stored, incoming))
     }
 
@@ -144,8 +149,9 @@ class ContactCardCodecTest {
     fun shouldUpdate_falseForSameUpdatedAt() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val stored = makeCard(kp, encKp, updatedAt = 1_000L)
-        val incoming = makeCard(kp, encKp, updatedAt = 1_000L)
+        val now = Clock.System.now()
+        val stored = makeCard(kp, encKp, updatedAt = now)
+        val incoming = makeCard(kp, encKp, updatedAt = now)
         assertFalse(ContactCardCodec.shouldUpdate(stored, incoming))
     }
 
@@ -153,8 +159,9 @@ class ContactCardCodecTest {
     fun shouldUpdate_falseForOlderUpdatedAt() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val stored = makeCard(kp, encKp, updatedAt = 2_000L)
-        val incoming = makeCard(kp, encKp, updatedAt = 1_000L)
+        val now = Clock.System.now()
+        val stored = makeCard(kp, encKp, updatedAt = now)
+        val incoming = makeCard(kp, encKp, updatedAt = now - 1000.milliseconds)
         assertFalse(ContactCardCodec.shouldUpdate(stored, incoming))
     }
 
@@ -163,9 +170,10 @@ class ContactCardCodecTest {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val kp2 = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val stored = makeCard(kp, encKp, updatedAt = 1_000L)
+        val now = Clock.System.now()
+        val stored = makeCard(kp, encKp, updatedAt = now)
         // incoming has a different sigKey (and therefore a different nodeId too)
-        val incoming = makeCard(kp2, encKp, updatedAt = 2_000L)
+        val incoming = makeCard(kp2, encKp, updatedAt = now + 1000.milliseconds)
         assertFalse(ContactCardCodec.shouldUpdate(stored, incoming))
     }
 
@@ -174,9 +182,10 @@ class ContactCardCodecTest {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val kp2 = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val stored = makeCard(kp, encKp, updatedAt = 1_000L)
+        val now = Clock.System.now()
+        val stored = makeCard(kp, encKp, updatedAt = now)
         // Corrupt the nodeId on an otherwise-valid incoming card
-        val incoming = makeCard(kp, encKp, updatedAt = 2_000L)
+        val incoming = makeCard(kp, encKp, updatedAt = now + 1000.milliseconds)
             .copy(nodeId = ContactCardCodec.deriveNodeId(kp2.publicKey))
         assertFalse(ContactCardCodec.shouldUpdate(stored, incoming))
     }
