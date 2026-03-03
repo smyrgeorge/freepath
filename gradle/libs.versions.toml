@@ -12,7 +12,7 @@ log4k = "1.3.2"
 # https://github.com/Kotlin/kotlinx.serialization
 kotlinx-serialization = "1.10.0"
 # https://github.com/ktorio/ktor
-ktor = "3.4.0"
+ktor = "3.4.1"
 # https://www.bouncycastle.org
 bouncycastle = "1.83"
 # https://github.com/ionspin/kotlin-multiplatform-bignum
@@ -20,46 +20,64 @@ bignum = "0.3.10"
 # https://github.com/InsertKoinIO/koin
 koin = "4.1.1"
 # https://github.com/smyrgeorge/sqlx4k
-sqlx4k = "1.7.0"
-# https://github.com/orchestr7/ktoml
-ktoml = "0.7.1"
+sqlx4k = "1.7.1"
 # https://github.com/google/ksp
 ksp = "2.3.6"
-# https://github.com/arrow-kt/arrow
-arrow = "2.2.1.1"
 # https://github.com/jmdns/jmdns
 jmdns = "3.6.3"
 # https://developer.android.com/studio/releases/gradle-plugin
-android-gradle-plugin = "9.0.1"
+android-gradle-plugin = "9.0.0-alpha06"
+# https://github.com/alexzhirkevich/qrose
+qrose = "1.1.2"
+material3 = "1.9.0"
+compose-hot-reload = "1.0.0"
+compose-multiplatform = "1.10.1"
+androidx-activity-compose = "1.12.4"
+androidx-lifecycle = "2.9.6"
+android-compileSdk = "36"
+android-minSdk = "26"
+android-targetSdk = "36"
+uiTooling = "1.10.4"
+customview-poolingcontainer = "1.1.0"
+androidx-emoji2 = "1.6.0"
 
 [libraries]
 gradle-kotlin-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 gradle-publish-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "publish" }
 gradle-dokka-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
-gradle-android-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle-plugin" }
 jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
-ktoml-core = { module = "com.akuleshov7:ktoml-core", version.ref = "ktoml" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 log4k = { module = "io.github.smyrgeorge:log4k", version.ref = "log4k" }
 log4k-slf4j = { module = "io.github.smyrgeorge:log4k-slf4j", version.ref = "log4k" }
-arrow-core = { module = "io.arrow-kt:arrow-core", version.ref = "arrow" }
-arrow-resilience = { module = "io.arrow-kt:arrow-resilience", version.ref = "arrow" }
 ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
-ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 bignum = { module = "com.ionspin.kotlin:bignum", version.ref = "bignum" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
+compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose-multiplatform" }
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
+compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose-multiplatform" }
+material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3" }
 sqlx4k = { module = "io.github.smyrgeorge:sqlx4k", version.ref = "sqlx4k" }
-sqlx4k-arrow = { module = "io.github.smyrgeorge:sqlx4k-arrow", version.ref = "sqlx4k" }
 sqlx4k-sqlite = { module = "io.github.smyrgeorge:sqlx4k-sqlite", version.ref = "sqlx4k" }
 sqlx4k-codegen = { module = "io.github.smyrgeorge:sqlx4k-codegen", version.ref = "sqlx4k" }
+qrose = { module = "io.github.alexzhirkevich:qrose", version.ref = "qrose" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }
+androidx-lifecycle-viewmodelCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "uiTooling" }
+androidx-customview-poolingcontainer = { group = "androidx.customview", name = "customview-poolingcontainer", version.ref = "customview-poolingcontainer" }
+androidx-emoji2 = { group = "androidx.emoji2", name = "emoji2", version.ref = "androidx-emoji2" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -68,3 +86,7 @@ pubhish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 android = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle-plugin" }
+androidApplication = { id = "com.android.application", version.ref = "android-gradle-plugin" }
+composeHotReload = { id = "org.jetbrains.compose.hot-reload", version.ref = "compose-hot-reload" }
+composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
+composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

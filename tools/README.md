@@ -12,7 +12,7 @@ This folder contains scripts and templates for building PDF documentation from M
 Basic command:
 
 ```bash
-pandoc README.md -o README.pdf --lua-filter=scripts/github-alerts.lua --template=scripts/template.tex
+pandoc README.md -o README.pdf --lua-filter=tools/github-alerts.lua --template=tools/template.tex
 ```
 
 ### Supported GitHub Alerts

@@ -15,8 +15,8 @@ kotlin {
     }
     android {
         namespace = "io.github.smyrgeorge.freepath.transport.lan"
-        compileSdk = 36
-        minSdk = 26
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
     }
     iosX64()
     iosArm64()

@@ -6,6 +6,10 @@ plugins {
     alias(libs.plugins.pubhish) apply false
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.android) apply false
+    alias(libs.plugins.androidApplication) apply false
+    alias(libs.plugins.composeHotReload) apply false
+    alias(libs.plugins.composeMultiplatform) apply false
+    alias(libs.plugins.composeCompiler) apply false
 }
 
 repositories {
@@ -20,7 +24,6 @@ subprojects {
     repositories {
         google()
         mavenCentral()
-        // IMPORTANT: must be last.
         mavenLocal()
     }
 }

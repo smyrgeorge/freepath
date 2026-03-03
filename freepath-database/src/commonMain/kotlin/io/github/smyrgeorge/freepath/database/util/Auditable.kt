@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.util.db
+package io.github.smyrgeorge.freepath.database.util
 
 import kotlin.time.Instant
 

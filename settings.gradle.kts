@@ -10,9 +10,20 @@ pluginManagement {
     includeBuild("build-logic")
 }
 
-include("freepath-util")
-include("freepath-crypto")
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+include("examples:transport-lan")
+
+include("freepath-app:composeApp")
+include("freepath-app:androidApp")
 include("freepath-contact")
+include("freepath-crypto")
+include("freepath-database")
 include("freepath-transport")
 include("freepath-transport-lan")
-include("examples:transport-lan")
+include("freepath-util")

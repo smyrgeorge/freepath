@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.util.db
+package io.github.smyrgeorge.freepath.database.util
 
 import io.github.smyrgeorge.sqlx4k.CrudRepository
 import io.github.smyrgeorge.sqlx4k.QueryExecutor

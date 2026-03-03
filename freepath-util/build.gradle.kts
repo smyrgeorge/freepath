@@ -14,8 +14,8 @@ kotlin {
     }
     android {
         namespace = "io.github.smyrgeorge.freepath.util"
-        compileSdk = 36
-        minSdk = 26
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
     }
     iosX64()
     iosArm64()
@@ -29,7 +29,6 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(libs.bignum)
-                implementation(libs.sqlx4k)
                 implementation(libs.kotlinx.serialization.json)
             }
         }

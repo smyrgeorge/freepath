@@ -1,12 +1,9 @@
-import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android)
-    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -18,8 +15,8 @@ kotlin {
     }
     android {
         namespace = "io.github.smyrgeorge.freepath.contact"
-        compileSdk = 36
-        minSdk = 26
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
     }
     iosX64()
     iosArm64()
@@ -35,10 +32,9 @@ kotlin {
                 implementation(project(":freepath-crypto"))
                 implementation(project(":freepath-util"))
                 implementation(libs.kotlinx.serialization.json)
+                implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.sqlx4k)
             }
-            // Config if your code is under the commonMain module.
-            kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin")
         }
         commonTest {
             dependencies {
@@ -46,18 +42,4 @@ kotlin {
             }
         }
     }
-}
-
-ksp {
-    arg("dialect", "sqlite")
-    arg("output-package", "io.github.smyrgeorge.freepath.contact.generated")
-}
-
-// Config if your code is under the commonMain module.
-dependencies {
-    add("kspCommonMainMetadata", libs.sqlx4k.codegen)
-}
-
-tasks.withType<KotlinCompilationTask<*>> {
-    dependsOn("kspCommonMainKotlinMetadata")
 }

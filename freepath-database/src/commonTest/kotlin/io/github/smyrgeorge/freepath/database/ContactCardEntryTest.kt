@@ -1,5 +1,7 @@
-package io.github.smyrgeorge.freepath.contact
+package io.github.smyrgeorge.freepath.database
 
+import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import kotlin.io.encoding.Base64
 import kotlin.test.Test

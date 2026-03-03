@@ -1,7 +1,11 @@
-package io.github.smyrgeorge.freepath.contact
+package io.github.smyrgeorge.freepath.database
 
-import io.github.smyrgeorge.freepath.util.db.Auditable
-import io.github.smyrgeorge.freepath.util.db.StringListConverter
+import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.ContactCardCoverter
+import io.github.smyrgeorge.freepath.contact.TrustLevel
+import io.github.smyrgeorge.freepath.database.util.Auditable
+import io.github.smyrgeorge.freepath.database.util.InstantConverter
+import io.github.smyrgeorge.freepath.database.util.StringListConverter
 import io.github.smyrgeorge.sqlx4k.annotation.Converter
 import io.github.smyrgeorge.sqlx4k.annotation.Id
 import io.github.smyrgeorge.sqlx4k.annotation.Table
@@ -12,10 +16,10 @@ import kotlin.time.Instant
 data class ContactCardEntry(
     /** Primary key. */
     @Id
-    override val id: Long = 0,
-//    @Converter(InstantConverter::class)
+    override val id: Int = 0,
+    @Converter(InstantConverter::class)
     override var createdAt: Instant = Clock.System.now(),
-//    @Converter(InstantConverter::class)
+    @Converter(InstantConverter::class)
     override var updatedAt: Instant = Clock.System.now(),
     /** Unique key. Derived locally from the contact's sigKey. */
     val nodeId: String,
@@ -27,7 +31,7 @@ data class ContactCardEntry(
     /** Local override for the contact's display name. Shown instead of card.name when set. */
     val name: String? = null,
     /** Unix epoch milliseconds when content or a card from this contact was last received. */
-//    @Converter(InstantConverter::class)
+    @Converter(InstantConverter::class)
     val lastSeenAt: Instant? = null,
     /** Free-text field for the user's own reference. Never shared. Max 1024 chars. */
     val notes: String? = null,
@@ -38,7 +42,7 @@ data class ContactCardEntry(
     /** User-defined labels for organising contacts. Max 16 tags, 32 chars each. */
     @Converter(StringListConverter::class)
     val tags: List<String> = emptyList(),
-) : Auditable<Long> {
+) : Auditable<Int> {
     init {
         require(id >= 0) { "id must be non-negative" }
         require(nodeId.matches(BASE58_REGEX)) {
