@@ -6,6 +6,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 class ContactCardEntryTest {
 
@@ -15,9 +17,9 @@ class ContactCardEntryTest {
         nodeId: String = "testNodeId",
         card: ContactCard? = null,
         trustLevel: TrustLevel = TrustLevel.TRUSTED,
-        addedAt: Long = 1_000L,
+        addedAt: Instant = Clock.System.now(),
         name: String? = null,
-        lastSeenAt: Long? = null,
+        lastSeenAt: Instant? = null,
         notes: String? = null,
         pinned: Boolean = false,
         muted: Boolean = false,
@@ -155,9 +157,9 @@ class ContactCardEntryTest {
             nodeId = "testId",
             card = storedCard,
             trustLevel = TrustLevel.KNOWN,
-            addedAt = 100L,
+            addedAt = Clock.System.now(),
             name = "Local Name",
-            lastSeenAt = 500L,
+            lastSeenAt = Clock.System.now(),
             notes = "My notes",
             pinned = true,
             muted = true,
@@ -173,9 +175,9 @@ class ContactCardEntryTest {
         assertEquals("New Name", merged.card.name)
         // Local-only fields preserved
         assertEquals(TrustLevel.KNOWN, merged.trustLevel)
-        assertEquals(100L, merged.addedAt)
+        assertEquals(stored.addedAt, merged.addedAt)
         assertEquals("Local Name", merged.name)
-        assertEquals(500L, merged.lastSeenAt)
+        assertEquals(stored.lastSeenAt, merged.lastSeenAt)
         assertEquals("My notes", merged.notes)
         assertEquals(true, merged.pinned)
         assertEquals(true, merged.muted)

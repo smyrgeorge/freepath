@@ -1,6 +1,8 @@
 package io.github.smyrgeorge.freepath.contact
 
 import io.github.smyrgeorge.freepath.util.db.Auditable
+import io.github.smyrgeorge.freepath.util.db.StringListConverter
+import io.github.smyrgeorge.sqlx4k.annotation.Converter
 import io.github.smyrgeorge.sqlx4k.annotation.Id
 import io.github.smyrgeorge.sqlx4k.annotation.Table
 import kotlin.time.Clock
@@ -8,6 +10,7 @@ import kotlin.time.Instant
 
 @Table("contact")
 data class ContactCardEntry(
+    /** Primary key. */
     @Id
     override val id: Long = 0,
     override var createdAt: Instant = Clock.System.now(),
@@ -19,11 +22,11 @@ data class ContactCardEntry(
     /** Controls how content from this contact is handled. */
     val trustLevel: TrustLevel = TrustLevel.TRUSTED,
     /** Unix epoch milliseconds when the contact card was first accepted. */
-    val addedAt: Long,
+    val addedAt: Instant,
     /** Local override for the contact's display name. Shown instead of card.name when set. */
     val name: String? = null,
     /** Unix epoch milliseconds when content or a card from this contact was last received. */
-    val lastSeenAt: Long? = null,
+    val lastSeenAt: Instant? = null,
     /** Free-text field for the user's own reference. Never shared. Max 1024 chars. */
     val notes: String? = null,
     /** Whether this contact is pinned to the top of the contact list. */
@@ -31,6 +34,7 @@ data class ContactCardEntry(
     /** If true, no notifications are generated for content from this contact. */
     val muted: Boolean = false,
     /** User-defined labels for organising contacts. Max 16 tags, 32 chars each. */
+    @Converter(StringListConverter::class)
     val tags: List<String> = emptyList(),
 ) : Auditable<Long> {
     init {
