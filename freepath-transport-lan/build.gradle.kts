@@ -29,6 +29,7 @@ kotlin {
         }
         commonMain {
             dependencies {
+                implementation(project(":freepath-contact"))
                 implementation(project(":freepath-transport"))
                 implementation(project(":freepath-util"))
                 implementation(project(":freepath-crypto"))

@@ -1,6 +1,6 @@
-package io.github.smyrgeorge.freepath.transport.model
+package io.github.smyrgeorge.freepath.contact
 
-data class LocalIdentity(
+data class Identity(
     /** Raw 16-byte Node ID: SHA-256(sigKey)[0..15]. */
     val nodeIdRaw: ByteArray,
     /** Ed25519 public key (32 bytes). */
@@ -14,7 +14,7 @@ data class LocalIdentity(
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (other !is LocalIdentity) return false
+        if (other !is Identity) return false
         return nodeIdRaw.contentEquals(other.nodeIdRaw)
     }
 

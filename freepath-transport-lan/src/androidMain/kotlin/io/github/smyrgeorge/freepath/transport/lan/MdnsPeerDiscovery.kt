@@ -5,8 +5,10 @@ import android.content.Context
 import android.net.nsd.DiscoveryRequest
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import android.os.Build
 import io.github.smyrgeorge.freepath.transport.PeerDiscovery
+import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,12 +31,19 @@ class MdnsPeerDiscovery(
     context: Context,
 ) : PeerDiscovery {
 
+    private val log = Logger.of(MdnsPeerDiscovery::class)
     private val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
+    private val multicastLock: WifiManager.MulticastLock =
+        (context.getSystemService(Context.WIFI_SERVICE) as WifiManager)
+            .createMulticastLock("freepath-mdns")
+            .also { it.setReferenceCounted(false) }
     private var registrationListener: NsdManager.RegistrationListener? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override suspend fun start(port: Int, onPeerDiscovered: suspend (nodeId: String, address: String) -> Unit) {
+        multicastLock.acquire()
+        log.info { "mDNS starting on port $port (nodeId=$nodeId)" }
         // Register this node's service for other peers to discover.
         val suffix = "%04x".format(Random.nextInt(0x10000))
         val serviceInfo = NsdServiceInfo().apply {
@@ -45,8 +54,12 @@ class MdnsPeerDiscovery(
             setAttribute("nodeId", this@MdnsPeerDiscovery.nodeId)
         }
         val regListener = object : NsdManager.RegistrationListener {
-            override fun onServiceRegistered(info: NsdServiceInfo) {}
-            override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {}
+            override fun onServiceRegistered(info: NsdServiceInfo) {
+                log.info { "mDNS service registered: ${info.serviceName}" }
+            }
+            override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {
+                log.error { "mDNS service registration failed: errorCode=$errorCode" }
+            }
             override fun onServiceUnregistered(info: NsdServiceInfo) {}
             override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {}
         }
@@ -65,12 +78,17 @@ class MdnsPeerDiscovery(
         }
 
         val listener = object : NsdManager.DiscoveryListener {
-            override fun onDiscoveryStarted(serviceType: String) {}
+            override fun onDiscoveryStarted(serviceType: String) {
+                log.info { "mDNS discovery started for $serviceType" }
+            }
             override fun onDiscoveryStopped(serviceType: String) {}
-            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {}
+            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+                log.error { "mDNS discovery start failed: $serviceType errorCode=$errorCode" }
+            }
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
+                log.info { "mDNS service found: ${serviceInfo.serviceName}" }
                 scope.launch { resolveChannel.send(serviceInfo) }
             }
 
@@ -110,11 +128,13 @@ class MdnsPeerDiscovery(
             lateinit var callback: NsdManager.ServiceInfoCallback
             callback = object : NsdManager.ServiceInfoCallback {
                 override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) {
+                    log.error { "mDNS service info callback registration failed: errorCode=$errorCode" }
                     if (handled.compareAndSet(false, true)) cont.resume(Unit)
                 }
 
                 override fun onServiceUpdated(info: NsdServiceInfo) {
                     if (!handled.compareAndSet(false, true)) return
+                    log.info { "mDNS service resolved: ${info.serviceName} host=${info.hostAddresses} port=${info.port}" }
                     // Unregister immediately — we only need the first update.
                     runCatching { nsdManager.unregisterServiceInfoCallback(callback) }
                     // Resume first so the next queued service can start resolving immediately.
@@ -164,6 +184,7 @@ class MdnsPeerDiscovery(
             }
 
             override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                log.info { "mDNS service resolved (legacy): ${serviceInfo.serviceName} host=${serviceInfo.host} port=${serviceInfo.port}" }
                 // Resume first so the next queued service can start resolving immediately.
                 cont.resume(Unit)
 
@@ -188,6 +209,7 @@ class MdnsPeerDiscovery(
     }
 
     override suspend fun stop() {
+        multicastLock.release()
         scope.cancel()
         registrationListener?.let {
             runCatching { nsdManager.unregisterService(it) }

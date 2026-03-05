@@ -57,6 +57,10 @@ data class ContactCard(
         }
     }
 
+    override fun toString(): String {
+        return "ContactCard(location=$location, avatar=$avatar, bio=$bio, name=$name, updatedAt=$updatedAt, nodeId='$nodeId', schema=$schema)"
+    }
+
     companion object {
         const val SCHEMA = 1
         const val MAX_NAME_LENGTH = 64

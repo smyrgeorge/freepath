@@ -1,11 +1,11 @@
 package io.github.smyrgeorge.freepath.transport.lan
 
-import io.github.smyrgeorge.freepath.transport.StatefulProtocol
-import io.github.smyrgeorge.freepath.util.codec.Base58
-import io.github.smyrgeorge.freepath.transport.codec.StatelessEnvelopeCodec
+import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.transport.StatefulProtocol
+import io.github.smyrgeorge.freepath.transport.codec.StatelessEnvelopeCodec
 import io.github.smyrgeorge.freepath.transport.model.ContactInfo
-import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
+import io.github.smyrgeorge.freepath.util.codec.Base58
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -18,16 +18,16 @@ import kotlin.test.assertEquals
 
 class LanStatelessEnvelopeTest {
 
-    private fun createIdentity(): LocalIdentity {
+    private fun createIdentity(): Identity {
         val sigKp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
         val nodeIdRaw = CryptoProvider.sha256(sigKp.publicKey).copyOf(16)
-        return LocalIdentity(nodeIdRaw, sigKp.publicKey, sigKp.privateKey, encKp.publicKey, encKp.privateKey)
+        return Identity(nodeIdRaw, sigKp.publicKey, sigKp.privateKey, encKp.publicKey, encKp.privateKey)
     }
 
     private fun buildProtocol(
-        identity: LocalIdentity,
-        knownPeers: List<LocalIdentity>,
+        identity: Identity,
+        knownPeers: List<Identity>,
         received: Channel<Pair<String, ByteArray>>,
     ): Pair<StatefulProtocol, LanLinkAdapter> {
         val nodeId = Base58.encode(identity.nodeIdRaw)

@@ -1,6 +1,7 @@
 package io.github.smyrgeorge.freepath.transport.lan
 
 import io.github.smyrgeorge.freepath.transport.PeerDiscovery
+import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -11,10 +12,13 @@ import javax.jmdns.JmDNS
 import javax.jmdns.ServiceEvent
 import javax.jmdns.ServiceInfo
 import javax.jmdns.ServiceListener
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import kotlin.random.Random
 
 class MdnsPeerDiscovery(override val nodeId: String) : PeerDiscovery {
 
+    private val log = Logger.of(MdnsPeerDiscovery::class)
     private var jmdns: JmDNS? = null
     private var serviceInfo: ServiceInfo? = null
     private var listener: ServiceListener? = null
@@ -22,7 +26,18 @@ class MdnsPeerDiscovery(override val nodeId: String) : PeerDiscovery {
 
     override suspend fun start(port: Int, onPeerDiscovered: suspend (String, String) -> Unit) =
         withContext(Dispatchers.IO) {
-            val jm = JmDNS.create()
+            log.info { "mDNS starting on port $port (nodeId=$nodeId)" }
+            // Bind to the first non-loopback, non-link-local IPv4 address so that JmDNS
+            // uses the real LAN interface (e.g. en0/Wi-Fi) instead of a macOS auxiliary
+            // interface like llw0 which has no IPv4 address and no LAN multicast reachability.
+            val localAddress = NetworkInterface.getNetworkInterfaces()
+                ?.asSequence()
+                ?.filter { it.isUp && !it.isLoopback && !it.isVirtual }
+                ?.flatMap { it.inetAddresses.asSequence() }
+                ?.filterIsInstance<Inet4Address>()
+                ?.firstOrNull { !it.isLinkLocalAddress && !it.isLoopbackAddress }
+            log.info { "mDNS binding to $localAddress" }
+            val jm = if (localAddress != null) JmDNS.create(localAddress) else JmDNS.create()
             jmdns = jm
 
             // Register this node's service for other peers to discover.
@@ -33,10 +48,12 @@ class MdnsPeerDiscovery(override val nodeId: String) : PeerDiscovery {
             val info = ServiceInfo.create(SERVICE_TYPE, "Freepath ($suffix)", port, 0, 0, props)
             serviceInfo = info
             jm.registerService(info)
+            log.info { "mDNS service registered: ${info.name} on ${jm.inetAddress}" }
 
             // Discover peers.
             val l = object : ServiceListener {
                 override fun serviceAdded(event: ServiceEvent) {
+                    log.info { "mDNS service found: ${event.name}" }
                     // Request full resolution; serviceResolved will be called when it completes.
                     jm.requestServiceInfo(event.type, event.name)
                 }
@@ -47,6 +64,7 @@ class MdnsPeerDiscovery(override val nodeId: String) : PeerDiscovery {
 
                 override fun serviceResolved(event: ServiceEvent) {
                     val resolved = event.info ?: return
+                    log.info { "mDNS service resolved: ${event.name} host=${resolved.inet4Addresses.firstOrNull()} port=${resolved.port}" }
 
                     // Spec: MUST ignore advertisements whose v value is not supported.
                     val version = resolved.getPropertyString("v") ?: return

@@ -14,6 +14,9 @@ kotlin {
         namespace = "io.github.smyrgeorge.freepath.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
+        androidResources {
+            enable = true
+        }
     }
 
     listOf(
@@ -30,6 +33,14 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":freepath-contact"))
+            implementation(project(":freepath-crypto"))
+            implementation(project(":freepath-database"))
+            implementation(project(":freepath-transport"))
+            implementation(project(":freepath-transport-lan"))
+            implementation(project(":freepath-util"))
+
+            implementation(libs.log4k)
             implementation(libs.material3)
             implementation(libs.compose.ui)
             implementation(libs.compose.runtime)

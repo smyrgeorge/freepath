@@ -19,6 +19,7 @@ kotlin {
         }
         jvmMain {
             dependencies {
+                implementation(project(":freepath-contact"))
                 implementation(project(":freepath-transport"))
                 implementation(project(":freepath-transport-lan"))
                 implementation(project(":freepath-util"))

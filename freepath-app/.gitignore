@@ -1,3 +1,5 @@
+freepath.db*
+
 *.iml
 .kotlin
 .gradle

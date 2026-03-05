@@ -1,8 +1,8 @@
 package io.github.smyrgeorge.freepath.transport.lan
 
+import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.transport.StatefulProtocol
 import io.github.smyrgeorge.freepath.util.codec.Base58
-import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -132,7 +132,7 @@ object DemoApp {
      *   X.509 SubjectPublicKeyInfo  — 12-byte OID header + 32-byte raw public key
      *   PKCS#8 PrivateKeyInfo       — 16-byte DER header + 32-byte raw seed
      */
-    private fun deriveIdentity(index: Int): LocalIdentity {
+    private fun deriveIdentity(index: Int): Identity {
         val seed = MessageDigest.getInstance("SHA-256")
             .digest("freepath-demo-node-$index".toByteArray())
 
@@ -155,6 +155,6 @@ object DemoApp {
         val encPubKey = kpX.public.encoded.copyOfRange(12, 44)
         val encPrivKey = kpX.private.encoded.copyOfRange(16, 48)
 
-        return LocalIdentity(nodeIdRaw, pubKey, privKey, encPubKey, encPrivKey)
+        return Identity(nodeIdRaw, pubKey, privKey, encPubKey, encPrivKey)
     }
 }

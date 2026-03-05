@@ -33,5 +33,6 @@ android {
 
 dependencies {
     implementation(project(":freepath-app:composeApp"))
+    implementation(project(":freepath-util"))
     implementation(libs.androidx.activity.compose)
 }

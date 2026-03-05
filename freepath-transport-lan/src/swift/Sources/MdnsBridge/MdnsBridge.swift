@@ -33,6 +33,7 @@ import Foundation
     @objc public func start(port: Int32, onPeerDiscovered: @escaping (String?, String?) -> Void) {
         self.callback = onPeerDiscovered
 
+        NSLog("[MdnsBridge] starting on port %d (nodeId=%@)", port, nodeId)
         let t = Thread { [weak self] in self?.runLoopMain(port: port) }
         t.name = "io.github.smyrgeorge.freepath.mdns"
         t.start()
@@ -61,6 +62,7 @@ import Foundation
         svc.schedule(in: currentRL, forMode: .default)
         svc.publish()
         service = svc
+        NSLog("[MdnsBridge] service published: %@", name)
 
         // Browse for peers
         let b = NetServiceBrowser()
@@ -133,6 +135,7 @@ extension MdnsBridge: NetServiceBrowserDelegate {
         didFind service: NetService,
         moreComing: Bool
     ) {
+        NSLog("[MdnsBridge] service found: %@", service.name)
         // Schedule on our run loop so delegate callbacks are dispatched there too.
         service.delegate = self
         service.schedule(in: rl ?? RunLoop.current, forMode: .default)
@@ -152,7 +155,7 @@ extension MdnsBridge: NetServiceBrowserDelegate {
         _ browser: NetServiceBrowser,
         didNotSearch errorDict: [String: NSNumber]
     ) {
-        // Non-fatal; browsing continues when network becomes available.
+        NSLog("[MdnsBridge] browse failed: %@", errorDict)
     }
 }
 
@@ -167,7 +170,10 @@ extension MdnsBridge: NetServiceDelegate {
             sender.remove(from: rl ?? RunLoop.current, forMode: .default)
         }
 
-        guard let txtData = sender.txtRecordData() else { return }
+        guard let txtData = sender.txtRecordData() else {
+            NSLog("[MdnsBridge] resolved %@ but no TXT record", sender.name)
+            return
+        }
         let dict = NetService.dictionary(fromTXTRecord: txtData)
 
         guard
@@ -177,12 +183,17 @@ extension MdnsBridge: NetServiceDelegate {
             let peerId  = String(data: idData, encoding: .utf8),
             peerId != nodeId,
             let address = resolvedAddress(for: sender)
-        else { return }
+        else {
+            NSLog("[MdnsBridge] resolved %@ but skipped (own service, wrong version, or no address)", sender.name)
+            return
+        }
 
+        NSLog("[MdnsBridge] peer discovered: %@ at %@", peerId, address)
         callback?(peerId, address)
     }
 
     public func netService(_ sender: NetService, didNotResolve errorDict: [String: NSNumber]) {
+        NSLog("[MdnsBridge] resolve failed for %@: %@", sender.name, errorDict)
         resolving.removeAll { $0 === sender }
         sender.stop()
         sender.remove(from: rl ?? RunLoop.current, forMode: .default)

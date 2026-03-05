@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.database
 
 import io.github.smyrgeorge.freepath.contact.ContactCard
-import io.github.smyrgeorge.freepath.contact.ContactCardCoverter
+import io.github.smyrgeorge.freepath.contact.ContactCardConverter
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.database.util.Auditable
 import io.github.smyrgeorge.freepath.database.util.InstantConverter
@@ -24,7 +24,7 @@ data class ContactCardEntry(
     /** Unique key. Derived locally from the contact's sigKey. */
     val nodeId: String,
     /** The accepted contact card. */
-    @Converter(ContactCardCoverter::class)
+    @Converter(ContactCardConverter::class)
     val card: ContactCard,
     /** Controls how content from this contact is handled. */
     val trustLevel: TrustLevel = TrustLevel.TRUSTED,
@@ -91,5 +91,8 @@ data class ContactCardEntry(
         const val MAX_TAGS_COUNT = 16
         const val MAX_TAG_LENGTH = 32
         private val BASE58_REGEX = Regex("[1-9A-HJ-NP-Za-km-z]{22}")
+
+        /** Tag applied to the user's own card on first creation. Used to route to the onboarding screen. */
+        const val TAG_ONBOARDING = "ONBOARDING"
     }
 }

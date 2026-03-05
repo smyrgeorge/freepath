@@ -1,10 +1,10 @@
 package io.github.smyrgeorge.freepath.transport.codec
 
+import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.freepath.transport.model.ContactInfo
-import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
 import io.github.smyrgeorge.freepath.transport.model.StatelessEnvelope
+import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.freepath.util.codec.JsonCodec
 import kotlin.io.encoding.Base64
 
@@ -16,7 +16,7 @@ object StatelessEnvelopeCodec {
     class EnvelopeException(message: String) : Exception(message)
 
     fun seal(
-        sender: LocalIdentity,
+        sender: Identity,
         receiverIdRaw: ByteArray,
         receiverEncKeyPublic: ByteArray,
         plaintext: ByteArray,
@@ -52,7 +52,7 @@ object StatelessEnvelopeCodec {
 
     fun open(
         envelope: StatelessEnvelope,
-        receiver: LocalIdentity,
+        receiver: Identity,
         contactLookup: (nodeIdRaw: ByteArray) -> ContactInfo?,
     ): ByteArray {
         if (envelope.schema != SCHEMA)

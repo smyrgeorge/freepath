@@ -34,7 +34,7 @@ kotlin {
                 implementation(project(":freepath-contact"))
                 implementation(project(":freepath-crypto"))
                 implementation(project(":freepath-util"))
-                implementation(libs.sqlx4k.sqlite)
+                api(libs.sqlx4k.sqlite)
             }
             // Config if your code is under the commonMain module.
             kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin")

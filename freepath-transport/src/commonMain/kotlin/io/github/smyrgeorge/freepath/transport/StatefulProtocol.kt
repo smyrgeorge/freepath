@@ -1,14 +1,13 @@
 package io.github.smyrgeorge.freepath.transport
 
-import io.github.smyrgeorge.freepath.transport.codec.AeadCodec
-import io.github.smyrgeorge.freepath.util.codec.Base58
+import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.transport.crypto.HandshakeHandler
+import io.github.smyrgeorge.freepath.transport.codec.AeadCodec
 import io.github.smyrgeorge.freepath.transport.model.ContactLookup
 import io.github.smyrgeorge.freepath.transport.model.Frame
 import io.github.smyrgeorge.freepath.transport.model.FrameType
-import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
 import io.github.smyrgeorge.freepath.transport.model.SessionState
+import io.github.smyrgeorge.freepath.util.codec.Base58
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -25,7 +24,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TimeSource
 
 class StatefulProtocol(
-    identity: LocalIdentity,
+    identity: Identity,
     contactLookup: ContactLookup,
     private val linkAdapter: LinkAdapter,
     private val onFrameReceived: suspend (peerId: String, frame: Frame, session: SessionState) -> Unit,

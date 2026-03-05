@@ -1,9 +1,9 @@
 package io.github.smyrgeorge.freepath.transport.codec
 
+import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.freepath.transport.model.ContactInfo
-import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
+import io.github.smyrgeorge.freepath.util.codec.Base58
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -12,14 +12,14 @@ import kotlin.test.assertFailsWith
 
 class StatelessEnvelopeCodecTest {
 
-    private fun makeIdentity(): LocalIdentity {
+    private fun makeIdentity(): Identity {
         val sigKp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
         val nodeIdRaw = CryptoProvider.randomBytes(16)
-        return LocalIdentity(nodeIdRaw, sigKp.publicKey, sigKp.privateKey, encKp.publicKey, encKp.privateKey)
+        return Identity(nodeIdRaw, sigKp.publicKey, sigKp.privateKey, encKp.publicKey, encKp.privateKey)
     }
 
-    private fun contactLookupFor(vararg identities: LocalIdentity): (ByteArray) -> ContactInfo? = { nodeIdRaw ->
+    private fun contactLookupFor(vararg identities: Identity): (ByteArray) -> ContactInfo? = { nodeIdRaw ->
         identities.firstOrNull { it.nodeIdRaw.contentEquals(nodeIdRaw) }
             ?.let { ContactInfo(it.sigKeyPublic, it.encKeyPublic) }
     }

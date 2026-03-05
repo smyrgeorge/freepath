@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FREEPATH</string>
+    <string name="tagline">La información viaja a través de las personas</string>
+    <string name="identity_title">Tu identidad está lista</string>
+    <string name="node_id_label">ID de nodo</string>
+    <string name="identity_description">Esta es tu dirección única en la red Freepath. Otros la usarán para reconocerte al intercambiar tarjetas de contacto. Generada en este dispositivo — sin cuenta, sin correo, sin servidor.</string>
+    <string name="profile_title">Tu perfil</string>
+    <string name="name_label">Nombre</string>
+    <string name="name_hint">Nombre visible (opcional)</string>
+    <string name="bio_label">Bio</string>
+    <string name="bio_hint">Sobre ti (opcional)</string>
+    <string name="location_label">Ubicación</string>
+    <string name="location_hint">Ciudad o región (opcional)</string>
+    <string name="continue_button">Continuar</string>
+    <string name="finish_button">Finalizar</string>
+    <string name="security_note">Tus claves se almacenan solo en este dispositivo y nunca lo abandonan</string>
+</resources>

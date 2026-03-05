@@ -1,16 +1,16 @@
-package io.github.smyrgeorge.freepath.transport.crypto
+package io.github.smyrgeorge.freepath.transport
 
+import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.freepath.transport.model.ContactLookup
 import io.github.smyrgeorge.freepath.transport.model.Frame
 import io.github.smyrgeorge.freepath.transport.model.FrameType
-import io.github.smyrgeorge.freepath.transport.model.LocalIdentity
 import io.github.smyrgeorge.freepath.transport.model.SessionState
+import io.github.smyrgeorge.freepath.util.codec.Base58
 import kotlin.io.encoding.Base64
 
 class HandshakeHandler(
-    private val identity: LocalIdentity,
+    private val identity: Identity,
     private val contactLookup: ContactLookup,
 ) {
     fun createInitiatorFrame(streamId: String): Pair<Frame, InitiatorContext> {
@@ -28,7 +28,7 @@ class HandshakeHandler(
 
     /**
      * Completes the initiator side of the handshake and returns the cryptographically
-     * verified peer nodeId alongside the derived [SessionState]. Callers MUST verify
+     * verified peer nodeId alongside the derived [io.github.smyrgeorge.freepath.transport.model.SessionState]. Callers MUST verify
      * that the returned nodeId matches the peer they intended to connect to before
      * registering the session.
      */
