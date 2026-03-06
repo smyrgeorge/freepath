@@ -26,7 +26,7 @@ ksp = "2.3.6"
 # https://github.com/jmdns/jmdns
 jmdns = "3.6.3"
 # https://developer.android.com/studio/releases/gradle-plugin
-android-gradle-plugin = "9.0.0-alpha06"
+android-gradle-plugin = "9.2.0-alpha02"
 # https://github.com/alexzhirkevich/qrose
 qrose = "1.1.2"
 material3 = "1.9.0"
