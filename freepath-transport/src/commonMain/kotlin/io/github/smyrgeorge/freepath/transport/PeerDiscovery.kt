@@ -53,7 +53,11 @@ interface PeerDiscovery {
      * or thread internally. [onPeerDiscovered] is a suspend function and MUST be invoked
      * from a coroutine context.
      */
-    suspend fun start(port: Int, onPeerDiscovered: suspend (nodeId: String, address: String) -> Unit)
+    suspend fun start(
+        port: Int,
+        onPeerDiscovered: suspend (nodeId: String, address: String) -> Unit,
+        onPeerRemoved: suspend (nodeId: String) -> Unit,
+    )
 
     /**
      * Stops the discovery mechanism and releases all associated resources (sockets, scan

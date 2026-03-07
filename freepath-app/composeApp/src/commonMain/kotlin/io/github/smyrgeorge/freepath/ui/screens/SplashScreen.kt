@@ -21,11 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.smyrgeorge.composeapp.generated.resources.Res
 import io.github.smyrgeorge.composeapp.generated.resources.app_name
-import io.github.smyrgeorge.freepath.AppState
-import kotlinx.coroutines.delay
+import io.github.smyrgeorge.freepath.AppUiState
+import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.stringResource
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.measureTime
 
 @Composable
 fun SplashScreen(
@@ -35,18 +33,11 @@ fun SplashScreen(
     val alpha = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
-        val time = measureTime {
-            AppState.initialize()
-        }
-
-        AppState.log.info { "App initialization took $time" }
-        if (time < 1.seconds) delay(1.seconds - time)
-
+        AppUiState.startupRoute.first { it != AppUiState.StartupRoute.Loading }
         alpha.animateTo(
             targetValue = 0f,
             animationSpec = tween(durationMillis = 400),
         )
-
         onReady()
     }
 

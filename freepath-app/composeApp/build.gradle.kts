@@ -41,6 +41,8 @@ kotlin {
             implementation(project(":freepath-util"))
 
             implementation(libs.log4k)
+            implementation(libs.qrose)
+            implementation(libs.actor4k)
             implementation(libs.material3)
             implementation(libs.compose.ui)
             implementation(libs.compose.runtime)

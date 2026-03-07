@@ -2,16 +2,16 @@ package io.github.smyrgeorge.freepath.transport
 
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.transport.model.ContactLookup
 import io.github.smyrgeorge.freepath.transport.model.Frame
 import io.github.smyrgeorge.freepath.transport.model.FrameType
 import io.github.smyrgeorge.freepath.transport.model.SessionState
 import io.github.smyrgeorge.freepath.util.codec.Base58
+import kotlinx.coroutines.runBlocking
 import kotlin.io.encoding.Base64
 
 class HandshakeHandler(
     private val identity: Identity,
-    private val contactLookup: ContactLookup,
+    private val contactLookup: suspend (nodeIdRaw: ByteArray) -> ByteArray?,
 ) {
     fun createInitiatorFrame(streamId: String): Pair<Frame, InitiatorContext> {
         val ephemeral = CryptoProvider.generateX25519KeyPair()
@@ -99,7 +99,7 @@ class HandshakeHandler(
         // Look up the peer's sigKey from the contact list — do NOT trust the received sigKey.
         // Verify the received SIGKEY matches the key on file (spec requirement), then verify
         // the signature using the trusted key from the contact list.
-        val trustedSigKey = contactLookup.getSigKey(fields.nodeIdRaw)
+        val trustedSigKey = runBlocking { contactLookup(fields.nodeIdRaw) }
             ?: throw HandshakeException("Unknown peer nodeId")
 
         if (!fields.sigKey.contentEquals(trustedSigKey))

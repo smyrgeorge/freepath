@@ -8,82 +8,92 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.Inet4Address
+import java.net.NetworkInterface
+import java.util.concurrent.ConcurrentHashMap
 import javax.jmdns.JmDNS
 import javax.jmdns.ServiceEvent
 import javax.jmdns.ServiceInfo
 import javax.jmdns.ServiceListener
-import java.net.Inet4Address
-import java.net.NetworkInterface
 import kotlin.random.Random
 
 class MdnsPeerDiscovery(override val nodeId: String) : PeerDiscovery {
 
-    private val log = Logger.of(MdnsPeerDiscovery::class)
+    private val log = Logger.of(this::class)
     private var jmdns: JmDNS? = null
     private var serviceInfo: ServiceInfo? = null
     private var listener: ServiceListener? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    override suspend fun start(port: Int, onPeerDiscovered: suspend (String, String) -> Unit) =
-        withContext(Dispatchers.IO) {
-            log.info { "mDNS starting on port $port (nodeId=$nodeId)" }
-            // Bind to the first non-loopback, non-link-local IPv4 address so that JmDNS
-            // uses the real LAN interface (e.g. en0/Wi-Fi) instead of a macOS auxiliary
-            // interface like llw0 which has no IPv4 address and no LAN multicast reachability.
-            val localAddress = NetworkInterface.getNetworkInterfaces()
-                ?.asSequence()
-                ?.filter { it.isUp && !it.isLoopback && !it.isVirtual }
-                ?.flatMap { it.inetAddresses.asSequence() }
-                ?.filterIsInstance<Inet4Address>()
-                ?.firstOrNull { !it.isLinkLocalAddress && !it.isLoopbackAddress }
-            log.info { "mDNS binding to $localAddress" }
-            val jm = if (localAddress != null) JmDNS.create(localAddress) else JmDNS.create()
-            jmdns = jm
+    /** Maps mDNS service name → peer nodeId for removal lookups. */
+    private val resolvedPeers = ConcurrentHashMap<String, String>()
 
-            // Register this node's service for other peers to discover.
-            val suffix = "%04x".format(Random.nextInt(0x10000))
-            val props = HashMap<String, String>()
-            props["v"] = PROTOCOL_VERSION
-            props["nodeId"] = nodeId
-            val info = ServiceInfo.create(SERVICE_TYPE, "Freepath ($suffix)", port, 0, 0, props)
-            serviceInfo = info
-            jm.registerService(info)
-            log.info { "mDNS service registered: ${info.name} on ${jm.inetAddress}" }
+    override suspend fun start(
+        port: Int,
+        onPeerDiscovered: suspend (String, String) -> Unit,
+        onPeerRemoved: suspend (String) -> Unit,
+    ) = withContext(Dispatchers.IO) {
+        log.info { "mDNS starting on port $port (nodeId=$nodeId)" }
+        // Bind to the first non-loopback, non-link-local IPv4 address so that JmDNS
+        // uses the real LAN interface (e.g. en0/Wi-Fi) instead of a macOS auxiliary
+        // interface like llw0 which has no IPv4 address and no LAN multicast reachability.
+        val localAddress = NetworkInterface.getNetworkInterfaces()
+            ?.asSequence()
+            ?.filter { it.isUp && !it.isLoopback && !it.isVirtual }
+            ?.flatMap { it.inetAddresses.asSequence() }
+            ?.filterIsInstance<Inet4Address>()
+            ?.firstOrNull { !it.isLinkLocalAddress && !it.isLoopbackAddress }
+        log.info { "mDNS binding to $localAddress" }
+        val jm = if (localAddress != null) JmDNS.create(localAddress) else JmDNS.create()
+        jmdns = jm
 
-            // Discover peers.
-            val l = object : ServiceListener {
-                override fun serviceAdded(event: ServiceEvent) {
-                    log.info { "mDNS service found: ${event.name}" }
-                    // Request full resolution; serviceResolved will be called when it completes.
-                    jm.requestServiceInfo(event.type, event.name)
-                }
+        // Register this node's service for other peers to discover.
+        val suffix = "%04x".format(Random.nextInt(0x10000))
+        val props = HashMap<String, String>()
+        props["v"] = PROTOCOL_VERSION
+        props["nodeId"] = nodeId
+        val info = ServiceInfo.create(SERVICE_TYPE, "Freepath ($suffix)", port, 0, 0, props)
+        serviceInfo = info
+        jm.registerService(info)
+        log.info { "mDNS service registered: ${info.name} on ${jm.inetAddress}" }
 
-                override fun serviceRemoved(event: ServiceEvent) {
-                    // No action needed — session teardown is handled by the protocol layer.
-                }
-
-                override fun serviceResolved(event: ServiceEvent) {
-                    val resolved = event.info ?: return
-                    log.info { "mDNS service resolved: ${event.name} host=${resolved.inet4Addresses.firstOrNull()} port=${resolved.port}" }
-
-                    // Spec: MUST ignore advertisements whose v value is not supported.
-                    val version = resolved.getPropertyString("v") ?: return
-                    if (version != SUPPORTED_VERSION) return
-
-                    val peerNodeId = resolved.getPropertyString("nodeId") ?: return
-
-                    // Prefer IPv4; fall back to IPv6 if no IPv4 address is available.
-                    val host = resolved.inet4Addresses.firstOrNull()?.hostAddress
-                        ?: resolved.inet6Addresses.firstOrNull()?.hostAddress
-                        ?: return
-
-                    scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddress.encode(host, resolved.port)) }
-                }
+        // Discover peers.
+        val l = object : ServiceListener {
+            override fun serviceAdded(event: ServiceEvent) {
+                log.info { "mDNS service found: ${event.name}" }
+                // Request full resolution; serviceResolved will be called when it completes.
+                jm.requestServiceInfo(event.type, event.name)
             }
 
-            listener = l
-            jm.addServiceListener(SERVICE_TYPE, l)
+            override fun serviceRemoved(event: ServiceEvent) {
+                val peerNodeId = resolvedPeers.remove(event.name) ?: return
+                log.info { "mDNS service removed: ${event.name} (nodeId=$peerNodeId)" }
+                scope.launch { onPeerRemoved(peerNodeId) }
+            }
+
+            override fun serviceResolved(event: ServiceEvent) {
+                val resolved = event.info ?: return
+                log.info { "mDNS service resolved: ${event.name} host=${resolved.inet4Addresses.firstOrNull()} port=${resolved.port}" }
+
+                // Spec: MUST ignore advertisements whose v value is not supported.
+                val version = resolved.getPropertyString("v") ?: return
+                if (version != SUPPORTED_VERSION) return
+
+                val peerNodeId = resolved.getPropertyString("nodeId") ?: return
+
+                // Prefer IPv4; fall back to IPv6 if no IPv4 address is available.
+                val host = resolved.inet4Addresses.firstOrNull()?.hostAddress
+                    ?: resolved.inet6Addresses.firstOrNull()?.hostAddress
+                    ?: return
+
+                resolvedPeers[event.name] = peerNodeId
+                scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddress.encode(host, resolved.port)) }
+            }
         }
+
+        listener = l
+        jm.addServiceListener(SERVICE_TYPE, l)
+    }
 
     override suspend fun stop() {
         scope.cancel()

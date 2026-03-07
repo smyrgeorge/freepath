@@ -1,23 +1,49 @@
 # Freepath
 
 Protocol specification and reference implementation. Specs live in `spec/`; Kotlin Multiplatform implementation in
-`freepath-util`, `freepath-crypto`, `freepath-contact`, `freepath-transport`, `freepath-transport-lan`, and `freepath-transport-lan-demo`.
+`freepath-util`, `freepath-crypto`, `freepath-contact`, `freepath-transport`, `freepath-transport-lan`,
+`freepath-database`, and `freepath-app`.
+
+## Commands
+
+```bash
+# Build everything
+./gradlew build
+
+# Run tests for a specific module
+./gradlew :freepath-transport:jvmTest
+./gradlew :freepath-contact:jvmTest
+
+# Regenerate KSP-generated database repositories (after changing @Table/@Column annotations)
+./gradlew :freepath-database:kspCommonMainKotlinMetadata
+
+# Run the LAN demo (builds fatJar + launches Docker nodes)
+./examples/transport-lan/src/docker/run.sh
+
+# Build Compose desktop app (JVM)
+./gradlew :freepath-app:composeApp:run
+
+# Android APK
+./gradlew :freepath-app:androidApp:assembleDebug
+```
 
 ## Repository structure
 
-| Path                           | Purpose                                                                                                   |
-|--------------------------------|-----------------------------------------------------------------------------------------------------------|
-| `spec/`                        | Protocol and data model specifications                                                                    |
-| `freepath-util/`               | Shared utilities: `Base58` encoder/decoder                                                                |
-| `freepath-crypto/`             | Crypto primitives: `CryptoProvider` expect/actual (JVM+Android via BouncyCastle, iOS via Swift/CryptoKit) |
-| `freepath-contact/`            | Contact identity model: `ContactCard`, `ContactEntry`, `ContactCardCodec` (specs 1 & 2)                   |
-| `freepath-transport/`          | Protocol core: handshake, session, frame codec, crypto                                                    |
-| `freepath-transport-lan/`      | LAN adapter library: TCP + mDNS peer discovery (JVM + Android)                                            |
-| `freepath-transport-lan-demo/` | JVM demo app: multi-node heartbeat demo + Docker setup                                                    |
-| `build-logic/`                 | Gradle convention plugins (`freepath.dokka`, `freepath.swift.interop`)                                    |
-| `docs/`                        | Published HTML documentation                                                                              |
-| `tools/`                       | Pandoc templates and Lua filters for PDF/HTML generation                                                  |
-| `README.md`                    | Project vision and concept overview                                                                       |
+| Path                      | Purpose                                                                                                   |
+|---------------------------|-----------------------------------------------------------------------------------------------------------|
+| `spec/`                   | Protocol and data model specifications                                                                    |
+| `freepath-util/`          | Shared utilities: `Base58` encoder/decoder                                                                |
+| `freepath-crypto/`        | Crypto primitives: `CryptoProvider` expect/actual (JVM+Android via BouncyCastle, iOS via Swift/CryptoKit) |
+| `freepath-contact/`       | Contact identity model: `ContactCard`, `ContactEntry`, `ContactCardCodec` (specs 1 & 2)                   |
+| `freepath-transport/`     | Protocol core: handshake, session, frame codec, crypto                                                    |
+| `freepath-transport-lan/` | LAN adapter library: TCP + mDNS peer discovery (JVM + Android + iOS)                                      |
+| `freepath-database/`      | SQLite persistence: sqlx4k + KSP-generated repos, migrations, `ContactCardEntry`, `IdentityEntry`         |
+| `freepath-app/`           | Compose Multiplatform mobile app (composeApp, androidApp, iosApp)                                         |
+| `examples/transport-lan/` | JVM demo app: multi-node heartbeat demo + Docker setup                                                    |
+| `build-logic/`            | Gradle convention plugins (`freepath.dokka`, `freepath.swift.interop`)                                    |
+| `docs/`                   | Published HTML documentation                                                                              |
+| `tools/`                  | Pandoc templates and Lua filters for PDF/HTML generation                                                  |
+| `README.md`               | Project vision and concept overview                                                                       |
 
 ## Spec files
 
@@ -110,18 +136,19 @@ Kotlin Multiplatform library (JVM, Android, iOS). Implements:
 - **`BinaryCodec`** — Binary encoding utility
 - **`CryptoProvider`** — `expect`/`actual` crypto interface; actuals live in `freepath-crypto`
 
-**Key interfaces:** `Protocol`, `LinkAdapter`, `PeerDiscovery`
+**Key interfaces:** `Protocol` (transport-layer interface — distinct from `freepath-app`'s `Protocol` sealed class of actor messages), `LinkAdapter`, `PeerDiscovery`
 
 **Key dependencies:** `project(":freepath-crypto")`, `project(":freepath-util")`, `kotlinx-coroutines-core`,
 `kotlinx-serialization-json`, `log4k`
 
 ### `freepath-transport-lan` — LAN adapter
 
-Kotlin Multiplatform library targeting JVM and Android (minSdk 26). Implements:
+Kotlin Multiplatform library targeting JVM, Android (minSdk 26), and iOS. Implements:
 
 - **`LanLinkAdapter`** — TCP connections; duplicate-connection resolution (lexicographically smaller nodeId wins);
-  concurrent outbound connect guard; `LINK_MTU` = 16 KiB
-- **`LanServer`** — TCP server; OS-assigned port; max 8 inbound connections
+  concurrent outbound connect guard; `LINK_MTU` = 64 KiB; `onInboundConnectionEstablished` callback fires for inbound
+  connections (distinct from `onConnectionEstablished` which is outbound-only and initiates the handshake)
+- **`LanServer`** — TCP server; OS-assigned port; max 128 inbound connections
 - **`LanConnection`** — Per-socket Ktor read/write channels; fragmentation at MTU; reassembly keyed by seq with 30 s
   timeout and max 64 concurrent slots
 - **`MdnsPeerDiscovery` (JVM)** — JmDNS; service type `_freepath._tcp.`; TXT record `v=1` + nodeId
@@ -130,14 +157,51 @@ Kotlin Multiplatform library targeting JVM and Android (minSdk 26). Implements:
 
 **Key dependencies:** `project(":freepath-transport")`, `ktor-network`, `jmdns` (JVM), `log4k`
 
-### `freepath-transport-lan-demo` — LAN demo app
+### `freepath-database` — SQLite persistence
+
+Kotlin Multiplatform library (JVM and Android). Implements:
+
+- **`ContactCardEntry`** — persisted contact record: combines `ContactCard` with trust level, timestamps, name
+  override, tags, pin/mute flags
+- **`IdentityEntry`** — persisted local identity (single row; nodeId + `Identity` key material)
+- **`ContactCardEntryRepository` / `IdentityEntryRepository`** — interfaces; implementations generated by KSP at
+  build time (`generated/` package); regenerate with `./gradlew :freepath-database:kspCommonMainKotlinMetadata`
+- **`migrations`** — `V1_CreateTableContactCard`, `V2_CreateTableIdentity`; run via `ISQLite.migrate()`
+
+**Key dependencies:** `sqlx4k-sqlite` (Rust-backed SQLite via `sqlx4k`), `ksp`
+
+### `freepath-app` — Compose Multiplatform mobile app
+
+Multi-target app (Android, iOS, JVM desktop) using Compose Multiplatform. Key files in `composeApp/src/commonMain`:
+
+- **`AppResources`** — singleton holding `db`, `lanAdapter`, `lanProtocol`, actor `system` ref; lifecycle entry points
+  (`startupActorSystem`, `openDatabase`, `startupLan`)
+- **`AppState`** — read-only `StateFlow` holder (`discoveredPeers`, `contacts`); internal helpers called only by
+  `AppActor`; never mutated directly from UI
+- **`AppUiState`** — pure UI state (`showAddContactDrawer`, `pendingContactCard`, `pendingDeepLink`); mutated directly
+  from UI/platform code (no actor round-trip needed)
+- **`AppActor`** — `BehaviorActor` (actor4k) that serialises all business-state mutations; handles `AcceptContact`,
+  `SetTrustLevel`, `PeerDiscovered/Connected/Lost/Disconnected`, `AppForegrounded`
+- **`Protocol`** — sealed interface of all actor messages; always route business mutations through `system.tell()`
+
+**Non-obvious patterns:**
+
+- All business-state mutations MUST go through `AppActor` via `system.tell(Protocol.Xxx)` — prevents race conditions
+- UI-only state (drawer open/closed, pending cards) lives in `AppUiState` and can be mutated directly
+- `tell()` is `suspend fun` in actor4k — wrap non-suspend callbacks with `scope.launch { system.tell(...) }`
+- `ctx.log` (actor's built-in logger) has no lambda overloads — use `ctx.log.info("string")` not `{ "string" }`
+
+**Key dependencies:** `actor4k`, `project(":freepath-database")`, `project(":freepath-transport-lan")`,
+`compose-multiplatform`
+
+### `examples/transport-lan` — LAN demo app
 
 JVM-only module (not a library). Implements:
 
 - **`DemoApp`** — 20-node deterministic contact pool (SHA-256-seeded SHA1PRNG → Ed25519 + X25519); periodic heartbeat
   sends; SIGTERM shutdown hook
-- **Docker** — `src/docker/` with `Dockerfile`, `docker-compose.yml`, `run.sh`; run `src/docker/run.sh` from the
-  project root to build the fatJar and launch nodes via `docker compose`
+- **Docker** — `src/docker/` with `Dockerfile`, `docker-compose.yml`, `run.sh`; run from the project root:
+  `./examples/transport-lan/src/docker/run.sh`
 
 **Key dependencies:** `project(":freepath-transport-lan")`, `kotlinx-coroutines-core`, `log4k-slf4j`
 

@@ -12,14 +12,17 @@ import Foundation
     private static let domain      = "local."
     private static let version     = "1"
 
-    private var thread:   Thread?
-    private var rl:       RunLoop?
-    private var service:  NetService?
-    private var browser:  NetServiceBrowser?
-    private var callback: ((String?, String?) -> Void)?
+    private var thread:         Thread?
+    private var rl:             RunLoop?
+    private var service:        NetService?
+    private var browser:        NetServiceBrowser?
+    private var callback:       ((String?, String?) -> Void)?
+    private var removeCallback: ((String?) -> Void)?
 
     // All NetService objects being resolved, kept alive until resolution completes.
     private var resolving: [NetService] = []
+    // Maps mDNS service name → peer nodeId for removal lookups.
+    private var resolvedPeers: [String: String] = [:]
 
     @objc public init(nodeId: String) {
         self.nodeId = nodeId
@@ -27,6 +30,12 @@ import Foundation
     }
 
     // MARK: - Public API
+
+    /// Registers a callback fired when an mDNS service disappears.
+    /// Must be called before `start(port:onPeerDiscovered:)`.
+    @objc public func setOnPeerRemoved(_ callback: @escaping (String?) -> Void) {
+        self.removeCallback = callback
+    }
 
     /// Start advertising and browsing. `onPeerDiscovered` is called (on an arbitrary
     /// background thread) whenever a new remote node is fully resolved.
@@ -148,7 +157,9 @@ extension MdnsBridge: NetServiceBrowserDelegate {
         didRemove service: NetService,
         moreComing: Bool
     ) {
-        // Disconnection is detected at the TCP level; nothing to do here.
+        guard let peerId = resolvedPeers.removeValue(forKey: service.name) else { return }
+        NSLog("[MdnsBridge] service removed: %@ (nodeId=%@)", service.name, peerId)
+        removeCallback?(peerId)
     }
 
     public func netServiceBrowser(
@@ -189,6 +200,7 @@ extension MdnsBridge: NetServiceDelegate {
         }
 
         NSLog("[MdnsBridge] peer discovered: %@ at %@", peerId, address)
+        resolvedPeers[sender.name] = peerId
         callback?(peerId, address)
     }
 

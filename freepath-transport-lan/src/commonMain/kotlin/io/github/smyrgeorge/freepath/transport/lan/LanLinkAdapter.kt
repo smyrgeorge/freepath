@@ -2,10 +2,11 @@ package io.github.smyrgeorge.freepath.transport.lan
 
 import io.github.smyrgeorge.freepath.transport.LinkAdapter
 import io.github.smyrgeorge.freepath.transport.PeerDiscovery
-import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.freepath.transport.lan.LanLinkAdapter.Companion.HANDSHAKE_TIMEOUT_MS
+import io.github.smyrgeorge.freepath.transport.lan.LanLinkAdapter.Companion.IDLE_TIMEOUT_MS
 import io.github.smyrgeorge.freepath.transport.model.Frame
 import io.github.smyrgeorge.freepath.transport.model.FrameType
+import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.ktor.network.selector.SelectorManager
 import io.ktor.network.sockets.InetSocketAddress
 import io.ktor.network.sockets.aSocket
@@ -14,9 +15,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -27,18 +28,38 @@ import kotlin.time.TimeSource
 
 class LanLinkAdapter(
     private val peerDiscovery: PeerDiscovery,
+    /**
+     * Called when a peer's TCP connection is lost. Implementations should close any active
+     * session and update the UI peer list (e.g. call StatefulProtocol.closeSession(peerId)).
+     */
     private val onPeerDisconnected: suspend (peerId: String) -> Unit,
     /**
      * Returns true if [nodeId] belongs to a known contact. Called before opening a TCP
      * connection to a discovered peer — unknown peers are silently ignored per spec step 2.
      */
-    private val isKnownPeer: (nodeId: String) -> Boolean,
+    private val isKnownPeer: suspend (nodeId: String) -> Boolean,
     /**
      * Called immediately after a new outbound TCP connection is registered, before the
      * receive loop starts. Implementations should initiate the protocol handshake here
      * (e.g. call StatefulProtocol.initiateHandshake(peerId)).
      */
     private val onConnectionEstablished: suspend (peerId: String) -> Unit,
+    /**
+     * Called when a peer is discovered via mDNS, before the known-peer check. Fired once
+     * per unique nodeId (self is excluded). Use this to surface unknown peers in the UI.
+     */
+    private val onPeerDiscovered: (suspend (nodeId: String) -> Unit)? = null,
+    /**
+     * Called when a previously-discovered peer's mDNS service disappears. Use this to
+     * remove the peer from any UI list (especially unknown peers that have no TCP connection).
+     */
+    private val onPeerLost: (suspend (nodeId: String) -> Unit)? = null,
+    /**
+     * Called immediately after a new inbound TCP connection is registered from a known peer.
+     * Implementations should update peer state (e.g. call AppState.peerConnected) but must NOT
+     * initiate a handshake — the remote side already sent one, which arrives via [inboundFrameHandler].
+     */
+    private val onInboundConnectionEstablished: suspend (peerId: String) -> Unit = {},
     /**
      * Called when a connection has been idle for [IDLE_TIMEOUT_MS]. The callback should
      * send a CLOSE frame (e.g. via StatefulProtocol.closeSession()) before the connection
@@ -58,6 +79,11 @@ class LanLinkAdapter(
 
     /** Active connections keyed by peer nodeId (Base58-encoded). */
     private val connections = mutableMapOf<String, LanConnection>()
+
+    // Stored discovery parameters so that restartDiscovery() can re-use them.
+    private var discoveryPort: Int = 0
+    private var discoveryOnPeerDiscovered: (suspend (String, String) -> Unit)? = null
+    private var discoveryOnPeerRemoved: (suspend (String) -> Unit)? = null
 
     /**
      * A shared, unbounded channel used to handle activity or state changes within the LanLinkAdapter.
@@ -136,10 +162,30 @@ class LanLinkAdapter(
         }
 
         // Advertise and discover
-        peerDiscovery.start(server.localPort) { peerNodeId, address ->
+        val onDiscovered: suspend (String, String) -> Unit = { peerNodeId, address ->
             val (host, port) = LanPeerAddress.decode(address)
             sc.launch { connectToDiscoveredPeer(peerNodeId, host, port) }
         }
+        val onRemoved: suspend (String) -> Unit = { peerNodeId ->
+            onPeerLost?.invoke(peerNodeId)
+        }
+        discoveryPort = server.localPort
+        discoveryOnPeerDiscovered = onDiscovered
+        discoveryOnPeerRemoved = onRemoved
+        peerDiscovery.start(port = server.localPort, onPeerDiscovered = onDiscovered, onPeerRemoved = onRemoved)
+    }
+
+    /**
+     * Restarts only the mDNS peer discovery layer without tearing down TCP connections or the
+     * server. Call this when the app returns to foreground after the OS has suspended or killed
+     * the mDNS service (iOS background / Android screen-off).
+     */
+    suspend fun restartDiscovery() {
+        val port = discoveryPort
+        val onDiscovered = discoveryOnPeerDiscovered ?: return
+        val onRemoved = discoveryOnPeerRemoved ?: return
+        peerDiscovery.stop()
+        peerDiscovery.start(port = port, onPeerDiscovered = onDiscovered, onPeerRemoved = onRemoved)
     }
 
     override suspend fun stop() {
@@ -199,6 +245,7 @@ class LanLinkAdapter(
             }
 
             if (!registerConnection(peerId, connection)) return  // duplicate; new conn closed
+            onInboundConnectionEstablished(peerId)
             inboundFrameHandler?.invoke(peerId, firstFrame)
             receiveLoop(peerId, connection)
         } catch (_: Exception) {
@@ -209,6 +256,8 @@ class LanLinkAdapter(
     internal suspend fun connectToDiscoveredPeer(nodeId: String, host: String, port: Int) {
         // Never connect to ourselves.
         if (nodeId == this.nodeId) return
+        // Notify observer of every discovered peer (known or not) before the gate.
+        onPeerDiscovered?.invoke(nodeId)
         // Spec step 2: ignore peers not in the contact list — no TCP connection should be opened.
         if (!isKnownPeer(nodeId)) return
         // Spec step 3: skip if an active connection exists OR an outbound connect is already in
@@ -281,7 +330,7 @@ class LanLinkAdapter(
                     // Duplicate-connection resolution closes one side's socket, which causes its
                     // receiveLoop to exit.  The inbound replacement may not yet be registered, so
                     // we wait briefly and re-check before signalling a peer-disconnect.
-                    delay(300)
+                    delay(300.milliseconds)
                     val replaced = connectionMutex.withLock { connections.containsKey(peerId) }
                     if (!replaced) onPeerDisconnected(peerId)
                 } else {

@@ -9,6 +9,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (instancetype)initWithNodeId:(NSString *)nodeId;
 
+/// Registers a callback fired when an mDNS service disappears.
+/// Must be called before startWithPort:onPeerDiscovered:.
+- (void)setOnPeerRemoved:(void (^)(NSString * _Nullable))callback;
+
 /// Starts advertising this node and browsing for peers.
 /// `onPeerDiscovered` is called on a background thread for each resolved peer;
 /// it receives (peerNodeId, "host:port").

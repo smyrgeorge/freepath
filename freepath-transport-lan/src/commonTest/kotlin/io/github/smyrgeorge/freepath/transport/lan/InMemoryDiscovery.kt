@@ -22,7 +22,11 @@ class InMemoryDiscovery(override val nodeId: String = "") : PeerDiscovery {
         }
     }
 
-    override suspend fun start(port: Int, onPeerDiscovered: suspend (String, String) -> Unit) {
+    override suspend fun start(
+        port: Int,
+        onPeerDiscovered: suspend (String, String) -> Unit,
+        onPeerRemoved: suspend (String) -> Unit,
+    ) {
         listeners += onPeerDiscovered
         peers.forEach { (id, address) ->
             GlobalScope.launch(Dispatchers.IO) {

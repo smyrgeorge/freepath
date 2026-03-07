@@ -46,7 +46,7 @@ class LanServer(
                     // Spec (6-transport-lan.md): SHOULD enable TCP keep-alive on all
                     // Freepath connections. Ktor has no public API for accepted sockets,
                     // so we use a platform-specific best-effort helper.
-                    SocketUtils.trySetKeepAlive(socket)
+                    trySetKeepAlive(socket)
 
                     mutex.withLock {
                         if (connectionCount >= maxInboundConnections) {

@@ -9,6 +9,8 @@ publish = "0.36.0"
 dokka = "2.1.0"
 # https://github.com/smyrgeorge/log4k
 log4k = "1.4.0"
+# https://github.com/smyrgeorge/actor4k
+actor4k = "1.4.9"
 # https://github.com/Kotlin/kotlinx.serialization
 kotlinx-serialization = "1.10.0"
 # https://github.com/ktorio/ktor
@@ -53,6 +55,7 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 log4k = { module = "io.github.smyrgeorge:log4k", version.ref = "log4k" }
 log4k-slf4j = { module = "io.github.smyrgeorge:log4k-slf4j", version.ref = "log4k" }
+actor4k = { module = "io.github.smyrgeorge:actor4k", version.ref = "actor4k" }
 ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 bignum = { module = "com.ionspin.kotlin:bignum", version.ref = "bignum" }

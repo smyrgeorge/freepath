@@ -1,78 +1,125 @@
 package io.github.smyrgeorge.freepath
 
+import io.github.smyrgeorge.freepath.AppResources.contactCardRepository
+import io.github.smyrgeorge.freepath.AppResources.db
+import io.github.smyrgeorge.freepath.AppResources.identityRepository
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.Identity
+import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
-import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
-import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
-import io.github.smyrgeorge.freepath.database.generated.ContactCardEntryRepositoryImpl
-import io.github.smyrgeorge.freepath.database.generated.IdentityEntryRepositoryImpl
-import io.github.smyrgeorge.freepath.database.migration.migrations
-import io.github.smyrgeorge.freepath.database.sqlite
-import io.github.smyrgeorge.freepath.transport.StatefulProtocol
-import io.github.smyrgeorge.freepath.transport.lan.LanLinkAdapter
-import io.github.smyrgeorge.freepath.transport.lan.createPeerDiscovery
 import io.github.smyrgeorge.freepath.util.codec.Base58
-import io.github.smyrgeorge.freepath.util.configureLogging
-import io.github.smyrgeorge.log4k.Logger
-import io.github.smyrgeorge.log4k.RootLogger
-import io.github.smyrgeorge.sqlx4k.ConnectionPool
-import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 
 object AppState {
-    @Suppress("unused")
-    private val rootLogger = RootLogger // Do not delete this line.
-    val log = Logger.of(AppState::class)
+    data class DiscoveredPeer(val nodeId: String, val isKnown: Boolean)
 
-    init {
-        configureLogging()
-    }
+    private val _discoveredPeers = MutableStateFlow<Map<String, DiscoveredPeer>>(emptyMap())
+    val discoveredPeers: StateFlow<Map<String, DiscoveredPeer>> = _discoveredPeers.asStateFlow()
 
-    lateinit var db: ISQLite private set
+    private val _contacts = MutableStateFlow<List<ContactCardEntry>>(emptyList())
+    val contacts: StateFlow<List<ContactCardEntry>> = _contacts.asStateFlow()
+
     lateinit var identity: Identity private set
     lateinit var identityEntry: IdentityEntry private set
     lateinit var contactCard: ContactCard private set
     lateinit var contactCardEntry: ContactCardEntry private set
-    lateinit var lanProtocol: StatefulProtocol private set
 
-    val contactCardEntryRepository: ContactCardEntryRepository = ContactCardEntryRepositoryImpl
-    val identityEntryRepository: IdentityEntryRepository = IdentityEntryRepositoryImpl
-
-
-    // In-memory map of known peer nodeId (Base58) -> sigKey public bytes.
-    // Populated at startup from the DB; used for synchronous lookups by the protocol stack.
-    private val contactSigKeys = mutableMapOf<String, ByteArray>()
-
+    // Called only by AppActor
     suspend fun initialize() {
-        loadDatabase()
         loadIdentity()
         loadOwnContactCard()
-        loadLanProtocol()
+        loadContacts()
     }
 
-    private suspend fun loadDatabase() {
-        db = sqlite(
-            url = "freepath.db",
-            options = ConnectionPool.Options(
-                minConnections = 1,
-                maxConnections = 1,
-            ),
-        ).also {
-            it.migrate(
-                files = migrations,
-                afterStatementExecution = { s, d -> log.info { "DB: Executed: $s ($d)" } },
-                afterFileMigration = { f, d -> log.info { "DB: Migrated: $f ($d)" } },
-            )
+    // Called only by AppActor
+    suspend fun acceptContact(card: ContactCard) {
+        val existing = contactCardRepository.findOneByNodeId(db, card.nodeId).getOrThrow()
+        if (existing == null) {
+            val entry = ContactCardEntry(nodeId = card.nodeId, card = card)
+            contactCardRepository.insert(db, entry).getOrThrow()
+        } else {
+            val entry = existing.merge(ContactCardEntry(nodeId = card.nodeId, card = card))
+            contactCardRepository.update(db, entry).getOrThrow()
+        }
+        markPeerKnown(card.nodeId)
+        loadContacts()
+    }
+
+    // Called only by AppActor
+    suspend fun setTrustLevel(entry: ContactCardEntry, level: TrustLevel) {
+        val updated = entry.copy(trustLevel = level, updatedAt = Clock.System.now())
+        contactCardRepository.update(db, updated).getOrThrow()
+        loadContacts()
+    }
+
+    // Called only by AppActor
+    suspend fun loadContacts() {
+        val ownNodeId = contactCardEntry.nodeId
+        _contacts.value = contactCardRepository.findAll(db).getOrThrow().filter { it.nodeId != ownNodeId }
+    }
+
+    // Called only by AppActor
+    fun peerDiscovered(nodeId: String) {
+        _discoveredPeers.update { current ->
+            if (nodeId !in current) current + (nodeId to DiscoveredPeer(nodeId = nodeId, isKnown = false))
+            else current
         }
     }
 
+    // Called only by AppActor
+    fun peerConnected(nodeId: String) {
+        _discoveredPeers.update { it + (nodeId to DiscoveredPeer(nodeId = nodeId, isKnown = true)) }
+    }
+
+    // Called only by AppActor
+    fun peerLost(nodeId: String) {
+        // Ignore mDNS loss for a peer that is actively connected (isKnown=true).
+        // iOS re-registers mDNS with a new service name on foreground, which JmDNS reports as
+        // "old service removed" followed by "new service found". The TCP connection is still alive,
+        // so the mDNS event is spurious. Only peerDisconnected (TCP teardown) removes a connected peer.
+        _discoveredPeers.update { current ->
+            val peer = current[nodeId]
+            if (peer == null || peer.isKnown) current else current - nodeId
+        }
+    }
+
+    // Called only by AppActor
+    fun peerDisconnected(nodeId: String) {
+        _discoveredPeers.update { it - nodeId }
+    }
+
+    // Called only by AppActor — marks accepted contact as known in the live peer map
+    fun markPeerKnown(nodeId: String) {
+        _discoveredPeers.update { peers ->
+            peers[nodeId]?.let { peer -> peers + (nodeId to peer.copy(isKnown = true)) } ?: peers
+        }
+    }
+
+    suspend fun completeOnboarding(name: String?, bio: String?, location: String?) {
+        val updatedCard = contactCard.copy(
+            name = name?.takeIf { it.isNotBlank() },
+            bio = bio?.takeIf { it.isNotBlank() },
+            location = location?.takeIf { it.isNotBlank() },
+            updatedAt = Clock.System.now(),
+        )
+        val updatedEntry = contactCardEntry.copy(
+            card = updatedCard,
+            tags = contactCardEntry.tags - ContactCardEntry.TAG_ONBOARDING,
+        )
+        contactCardEntry = contactCardRepository.update(db, updatedEntry).getOrThrow()
+        contactCard = contactCardEntry.card
+    }
+
     private suspend fun loadIdentity() {
-        val existing = identityEntryRepository.findAll(db).getOrThrow()
+        val existing = identityRepository.findAll(db).getOrThrow()
         require(existing.size <= 1) { "Expected at most one identity entry, got $existing" }
         val entry = existing.firstOrNull() ?: createAndSaveIdentity()
         identity = entry.data
@@ -81,7 +128,7 @@ object AppState {
 
     private suspend fun loadOwnContactCard() {
         val nodeId = identityEntry.nodeId
-        val existing = contactCardEntryRepository.findOneByNodeId(db, nodeId).getOrThrow()
+        val existing = contactCardRepository.findOneByNodeId(db, nodeId).getOrThrow()
         if (existing != null) {
             contactCard = existing.card
             contactCardEntry = existing
@@ -99,77 +146,10 @@ object AppState {
 
         contactCard = card
         val entry = ContactCardEntry(nodeId = nodeId, card = card, tags = listOf(ContactCardEntry.TAG_ONBOARDING))
-        contactCardEntry = contactCardEntryRepository.insert(db, entry).getOrThrow()
-    }
-
-    suspend fun completeOnboarding(name: String?, bio: String?, location: String?) {
-        val updatedCard = contactCard.copy(
-            name = name?.takeIf { it.isNotBlank() },
-            bio = bio?.takeIf { it.isNotBlank() },
-            location = location?.takeIf { it.isNotBlank() },
-            updatedAt = Clock.System.now(),
-        )
-        val updatedEntry = contactCardEntry.copy(
-            card = updatedCard,
-            tags = contactCardEntry.tags - ContactCardEntry.TAG_ONBOARDING,
-        )
-        contactCardEntry = contactCardEntryRepository.update(db, updatedEntry).getOrThrow()
-        contactCard = contactCardEntry.card
-    }
-
-    private suspend fun loadLanProtocol() {
-        // Build in-memory contact map from DB, excluding our own card.
-        // contactSigKeys must be populated before the protocol starts so that
-        // synchronous lookups from incoming mDNS/handshake callbacks are satisfied.
-        contactCardEntryRepository.findAll(db).getOrThrow().forEach {
-            if (it.nodeId != identityEntry.nodeId) {
-                contactSigKeys[it.nodeId] = Base64.decode(it.card.sigKey)
-            }
-        }
-
-        val nodeId = identityEntry.nodeId
-        var proto: StatefulProtocol? = null
-
-        val adapter = LanLinkAdapter(
-            peerDiscovery = createPeerDiscovery(nodeId),
-            onPeerDisconnected = { peerId ->
-                log.warn { "Peer $peerId disconnected" }
-                proto?.closeSession(peerId)
-            },
-            isKnownPeer = { peerId ->
-                log.info { "Looking up $peerId in contact map" }
-                peerId in contactSigKeys
-            },
-            onConnectionEstablished = { peerId ->
-                log.info { "Connected to $peerId — starting handshake" }
-                proto?.initiateHandshake(peerId)
-            },
-            onIdleTimeout = { peerId ->
-                log.info { "Idle timeout for $peerId — sending CLOSE" }
-                proto?.closeSession(peerId)
-            },
-        )
-
-        proto = StatefulProtocol(
-            identity = identity,
-            contactLookup = { nodeIdRaw ->
-                val nodeId = Base58.encode(nodeIdRaw)
-                log.info { "Looking up $nodeId in contact map" }
-                contactSigKeys[nodeId]
-            },
-            linkAdapter = adapter,
-            onFrameReceived = { peerId, _, _ ->
-                log.info { "Frame received from $peerId" }
-            },
-        )
-        lanProtocol = proto
-        proto.start()
-        log.info { "LAN protocol started on port ${adapter.localPort}" }
+        contactCardEntry = contactCardRepository.insert(db, entry).getOrThrow()
     }
 
     private suspend fun createAndSaveIdentity(): IdentityEntry {
-        require(this::db.isInitialized) { "Database not initialized" }
-
         val sigKeyPair: KeyPair = CryptoProvider.generateEd25519KeyPair()
         val encKeyPair: KeyPair = CryptoProvider.generateX25519KeyPair()
         val nodeIdRaw = CryptoProvider.sha256(sigKeyPair.publicKey).copyOf(16)
@@ -184,6 +164,6 @@ object AppState {
         )
 
         val entry = IdentityEntry(nodeId = nodeId, data = identity)
-        return identityEntryRepository.insert(db, entry).getOrThrow()
+        return identityRepository.insert(db, entry).getOrThrow()
     }
 }

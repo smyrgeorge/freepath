@@ -9,15 +9,17 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import io.github.smyrgeorge.freepath.transport.PeerDiscovery
 import io.github.smyrgeorge.log4k.Logger
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.net.Inet4Address
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.random.Random
@@ -31,7 +33,7 @@ class MdnsPeerDiscovery(
     context: Context,
 ) : PeerDiscovery {
 
-    private val log = Logger.of(MdnsPeerDiscovery::class)
+    private val log = Logger.of(this::class)
     private val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
     private val multicastLock: WifiManager.MulticastLock =
         (context.getSystemService(Context.WIFI_SERVICE) as WifiManager)
@@ -39,9 +41,17 @@ class MdnsPeerDiscovery(
             .also { it.setReferenceCounted(false) }
     private var registrationListener: NsdManager.RegistrationListener? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    override suspend fun start(port: Int, onPeerDiscovered: suspend (nodeId: String, address: String) -> Unit) {
+    /** Maps mDNS service name → peer nodeId for removal lookups. */
+    private val resolvedPeers = ConcurrentHashMap<String, String>()
+
+    override suspend fun start(
+        port: Int,
+        onPeerDiscovered: suspend (nodeId: String, address: String) -> Unit,
+        onPeerRemoved: suspend (nodeId: String) -> Unit,
+    ) {
+        if (!scope.isActive) scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         multicastLock.acquire()
         log.info { "mDNS starting on port $port (nodeId=$nodeId)" }
         // Register this node's service for other peers to discover.
@@ -57,9 +67,11 @@ class MdnsPeerDiscovery(
             override fun onServiceRegistered(info: NsdServiceInfo) {
                 log.info { "mDNS service registered: ${info.serviceName}" }
             }
+
             override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {
                 log.error { "mDNS service registration failed: errorCode=$errorCode" }
             }
+
             override fun onServiceUnregistered(info: NsdServiceInfo) {}
             override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {}
         }
@@ -81,10 +93,12 @@ class MdnsPeerDiscovery(
             override fun onDiscoveryStarted(serviceType: String) {
                 log.info { "mDNS discovery started for $serviceType" }
             }
+
             override fun onDiscoveryStopped(serviceType: String) {}
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
                 log.error { "mDNS discovery start failed: $serviceType errorCode=$errorCode" }
             }
+
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
@@ -93,7 +107,9 @@ class MdnsPeerDiscovery(
             }
 
             override fun onServiceLost(serviceInfo: NsdServiceInfo) {
-                // No action needed — session teardown is handled by the protocol layer.
+                val peerNodeId = resolvedPeers.remove(serviceInfo.serviceName) ?: return
+                log.info { "mDNS service lost: ${serviceInfo.serviceName} (nodeId=$peerNodeId)" }
+                scope.launch { onPeerRemoved(peerNodeId) }
             }
         }
 
@@ -149,6 +165,7 @@ class MdnsPeerDiscovery(
                         ?: info.hostAddresses.firstOrNull()?.hostAddress
                         ?: return
 
+                    resolvedPeers[info.serviceName] = peerNodeId
                     scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddress.encode(host, info.port)) }
                 }
 
@@ -194,6 +211,7 @@ class MdnsPeerDiscovery(
                 // NsdServiceInfo.host is the only option on API 26–33.
                 val host = serviceInfo.host?.hostAddress ?: return
 
+                resolvedPeers[serviceInfo.serviceName] = peerNodeId
                 scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddress.encode(host, serviceInfo.port)) }
             }
         })
