@@ -30,8 +30,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -46,16 +48,24 @@ import io.github.smyrgeorge.composeapp.generated.resources.nearby_one_device
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_status_connected
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_status_stranger
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_title
+import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
+import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.ui.components.ButtonSize
+import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
+import io.github.smyrgeorge.freepath.ui.components.FreepathButton
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
-fun NearbyScreen(modifier: Modifier = Modifier) {
+fun NearbyScreen(
+    modifier: Modifier = Modifier,
+) {
     val peers by AppState.discoveredPeers.collectAsState()
     val contacts by AppState.contacts.collectAsState()
     val contactByNodeId = contacts.associateBy { it.nodeId }
@@ -254,6 +264,7 @@ private fun RadarView(
 
 @Composable
 private fun PeerCard(peer: AppState.DiscoveredPeer, contact: ContactCardEntry?) {
+    val scope = rememberCoroutineScope()
     val avatarBg = if (peer.isKnown) MaterialTheme.colorScheme.secondaryContainer
     else MaterialTheme.colorScheme.surfaceVariant
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -278,7 +289,8 @@ private fun PeerCard(peer: AppState.DiscoveredPeer, contact: ContactCardEntry?) 
             modifier = Modifier
                 .size(38.dp)
                 .background(avatarBg, CircleShape)
-                .border(2.dp, onSurface, CircleShape),
+                .border(2.dp, onSurface, CircleShape)
+                .clip(CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -300,6 +312,29 @@ private fun PeerCard(peer: AppState.DiscoveredPeer, contact: ContactCardEntry?) 
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+
+        if (!peer.isKnown) {
+            FreepathButton(
+                onClick = {
+                    scope.launch {
+                        AppResources.system.tell(Protocol.InitiateContactExchange(peer.nodeId) { pin ->
+                            AppResources.lanAdapter.contactExchangeFrame(
+                                peer.nodeId, pin, AppState.contactCard, AppState.identity.sigKeyPrivate
+                            )
+                        })
+                    }
+                },
+                variant = ButtonVariant.Outline,
+                size = ButtonSize.Small,
+            ) {
+                Text(
+                    text = "Add",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }

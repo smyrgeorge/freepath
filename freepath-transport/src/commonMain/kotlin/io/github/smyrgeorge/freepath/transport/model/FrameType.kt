@@ -10,6 +10,14 @@ enum class FrameType {
     CLOSE,
 
     /**
+     * One-shot contact card exchange frame. Used during LAN contact exchange to transmit
+     * a PIN + signed card (request) or a status + signed card (response). The connection
+     * is closed immediately after the exchange completes. Unknown peers are permitted to
+     * send this frame type; all others are rejected without session material being revealed.
+     */
+    CONTACT_EXCHANGE,
+
+    /**
      * Sentinel for any frame type string not recognised by this implementation.
      * Per spec, receivers MUST silently discard such frames after AEAD verification
      * passes. UNKNOWN MUST NOT cause session teardown or any other side effect.

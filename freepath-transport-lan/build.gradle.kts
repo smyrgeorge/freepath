@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android)
+    alias(libs.plugins.kotlin.serialization)
     id("io.github.smyrgeorge.freepath.swift.interop")
 }
 
@@ -35,6 +36,7 @@ kotlin {
                 implementation(project(":freepath-crypto"))
                 implementation(libs.log4k)
                 implementation(libs.ktor.network)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
         commonTest {

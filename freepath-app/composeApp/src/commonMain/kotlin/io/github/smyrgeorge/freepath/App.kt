@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.smyrgeorge.freepath.ui.components.FreepathTabBar
+import io.github.smyrgeorge.freepath.ui.components.LanExchangeDrawer
 import io.github.smyrgeorge.freepath.ui.components.TabItem
 import io.github.smyrgeorge.freepath.ui.screens.AddContactDrawerOverlay
 import io.github.smyrgeorge.freepath.ui.screens.ContactDrawerOverlay
@@ -109,9 +110,10 @@ fun App() {
                     }
                 }
 
-                // Contact drawer — outside the safe-area box so it covers the full screen
+                // Drawers — outside the safe-area box so they cover the full screen
                 ContactDrawerOverlay()
                 AddContactDrawerOverlay()
+                LanExchangeDrawer()
             }
         }
     }

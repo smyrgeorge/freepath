@@ -247,6 +247,13 @@ class StatefulProtocol(
                 linkAdapter.closeConnection(peerId)
             }
 
+            FrameType.CONTACT_EXCHANGE -> {
+                // EXCHANGE is a one-shot contact-card frame handled by the LAN exchange layer,
+                // not by the stateful session. Silently discard here so the StatefulProtocol
+                // does not interfere with the exchange path.
+                return
+            }
+
             FrameType.UNKNOWN -> {
                 // Spec: silently discard any frame with an unrecognised type after AEAD verification.
                 // AEAD verification is required so an attacker cannot forge a discard-only frame.

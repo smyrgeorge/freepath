@@ -1,5 +1,7 @@
 package io.github.smyrgeorge.freepath.transport.lan
 
+import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.transport.HandshakeHandler
 import io.github.smyrgeorge.freepath.transport.LinkAdapter
 import io.github.smyrgeorge.freepath.transport.PeerDiscovery
 import io.github.smyrgeorge.freepath.transport.lan.LanLinkAdapter.Companion.HANDSHAKE_TIMEOUT_MS
@@ -22,6 +24,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -66,6 +69,12 @@ class LanLinkAdapter(
      * is closed.
      */
     private val onIdleTimeout: suspend (peerId: String) -> Unit = {},
+    /**
+     * Called when an unknown peer sends an EXCHANGE frame. Receives the PIN and the
+     * peer's signed card bytes; returns local signed card bytes if the PIN is valid,
+     * or null to reject.
+     */
+    private val onExchangeRequested: (suspend (pin: String, peerCardBytes: ByteArray) -> ByteArray?)? = null,
 ) : LinkAdapter {
 
     private var inboundFrameHandler: (suspend (peerId: String, frame: Frame) -> Unit)? = null
@@ -100,6 +109,9 @@ class LanLinkAdapter(
     /** Peer nodeIds for which an outbound TCP connect is in progress (not yet registered). */
     private val connecting = mutableSetOf<String>()
     private val connectionMutex = Mutex()
+
+    /** Maps nodeId → (host, port) for all mDNS-discovered peers, including unknown ones. */
+    private val discoveredAddresses = mutableMapOf<String, Pair<String, Int>>()
 
     /** The local TCP port the server is bound to. Only valid after [start]. */
     val localPort: Int get() = server.localPort
@@ -167,6 +179,7 @@ class LanLinkAdapter(
             sc.launch { connectToDiscoveredPeer(peerNodeId, host, port) }
         }
         val onRemoved: suspend (String) -> Unit = { peerNodeId ->
+            connectionMutex.withLock { discoveredAddresses.remove(peerNodeId) }
             onPeerLost?.invoke(peerNodeId)
         }
         discoveryPort = server.localPort
@@ -223,6 +236,10 @@ class LanLinkAdapter(
     private suspend fun handleInbound(connection: LanConnection) {
         try {
             val firstFrame = withTimeout(HANDSHAKE_TIMEOUT_MS) { connection.receiveFrame() } ?: return
+            if (firstFrame.type == FrameType.CONTACT_EXCHANGE) {
+                handleIncomingContactExchange(connection, firstFrame)
+                return
+            }
             // The first frame on an inbound connection MUST be HANDSHAKE frame 0.
             // Reject anything else before touching the payload to avoid registering a connection
             // under a garbage peerId derived from a non-handshake payload.
@@ -256,6 +273,8 @@ class LanLinkAdapter(
     internal suspend fun connectToDiscoveredPeer(nodeId: String, host: String, port: Int) {
         // Never connect to ourselves.
         if (nodeId == this.nodeId) return
+        // Track address for all peers (known or not) so exchangeFrame can reach them.
+        connectionMutex.withLock { discoveredAddresses[nodeId] = host to port }
         // Notify observer of every discovered peer (known or not) before the gate.
         onPeerDiscovered?.invoke(nodeId)
         // Spec step 2: ignore peers not in the contact list — no TCP connection should be opened.
@@ -380,6 +399,67 @@ class LanLinkAdapter(
                 false
             }
         }
+
+    private suspend fun handleIncomingContactExchange(connection: LanConnection, frame: Frame) {
+        try {
+            val handler = onExchangeRequested ?: return
+            val requestBytes = Base64.decode(frame.payload)
+            val request = Json.decodeFromString<ExchangeFramePayload.Request>(requestBytes.decodeToString())
+            val peerCardBytes = Base64.decode(request.card)
+
+            val localCardBytes = handler(request.pin, peerCardBytes)
+            val response = if (localCardBytes != null) {
+                ExchangeFramePayload.Response(ok = true, card = Base64.encode(localCardBytes))
+            } else {
+                ExchangeFramePayload.Response(ok = false)
+            }
+            val responseJson = Json.encodeToString(response)
+            val responseFrame = Frame(
+                schema = HandshakeHandler.SCHEMA,
+                streamId = "exchange",
+                seq = 1L,
+                type = FrameType.CONTACT_EXCHANGE,
+                payload = Base64.encode(responseJson.encodeToByteArray()),
+            )
+            connection.sendFrame(responseFrame)
+        } catch (_: Exception) {
+            // malformed or rejected — connection closed in caller's finally
+        }
+    }
+
+    /**
+     * Connects to [nodeId]'s LAN port and performs a one-shot EXCHANGE handshake using
+     * [LanContactExchangeSession].
+     *
+     * @param nodeId        The target peer's node ID (must have been discovered via mDNS).
+     * @param pin           The 6-digit PIN to send (obtained from the initiator verbally).
+     * @param localCard     The local [ContactCard] to share with the peer.
+     * @param sigKeyPrivate The Ed25519 private key used to sign the local card.
+     * @return The peer's verified [ContactCard] on success.
+     */
+    suspend fun contactExchangeFrame(
+        nodeId: String,
+        pin: String,
+        localCard: ContactCard,
+        sigKeyPrivate: ByteArray,
+    ): Result<ContactCard> = runCatching {
+        // A dedicated ephemeral connection is used intentionally: exchange targets unknown peers,
+        // which are never in `connections` (unknown peers are discovered but not connected to).
+        // Even for known peers, `connections` is exclusively owned by receiveLoop, so reuse would race.
+        val (host, port) = connectionMutex.withLock { discoveredAddresses[nodeId] }
+            ?: error("No address known for peer $nodeId")
+        val sm = selectorManager ?: error("Adapter not started")
+        val socket = withContext(Dispatchers.IO) {
+            aSocket(sm).tcp().connect(InetSocketAddress(host, port))
+        }
+        val session = LanContactExchangeSession(LanConnection(socket), pin)
+        try {
+            session.send(localCard, sigKeyPrivate)
+            session.receive().getOrThrow()
+        } finally {
+            session.close()
+        }
+    }
 
     companion object {
         const val LINK_MTU = 65_536

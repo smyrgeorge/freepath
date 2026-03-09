@@ -3,6 +3,7 @@ package io.github.smyrgeorge.freepath
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
 import io.github.smyrgeorge.freepath.AppState.identity
 import io.github.smyrgeorge.freepath.AppState.identityEntry
+import io.github.smyrgeorge.freepath.contact.exchange.LanContactExchange
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.database.generated.ContactCardEntryRepositoryImpl
@@ -17,6 +18,7 @@ import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.log4k.RootLogger
 import io.github.smyrgeorge.sqlx4k.ConnectionPool
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
+import kotlinx.coroutines.CompletableDeferred
 import kotlin.io.encoding.Base64
 
 object AppResources {
@@ -88,6 +90,11 @@ object AppResources {
             onIdleTimeout = { peerId ->
                 log.info { "Idle timeout for $peerId — sending CLOSE" }
                 lanProtocol.closeSession(peerId)
+            },
+            onExchangeRequested = { pin, peerCardBytes ->
+                val deferred = CompletableDeferred<ByteArray?>()
+                system.tell(Protocol.IncomingContactExchange(pin, peerCardBytes, LanContactExchange, deferred))
+                deferred.await()
             },
         )
 

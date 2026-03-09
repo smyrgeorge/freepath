@@ -119,7 +119,7 @@ class ContactCardCodecTest {
         val encKp = CryptoProvider.generateX25519KeyPair()
         val card = makeCard(kp, encKp)
         val signed = ContactCardCodec.seal(card, kp.privateKey)
-        val opened = ContactCardCodec.open(signed)
+        val opened = ContactCardCodec.open(signed).getOrThrow()
         assertEquals(card, opened)
     }
 
@@ -130,7 +130,7 @@ class ContactCardCodecTest {
         val encKp = CryptoProvider.generateX25519KeyPair()
         val card = makeCard(kp, encKp)
         val wrongSig = ContactCardCodec.sign(card, kp2.privateKey)
-        assertFails { ContactCardCodec.open(ContactCardSigned(card, Base64.encode(wrongSig))) }
+        assertFails { ContactCardCodec.open(ContactCardSigned(card, Base64.encode(wrongSig))).getOrThrow() }
     }
 
     // ── shouldUpdate ──────────────────────────────────────────────────────────

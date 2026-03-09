@@ -26,7 +26,7 @@ import kotlinx.coroutines.CompletableDeferred
  * decodes and verifies the card.
  * [close] cancels any pending [receive].
  */
-class UnidirectionalContactExchangeSession(
+class StatelessContactExchangeSession(
     private val codec: ContactExchange,
 ) : ContactExchangeSession {
 

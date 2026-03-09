@@ -6,19 +6,27 @@ import io.github.smyrgeorge.freepath.AppResources.identityRepository
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.contact.TrustLevel
+import io.github.smyrgeorge.freepath.contact.exchange.ContactExchange
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.util.codec.Base58
+import io.github.smyrgeorge.log4k.Logger
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 
 object AppState {
+    private val log = Logger.of(this::class)
+
     data class DiscoveredPeer(val nodeId: String, val isKnown: Boolean)
 
     private val _discoveredPeers = MutableStateFlow<Map<String, DiscoveredPeer>>(emptyMap())
@@ -31,6 +39,12 @@ object AppState {
     lateinit var identityEntry: IdentityEntry private set
     lateinit var contactCard: ContactCard private set
     lateinit var contactCardEntry: ContactCardEntry private set
+
+    // Contact exchange state — only valid during an active exchange
+    internal var contactExchangeJob: Job? = null
+    internal var contactExchangeIncomingDeferred: CompletableDeferred<ByteArray?>? = null
+    internal var contactExchangeIncomingPin: String? = null
+    internal var contactExchangeIncomingCodec: ContactExchange? = null
 
     // Called only by AppActor
     suspend fun initialize() {
@@ -101,6 +115,48 @@ object AppState {
         _discoveredPeers.update { peers ->
             peers[nodeId]?.let { peer -> peers + (nodeId to peer.copy(isKnown = true)) } ?: peers
         }
+    }
+
+    // Called only by AppActor
+    fun initiateContactExchange(
+        nodeId: String,
+        scope: CoroutineScope,
+        exchanger: suspend (pin: String) -> Result<ContactCard>,
+        onResult: suspend (Result<ContactCard>) -> Unit,
+    ) {
+        val pin = (0 until 6).map { ('0'..'9').random() }.joinToString("")
+        AppUiState.showRequestorDrawer(pin, nodeId)
+        log.info("[exchange] Exchange initiated with $nodeId, PIN $pin")
+        contactExchangeJob = scope.launch {
+            val result = exchanger(pin)
+            contactExchangeJob = null
+            onResult(result)
+        }
+    }
+
+    // Called only by AppActor
+    fun cancelContactExchange() {
+        val job = contactExchangeJob
+        contactExchangeJob = null
+        job?.cancel()
+        val deferred = contactExchangeIncomingDeferred
+        contactExchangeIncomingDeferred = null
+        contactExchangeIncomingPin = null
+        contactExchangeIncomingCodec = null
+        deferred?.complete(null)
+        AppUiState.hideExchangeDrawer()
+    }
+
+    // Called only by AppActor
+    fun handleContactExchangeSuccess(peerCard: ContactCard) {
+        AppUiState.hideExchangeDrawer()
+        AppUiState.showContactCard(peerCard)
+    }
+
+    // Called only by AppActor
+    fun handleContactExchangeFailure(reason: String) {
+        log.info("[exchange] Exchange failed: $reason")
+        AppUiState.exchangeFailed(reason)
     }
 
     suspend fun completeOnboarding(name: String?, bio: String?, location: String?) {

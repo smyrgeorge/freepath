@@ -40,4 +40,11 @@ enum class ContactExchangeMethod(
      * then exchange contact cards over a Bluetooth LE connection.
      */
     BLUETOOTH(isBidirectional = true),
+
+    /**
+     * LAN-based exchange. Bidirectional. Both devices must be on the same IP network.
+     * The initiator generates a 6-digit PIN; the responder enters it after selecting
+     * the initiator from the discovered peer list.
+     */
+    LAN(isBidirectional = true),
 }

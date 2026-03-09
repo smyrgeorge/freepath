@@ -41,14 +41,16 @@ object ContactCardCodec {
         ContactCardSigned(card, Base64.encode(sign(card, sigKeyPrivate)))
 
     /**
-     * Verifies the signature on [signed] and validates the Node ID.
-     * Returns the inner [ContactCard] on success, or throws [IllegalStateException] on failure.
+     * Fully verifies a [ContactCardSigned] per spec-3:
+     * (1) schema check, (2) Node ID verification, (3) signature verification.
      */
-    fun open(signed: ContactCardSigned): ContactCard {
-        val sigBytes = Base64.decode(signed.signature)
-        check(verify(signed.card, sigBytes)) { "Invalid signature on contact card" }
-        check(validateNodeId(signed.card)) { "nodeId mismatch in contact card" }
-        return signed.card
+    fun open(signed: ContactCardSigned): Result<ContactCard> = runCatching {
+        val card = signed.card
+        require(card.schema == ContactCard.SCHEMA) { "Unsupported card schema: ${card.schema}" }
+        require(validateNodeId(card)) { "Node ID mismatch" }
+        val signatureBytes = Base64.decode(signed.signature)
+        require(verify(card, signatureBytes)) { "Invalid card signature" }
+        card
     }
 
     // ── Card update rules (spec 1 Card updates) ──────────────────────────────

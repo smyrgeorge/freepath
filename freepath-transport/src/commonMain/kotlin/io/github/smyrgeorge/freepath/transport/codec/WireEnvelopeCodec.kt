@@ -50,6 +50,7 @@ object WireEnvelopeCodec {
         FrameType.DATA -> 0x01
         FrameType.ACK -> 0x02
         FrameType.CLOSE -> 0x03
+        FrameType.CONTACT_EXCHANGE -> 0x04
         FrameType.UNKNOWN -> error("Cannot encode UNKNOWN frame type onto the wire")
     }
 }
