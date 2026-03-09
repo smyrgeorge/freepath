@@ -1,8 +1,9 @@
 # Contact Exchange
 
 Contact exchange is the process by which one or both users share their contact cards, establishing a connection.
-It is the only moment in Freepath that requires physical proximity. Everything that follows — content propagation,
-private messaging, trust — flows from this in-person act.
+It is designed around in-person interaction: the preferred methods — QR, NFC, and Bluetooth — enforce proximity by
+physics. LAN exchange relaxes this requirement; both parties must still actively initiate the exchange and verbally
+confirm a PIN, preserving intent and mutual consent even without hardware-enforced proximity.
 
 There is no remote invitation, no username lookup, and no server to mediate the process.
 
@@ -22,7 +23,8 @@ propagation lists. See [1-contact.md](1-contact.md) for the full contact card st
 
 ## Exchange methods
 
-Three in-person methods are supported. Users may use whichever method their devices support.
+Four methods are supported. The first three require physical proximity; LAN exchange does not. Users may use whichever
+method their devices support.
 
 ### QR code
 
@@ -82,6 +84,27 @@ Bidirectional by default. Both devices advertise and exchange cards in a single 
 The device is not discoverable at any other time. The exchange screen must be explicitly opened and closed by the
 user.
 
+### LAN
+
+Bidirectional by default. Both devices must be on the same IP network. One party generates a PIN that the other
+enters, providing mutual confirmation without hardware-enforced proximity.
+
+**Flow:**
+
+1. User A opens the **Exchange via LAN** screen. The app advertises a short-lived LAN exchange service and displays
+   a randomly generated 6-digit PIN.
+2. User B opens the **Exchange via LAN** screen. The app discovers available peers on the network and shows a list.
+3. User B selects User A from the list and is prompted to enter the PIN.
+4. User A reads the PIN aloud (or shares it via any side channel) to User B.
+5. User B enters the PIN. The app submits it to User A's device for verification.
+6. If the PIN is correct, both devices proceed to exchange their contact cards bidirectionally.
+7. If the PIN is incorrect or has expired, the exchange is aborted and both parties must restart.
+8. Both apps verify the received card and present the [confirmation screen](#confirmation).
+
+The PIN is a 6-digit numeric code, randomly generated, single-use, and valid for 60 seconds from the moment it is
+displayed. The device is not discoverable for LAN exchange at any other time — the exchange screen must be
+explicitly opened.
+
 ## Receiving a card
 
 When a contact card arrives through any method, the app performs the following checks before storing anything:
@@ -124,3 +147,4 @@ If the user taps **Ignore**, the card is discarded and nothing is stored. The ot
 - [NFC Data Exchange Format (NDEF) — Wikipedia](https://en.wikipedia.org/wiki/NFC_Data_Exchange_Format)
 - [Bluetooth Low Energy — Wikipedia](https://en.wikipedia.org/wiki/Bluetooth_Low_Energy)
 - [Key exchange — Wikipedia](https://en.wikipedia.org/wiki/Key_exchange)
+- [Local area network — Wikipedia](https://en.wikipedia.org/wiki/Local_area_network)
