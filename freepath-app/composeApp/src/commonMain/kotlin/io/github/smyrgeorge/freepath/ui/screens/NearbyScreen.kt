@@ -268,7 +268,8 @@ private fun PeerCard(peer: AppState.DiscoveredPeer, contact: ContactCardEntry?) 
     val avatarBg = if (peer.isKnown) MaterialTheme.colorScheme.secondaryContainer
     else MaterialTheme.colorScheme.surfaceVariant
     val onSurface = MaterialTheme.colorScheme.onSurface
-    val displayName = if (peer.isKnown) contact?.resolvedDisplayName() ?: peer.nodeId.take(12) else "#${peer.nodeId.take(8)}"
+    val displayName =
+        if (peer.isKnown) contact?.resolvedDisplayName() ?: peer.nodeId.take(12) else "#${peer.nodeId.take(8)}"
     val avatarLabel = if (peer.isKnown) displayName.first().uppercaseChar().toString() else "?"
     val statusText =
         if (peer.isKnown) stringResource(Res.string.nearby_status_connected)

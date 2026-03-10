@@ -22,6 +22,12 @@ val LightTertiary = Color(0xFFBBBBBB)
 
 // Status colors
 val LightError = Color(0xFFB00020)
+val LightErrorContainer = Color(0xFFFFDDE2)
+val LightOnErrorContainer = Color(0xFF7A0016)
+
+// Success colors
+val LightSuccessContainer = Color(0xFFDCF2E5)
+val LightOnSuccessContainer = Color(0xFF1A6634)
 
 // Dark Theme Colors (inverted from wireframes)
 val DarkBackground = Color(0xFF111111)
@@ -43,6 +49,12 @@ val DarkTertiary = Color(0xFF444444)
 
 // Status colors for dark theme
 val DarkError = Color(0xFFCF6679)
+val DarkErrorContainer = Color(0xFF3D1219)
+val DarkOnErrorContainer = Color(0xFFCF6679)
+
+// Success colors for dark theme
+val DarkSuccessContainer = Color(0xFF1A3326)
+val DarkOnSuccessContainer = Color(0xFF72B888)
 
 // Common colors
 val FingerprintGray = Color(0xFF999999)

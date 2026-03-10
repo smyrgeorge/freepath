@@ -9,4 +9,7 @@ import io.github.smyrgeorge.sqlx4k.annotation.Repository
 interface IdentityEntryRepository : AuditableRepository<IdentityEntry> {
     @Query("SELECT * FROM identity")
     suspend fun findAll(context: QueryExecutor): Result<List<IdentityEntry>>
+
+    @Query("DELETE FROM identity")
+    suspend fun deleteAll(context: QueryExecutor): Result<Long>
 }

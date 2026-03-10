@@ -41,17 +41,22 @@ import io.github.alexzhirkevich.qrose.options.roundCorners
 import io.github.alexzhirkevich.qrose.options.solid
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import io.github.smyrgeorge.composeapp.generated.resources.Res
+import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_data
+import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_data_subtitle
+import io.github.smyrgeorge.composeapp.generated.resources.dev_section_title
 import io.github.smyrgeorge.composeapp.generated.resources.me_copied
 import io.github.smyrgeorge.composeapp.generated.resources.me_copy_link
 import io.github.smyrgeorge.composeapp.generated.resources.me_share_qr
 import io.github.smyrgeorge.composeapp.generated.resources.me_title
 import io.github.smyrgeorge.freepath.AppState
+import io.github.smyrgeorge.freepath.AppUiState
 import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
 import io.github.smyrgeorge.freepath.ui.components.FreepathButton
 import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
+import io.github.smyrgeorge.freepath.ui.components.SectionTitle
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.milliseconds
@@ -87,6 +92,36 @@ fun MeScreen(modifier: Modifier = Modifier) {
                     displayName = displayName,
                     nodeId = nodeId,
                     qrData = qrData,
+                )
+            }
+            item { DeveloperSection() }
+        }
+    }
+}
+
+@Composable
+private fun DeveloperSection() {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle(text = stringResource(Res.string.dev_section_title))
+        FreepathButton(
+            onClick = { AppUiState.showResetDataConfirmation() },
+            modifier = Modifier.fillMaxWidth(),
+            variant = ButtonVariant.Destructive,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.dev_reset_data),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onError,
+                )
+                Text(
+                    text = stringResource(Res.string.dev_reset_data_subtitle),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onError.copy(alpha = 0.7f),
                 )
             }
         }

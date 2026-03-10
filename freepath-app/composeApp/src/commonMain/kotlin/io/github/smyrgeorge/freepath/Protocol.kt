@@ -58,4 +58,8 @@ sealed interface Protocol : ActorProtocol {
 
     /** Internal: exchange failed */
     data class ContactExchangeFailed(val reason: String) : Message<Ok>()
+
+    // Developer / testing
+    /** Wipe all contact entries and exit the app — dev/testing only */
+    data object ResetData : Message<Ok>()
 }

@@ -42,4 +42,14 @@
     <string name="network_paste_link_hint">freepath://contact/…</string>
     <string name="network_paste_link">Paste from clipboard</string>
     <string name="network_invalid_link">Invalid link — not a Freepath contact URL</string>
+    <string name="dev_section_title">Developer</string>
+    <string name="dev_reset_data">Reset app data</string>
+    <string name="dev_reset_data_subtitle">Delete all contacts and restart</string>
+    <string name="dev_reset_confirm_title">Reset app data?</string>
+    <string name="dev_reset_confirm_body">All contacts will be deleted and the app will close. Your identity keypair is preserved — the app will start fresh on next launch.</string>
+    <string name="dev_reset_confirm_button">Reset &amp; close</string>
+    <string name="dev_reset_cancel">Cancel</string>
+    <string name="dev_reset_overlay_clearing">Clearing data…</string>
+    <string name="dev_reset_overlay_cleared">Data cleared.\nThe app will close automatically.\nIf it doesn\'t, you can close it manually.</string>
+    <string name="dev_reset_overlay_failed">Failed to clear data.\nPlease restart the app and try again.</string>
 </resources>

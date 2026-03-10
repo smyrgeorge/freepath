@@ -465,6 +465,7 @@ class LanLinkAdapter(
         const val LINK_MTU = 65_536
         const val MAX_INBOUND_CONNECTIONS = 128
         const val HANDSHAKE_TIMEOUT_MS = 10_000L
+        const val CONTACT_EXCHANGE_TIMEOUT_MS = 30_000L
         const val IDLE_TIMEOUT_MS = 300_000L  // 5 minutes
     }
 }

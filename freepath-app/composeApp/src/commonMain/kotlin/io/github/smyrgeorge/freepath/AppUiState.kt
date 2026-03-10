@@ -27,10 +27,13 @@ object AppUiState {
     // LAN exchange drawer state
     sealed class ExchangeDrawerState {
         data object Hidden : ExchangeDrawerState()
+
         /** Shown on requestor's device: display the generated PIN, waiting for peer response */
         data class RequestorWaiting(val pin: String, val peerNodeId: String) : ExchangeDrawerState()
-        /** Shown on recipient's device: enter the PIN shown on the requestor's screen */
-        data class RecipientEnterPin(val peerCardBytes: ByteArray) : ExchangeDrawerState()
+
+        /** Shown on recipient's device: shows the requestor's card and asks for the PIN */
+        data class RecipientEnterPin(val peerCard: ContactCard) : ExchangeDrawerState()
+
         /** Exchange failed, show error */
         data class Failed(val reason: String) : ExchangeDrawerState()
     }
@@ -72,8 +75,8 @@ object AppUiState {
         _exchangeDrawer.value = ExchangeDrawerState.RequestorWaiting(pin, peerNodeId)
     }
 
-    fun showRecipientDrawer(peerCardBytes: ByteArray) {
-        _exchangeDrawer.value = ExchangeDrawerState.RecipientEnterPin(peerCardBytes)
+    fun showRecipientDrawer(peerCard: ContactCard) {
+        _exchangeDrawer.value = ExchangeDrawerState.RecipientEnterPin(peerCard)
     }
 
     fun exchangeFailed(reason: String) {
@@ -82,5 +85,39 @@ object AppUiState {
 
     fun hideExchangeDrawer() {
         _exchangeDrawer.value = ExchangeDrawerState.Hidden
+    }
+
+    private val _showResetDataConfirmation = MutableStateFlow(false)
+    val showResetDataConfirmation: StateFlow<Boolean> = _showResetDataConfirmation.asStateFlow()
+
+    fun showResetDataConfirmation() {
+        _showResetDataConfirmation.value = true
+    }
+
+    fun hideResetDataConfirmation() {
+        _showResetDataConfirmation.value = false
+    }
+
+    // Reset-data progress overlay state
+    sealed class ResetOverlayState {
+        data object Hidden : ResetOverlayState()
+        data object Clearing : ResetOverlayState()
+        data object Cleared : ResetOverlayState()
+        data object Failed : ResetOverlayState()
+    }
+
+    private val _resetOverlay = MutableStateFlow<ResetOverlayState>(ResetOverlayState.Hidden)
+    val resetOverlay: StateFlow<ResetOverlayState> = _resetOverlay.asStateFlow()
+
+    fun showResetClearing() {
+        _resetOverlay.value = ResetOverlayState.Clearing
+    }
+
+    fun showResetCleared() {
+        _resetOverlay.value = ResetOverlayState.Cleared
+    }
+
+    fun showResetFailed() {
+        _resetOverlay.value = ResetOverlayState.Failed
     }
 }

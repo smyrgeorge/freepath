@@ -24,7 +24,8 @@ import androidx.compose.ui.unit.dp
 
 enum class ButtonVariant {
     Primary,
-    Outline
+    Outline,
+    Destructive,
 }
 
 enum class ButtonSize {
@@ -44,11 +45,13 @@ fun FreepathButton(
     val backgroundColor = when (variant) {
         ButtonVariant.Primary -> MaterialTheme.colorScheme.primary
         ButtonVariant.Outline -> Color.Transparent
+        ButtonVariant.Destructive -> MaterialTheme.colorScheme.error
     }
 
     val contentColor = when (variant) {
         ButtonVariant.Primary -> MaterialTheme.colorScheme.onPrimary
         ButtonVariant.Outline -> MaterialTheme.colorScheme.onSurface
+        ButtonVariant.Destructive -> MaterialTheme.colorScheme.onError
     }
 
     val height = when (size) {

@@ -129,7 +129,17 @@ import Foundation
             var sin6 = data.withUnsafeBytes { $0.load(as: sockaddr_in6.self) }
             var buf = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
             inet_ntop(AF_INET6, &sin6.sin6_addr, &buf, socklen_t(INET6_ADDRSTRLEN))
-            return "[\(String(cString: buf))]:\(port)"
+            var addrStr = String(cString: buf)
+            // Link-local addresses (fe80::/10) require an interface scope to be routable.
+            // Without %ifname the OS returns EHOSTUNREACH on connect().
+            let scopeId = sin6.sin6_scope_id
+            if scopeId != 0 {
+                var ifName = [CChar](repeating: 0, count: Int(IF_NAMESIZE))
+                if if_indextoname(scopeId, &ifName) != nil {
+                    addrStr = "\(addrStr)%\(String(cString: ifName))"
+                }
+            }
+            return "[\(addrStr)]:\(port)"
         }
         return nil
     }

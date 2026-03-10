@@ -45,6 +45,7 @@ object AppState {
     internal var contactExchangeIncomingDeferred: CompletableDeferred<ByteArray?>? = null
     internal var contactExchangeIncomingPin: String? = null
     internal var contactExchangeIncomingCodec: ContactExchange? = null
+    internal var contactExchangeIncomingPeerCard: ContactCard? = null
 
     // Called only by AppActor
     suspend fun initialize() {
@@ -124,7 +125,7 @@ object AppState {
         exchanger: suspend (pin: String) -> Result<ContactCard>,
         onResult: suspend (Result<ContactCard>) -> Unit,
     ) {
-        val pin = (0 until 6).map { ('0'..'9').random() }.joinToString("")
+        val pin = (0 until 4).map { ('0'..'9').random() }.joinToString("")
         AppUiState.showRequestorDrawer(pin, nodeId)
         log.info("[exchange] Exchange initiated with $nodeId, PIN $pin")
         contactExchangeJob = scope.launch {
@@ -135,15 +136,21 @@ object AppState {
     }
 
     // Called only by AppActor
-    fun cancelContactExchange() {
+    fun resetContactExchange() {
         val job = contactExchangeJob
-        contactExchangeJob = null
-        job?.cancel()
         val deferred = contactExchangeIncomingDeferred
+        contactExchangeJob = null
         contactExchangeIncomingDeferred = null
         contactExchangeIncomingPin = null
         contactExchangeIncomingCodec = null
+        contactExchangeIncomingPeerCard = null
+        job?.cancel()
         deferred?.complete(null)
+    }
+
+    // Called only by AppActor
+    fun cancelContactExchange() {
+        resetContactExchange()
         AppUiState.hideExchangeDrawer()
     }
 
@@ -157,6 +164,23 @@ object AppState {
     fun handleContactExchangeFailure(reason: String) {
         log.info("[exchange] Exchange failed: $reason")
         AppUiState.exchangeFailed(reason)
+    }
+
+    // Called only by AppActor — dev/testing only
+    suspend fun resetData(): Boolean {
+        AppUiState.showResetClearing()
+        return runCatching {
+            db.transaction {
+                contactCardRepository.deleteAll(this).getOrThrow()
+                identityRepository.deleteAll(this).getOrThrow()
+            }
+        }.onSuccess {
+            log.info("[dev] All data deleted.")
+            AppUiState.showResetCleared()
+        }.onFailure {
+            log.error("[dev] Failed to delete data: $it")
+            AppUiState.showResetFailed()
+        }.isSuccess
     }
 
     suspend fun completeOnboarding(name: String?, bio: String?, location: String?) {

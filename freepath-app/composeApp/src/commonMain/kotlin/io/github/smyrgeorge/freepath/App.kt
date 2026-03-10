@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.smyrgeorge.freepath.ui.components.FreepathTabBar
 import io.github.smyrgeorge.freepath.ui.components.LanExchangeDrawer
+import io.github.smyrgeorge.freepath.ui.components.ResetDataDrawer
+import io.github.smyrgeorge.freepath.ui.components.ResetDataOverlay
 import io.github.smyrgeorge.freepath.ui.components.TabItem
 import io.github.smyrgeorge.freepath.ui.screens.AddContactDrawerOverlay
 import io.github.smyrgeorge.freepath.ui.screens.ContactDrawerOverlay
@@ -114,6 +116,8 @@ fun App() {
                 ContactDrawerOverlay()
                 AddContactDrawerOverlay()
                 LanExchangeDrawer()
+                ResetDataDrawer()
+                ResetDataOverlay()
             }
         }
     }

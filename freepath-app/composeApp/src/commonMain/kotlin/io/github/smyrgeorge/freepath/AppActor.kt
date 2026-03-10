@@ -3,6 +3,7 @@ package io.github.smyrgeorge.freepath
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.actor4k.actor.impl.BehaviorActor
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.impl.extensions.doEvery
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.coroutines.CoroutineScope
@@ -97,15 +98,36 @@ class AppActor : BehaviorActor<Protocol, Protocol.Response>(KEY) {
                 }
 
                 is Protocol.IncomingContactExchange -> {
-                    AppState.contactExchangeIncomingDeferred = m.result
-                    AppState.contactExchangeIncomingPin = m.pin
-                    AppState.contactExchangeIncomingCodec = m.codec
-                    AppUiState.showRecipientDrawer(m.peerCardBytes)
-                    ctx.become(exchange)
+                    val peerCard = m.codec.decode(m.peerCardBytes).getOrNull()
+                    if (peerCard == null) {
+                        log.warn("[normal] IncomingContactExchange: failed to decode peer card — rejecting.")
+                        m.result.complete(null)
+                    } else {
+                        AppState.contactExchangeIncomingDeferred = m.result
+                        AppState.contactExchangeIncomingPin = m.pin
+                        AppState.contactExchangeIncomingCodec = m.codec
+                        AppState.contactExchangeIncomingPeerCard = peerCard
+                        AppUiState.showRecipientDrawer(peerCard)
+                        ctx.become(exchange)
+                    }
+                }
+
+                is Protocol.ResetData -> {
+                    log.info("[normal] Resetting app data...")
+                    ctx.become(reset)
+                    val success = AppState.resetData()
+                    launch {
+                        delay(2.seconds)
+                        exitApplication(if (success) 0 else 1)
+                    }
                 }
                 // Exchange-result messages are irrelevant in normal mode — ignore
                 is Protocol.ContactExchangePinSubmitted -> log.warn("[normal] Ignoring RecipientPinSubmitted — not in exchange.")
-                is Protocol.ContactExchangeCancelled -> log.warn("[normal] Ignoring ExchangeCancelled — not in exchange.")
+                is Protocol.ContactExchangeCancelled -> {
+                    AppState.cancelContactExchange()
+                    ctx.become(normal)
+                }
+
                 is Protocol.ContactExchangeSucceeded -> log.warn("[normal] Ignoring ExchangeSucceeded — not in exchange.")
                 is Protocol.ContactExchangeFailed -> log.warn("[normal] Ignoring ExchangeFailed — not in exchange.")
             }
@@ -132,20 +154,19 @@ class AppActor : BehaviorActor<Protocol, Protocol.Response>(KEY) {
                 // Exchange-specific handlers
                 is Protocol.ContactExchangePinSubmitted -> {
                     val deferred = AppState.contactExchangeIncomingDeferred
-                    val expectedPin = AppState.contactExchangeIncomingPin
+                    val pin = AppState.contactExchangeIncomingPin
                     val codec = AppState.contactExchangeIncomingCodec
-                    AppState.contactExchangeIncomingDeferred = null
-                    AppState.contactExchangeIncomingPin = null
-                    AppState.contactExchangeIncomingCodec = null
-                    val responseBytes = if (m.enteredPin == expectedPin) {
-                        if (codec != null) {
-                            codec.encode(AppState.contactCard, AppState.identity.sigKeyPrivate)
-                        } else {
-                            log.warn("[exchange] RecipientPinSubmitted: incomingCodec is null — rejecting exchange.")
-                            null
-                        }
-                    } else null
-                    deferred?.complete(responseBytes)
+                    val peerCard = AppState.contactExchangeIncomingPeerCard
+                    AppState.resetContactExchange()
+                    if (m.enteredPin == pin && codec != null && peerCard != null) {
+                        val responseBytes = codec.encode(AppState.contactCard, AppState.identity.sigKeyPrivate)
+                        deferred?.complete(responseBytes)
+                        AppState.handleContactExchangeSuccess(peerCard)
+                    } else {
+                        deferred?.complete(null)
+                        val reason = if (m.enteredPin != pin) "Invalid PIN" else "Exchange error"
+                        AppState.handleContactExchangeFailure(reason)
+                    }
                     ctx.become(normal)
                 }
 
@@ -155,17 +176,31 @@ class AppActor : BehaviorActor<Protocol, Protocol.Response>(KEY) {
                 }
 
                 is Protocol.ContactExchangeSucceeded -> {
+                    AppState.resetContactExchange()
                     AppState.handleContactExchangeSuccess(m.peerCard)
                     ctx.become(normal)
                 }
 
                 is Protocol.ContactExchangeFailed -> {
-                    AppState.handleContactExchangeFailure(m.reason)
+                    // Transport/network error on the requestor side — cancel silently so the
+                    // user can tap "Add" again immediately without dismissing an error drawer.
+                    log.warn("[exchange] Exchange failed (${m.reason}) — resetting.")
+                    AppState.cancelContactExchange()
                     ctx.become(normal)
                 }
 
                 is Protocol.IncomingContactExchange -> m.result.complete(null) // reject: already in exchange
                 is Protocol.InitiateContactExchange -> log.warn("[exchange] Ignoring InitiateExchange — already in exchange.")
+                is Protocol.ResetData -> log.warn("[exchange] Ignoring ResetData — exchange in progress.")
+            }
+            Behavior.Reply(Protocol.Ok)
+        }
+
+        private val reset: suspend (AppActor, Protocol) -> Behavior<Protocol.Response> = reset@{ ctx, m ->
+            val log = ctx.log
+            when (m) {
+                is Protocol.Ping -> return@reset Behavior.Reply(Protocol.Pong)
+                else -> log.warn("[reset] Resetting app data... (ignored $m)")
             }
             Behavior.Reply(Protocol.Ok)
         }

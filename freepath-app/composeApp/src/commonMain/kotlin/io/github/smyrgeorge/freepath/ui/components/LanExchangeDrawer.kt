@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -44,16 +47,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.flow.first
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppUiState
 import io.github.smyrgeorge.freepath.Protocol
+import io.github.smyrgeorge.freepath.contact.ContactCard
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
@@ -82,6 +87,7 @@ fun LanExchangeDrawer() {
                 offsetAnim.animateTo(offScreenPx(), tween(300))
                 currentState = AppUiState.ExchangeDrawerState.Hidden
             }
+
             else -> {
                 // Update visible state, then animate in
                 currentState = drawerState
@@ -121,34 +127,40 @@ fun LanExchangeDrawer() {
                 )
         )
 
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            when (val state = activeState) {
+        Box(modifier = Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.BottomCenter) {
+            when (activeState) {
                 is AppUiState.ExchangeDrawerState.RequestorWaiting -> {
                     RequestorWaitingDrawer(
-                        state = state,
+                        state = activeState,
                         offsetProvider = { offsetAnim.value.roundToInt() },
                         onHeightMeasured = { drawerHeightPx = it },
                         onCancel = { scope.launch { AppResources.system.tell(Protocol.ContactExchangeCancelled) } },
                     )
                 }
+
                 is AppUiState.ExchangeDrawerState.RecipientEnterPin -> {
                     RecipientEnterPinDrawer(
+                        peerCard = activeState.peerCard,
                         offsetProvider = { offsetAnim.value.roundToInt() },
                         onHeightMeasured = { drawerHeightPx = it },
-                        onSubmit = { pin -> scope.launch { AppResources.system.tell(Protocol.ContactExchangePinSubmitted(pin)) } },
+                        onSubmit = { pin ->
+                            scope.launch {
+                                AppResources.system.tell(Protocol.ContactExchangePinSubmitted(pin))
+                            }
+                        },
                         onCancel = { scope.launch { AppResources.system.tell(Protocol.ContactExchangeCancelled) } },
                     )
                 }
+
                 is AppUiState.ExchangeDrawerState.Failed -> {
                     FailedDrawer(
-                        state = state,
+                        state = activeState,
                         offsetProvider = { offsetAnim.value.roundToInt() },
                         onHeightMeasured = { drawerHeightPx = it },
-                        onDismiss = {
-                            scope.launch { AppResources.system.tell(Protocol.ContactExchangeCancelled) }
-                        },
+                        onDismiss = { scope.launch { AppResources.system.tell(Protocol.ContactExchangeCancelled) } },
                     )
                 }
+
                 else -> {}
             }
         }
@@ -264,6 +276,7 @@ private fun RequestorWaitingDrawer(
 
 @Composable
 private fun RecipientEnterPinDrawer(
+    peerCard: ContactCard,
     offsetProvider: () -> Int,
     onHeightMeasured: (Float) -> Unit,
     onSubmit: (String) -> Unit,
@@ -271,9 +284,16 @@ private fun RecipientEnterPinDrawer(
 ) {
     var enteredPin by remember { mutableStateOf("") }
 
+    val peerName = remember(peerCard) {
+        peerCard.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+    }
+    val avatarLabel = remember(peerCard) {
+        (peerName?.firstOrNull()?.uppercaseChar() ?: peerCard.nodeId.first().uppercaseChar()).toString()
+    }
+
     DrawerShell(offsetProvider = offsetProvider, onHeightMeasured = onHeightMeasured) {
         Text(
-            text = "Enter PIN",
+            text = "Contact request",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -281,25 +301,78 @@ private fun RecipientEnterPinDrawer(
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "Enter the 6-digit PIN shown on the other person's device.",
+            text = "This person wants to exchange contact cards with you.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Peer identity card
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    RoundedCornerShape(12.dp),
+                )
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            val onSurface = MaterialTheme.colorScheme.onSurface
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+                    .border(1.5.dp, onSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = avatarLabel,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = onSurface,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = peerName ?: (peerCard.nodeId.take(12) + "…"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                FreepathFingerprint(text = peerCard.nodeId)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Enter the 4-digit PIN shown on their device to confirm.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
         OutlinedTextField(
             value = enteredPin,
-            onValueChange = { new -> enteredPin = new.filter { it.isDigit() }.take(6) },
+            onValueChange = { new -> enteredPin = new.filter { it.isDigit() }.take(4) },
             placeholder = {
                 Text(
-                    text = "6-digit PIN",
+                    text = "4-digit PIN",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.NumberPassword,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { if (enteredPin.length == 4) onSubmit(enteredPin) },
+            ),
             textStyle = MaterialTheme.typography.bodyLarge.copy(
                 textAlign = TextAlign.Center,
                 letterSpacing = 8.sp,
@@ -329,7 +402,7 @@ private fun RecipientEnterPinDrawer(
                 onClick = { onSubmit(enteredPin) },
                 modifier = Modifier.weight(1f),
                 variant = ButtonVariant.Primary,
-                enabled = enteredPin.length == 6,
+                enabled = enteredPin.length == 4,
             ) {
                 Text(
                     text = "Confirm",
