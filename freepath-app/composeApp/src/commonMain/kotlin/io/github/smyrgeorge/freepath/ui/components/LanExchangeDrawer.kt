@@ -54,9 +54,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.smyrgeorge.freepath.AppResources
-import io.github.smyrgeorge.freepath.AppUiState
+import io.github.smyrgeorge.freepath.AppViewState
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.state.model.ExchangeDrawerState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -69,12 +70,12 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 @Composable
 fun LanExchangeDrawer() {
-    val drawerState by AppUiState.exchangeDrawer.collectAsState()
+    val drawerState by AppViewState.exchangeDrawer.collectAsState()
     val scope = rememberCoroutineScope()
 
-    val isVisible = drawerState !is AppUiState.ExchangeDrawerState.Hidden
+    val isVisible = drawerState !is ExchangeDrawerState.Hidden
 
-    var currentState by remember { mutableStateOf<AppUiState.ExchangeDrawerState>(AppUiState.ExchangeDrawerState.Hidden) }
+    var currentState by remember { mutableStateOf<ExchangeDrawerState>(ExchangeDrawerState.Hidden) }
     var drawerHeightPx by remember { mutableFloatStateOf(0f) }
     val offsetAnim = remember { Animatable(2000f) }
 
@@ -82,10 +83,10 @@ fun LanExchangeDrawer() {
 
     LaunchedEffect(drawerState) {
         when (drawerState) {
-            is AppUiState.ExchangeDrawerState.Hidden -> {
+            is ExchangeDrawerState.Hidden -> {
                 // Animate out
                 offsetAnim.animateTo(offScreenPx(), tween(300))
-                currentState = AppUiState.ExchangeDrawerState.Hidden
+                currentState = ExchangeDrawerState.Hidden
             }
 
             else -> {
@@ -108,14 +109,14 @@ fun LanExchangeDrawer() {
     // Keep currentState alive during exit animation
     val activeState = if (isVisible) drawerState else currentState
 
-    if (activeState !is AppUiState.ExchangeDrawerState.Hidden) {
+    if (activeState !is ExchangeDrawerState.Hidden) {
         // Scrim — not tappable for RequestorWaiting (prevents accidental dismiss while waiting)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.5f))
                 .then(
-                    if (activeState !is AppUiState.ExchangeDrawerState.RequestorWaiting) {
+                    if (activeState !is ExchangeDrawerState.RequestorWaiting) {
                         Modifier.clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -129,7 +130,7 @@ fun LanExchangeDrawer() {
 
         Box(modifier = Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.BottomCenter) {
             when (activeState) {
-                is AppUiState.ExchangeDrawerState.RequestorWaiting -> {
+                is ExchangeDrawerState.RequestorWaiting -> {
                     RequestorWaitingDrawer(
                         state = activeState,
                         offsetProvider = { offsetAnim.value.roundToInt() },
@@ -138,7 +139,7 @@ fun LanExchangeDrawer() {
                     )
                 }
 
-                is AppUiState.ExchangeDrawerState.RecipientEnterPin -> {
+                is ExchangeDrawerState.RecipientEnterPin -> {
                     RecipientEnterPinDrawer(
                         peerCard = activeState.peerCard,
                         offsetProvider = { offsetAnim.value.roundToInt() },
@@ -152,7 +153,7 @@ fun LanExchangeDrawer() {
                     )
                 }
 
-                is AppUiState.ExchangeDrawerState.Failed -> {
+                is ExchangeDrawerState.Failed -> {
                     FailedDrawer(
                         state = activeState,
                         offsetProvider = { offsetAnim.value.roundToInt() },
@@ -204,7 +205,7 @@ private fun DrawerShell(
 
 @Composable
 private fun RequestorWaitingDrawer(
-    state: AppUiState.ExchangeDrawerState.RequestorWaiting,
+    state: ExchangeDrawerState.RequestorWaiting,
     offsetProvider: () -> Int,
     onHeightMeasured: (Float) -> Unit,
     onCancel: () -> Unit,
@@ -416,7 +417,7 @@ private fun RecipientEnterPinDrawer(
 
 @Composable
 private fun FailedDrawer(
-    state: AppUiState.ExchangeDrawerState.Failed,
+    state: ExchangeDrawerState.Failed,
     offsetProvider: () -> Int,
     onHeightMeasured: (Float) -> Unit,
     onDismiss: () -> Unit,

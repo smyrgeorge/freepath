@@ -24,8 +24,8 @@ class InMemoryDiscovery(override val nodeId: String = "") : PeerDiscovery {
 
     override suspend fun start(
         port: Int,
-        onPeerDiscovered: suspend (String, String) -> Unit,
-        onPeerRemoved: suspend (String) -> Unit,
+        onPeerDiscovered: suspend (peerId: String, address: String) -> Unit,
+        onPeerRemoved: suspend (peerId: String) -> Unit,
     ) {
         listeners += onPeerDiscovered
         peers.forEach { (id, address) ->

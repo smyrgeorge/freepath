@@ -21,7 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.smyrgeorge.composeapp.generated.resources.Res
 import io.github.smyrgeorge.composeapp.generated.resources.app_name
-import io.github.smyrgeorge.freepath.AppUiState
+import io.github.smyrgeorge.freepath.AppViewState
+import io.github.smyrgeorge.freepath.state.model.StartupRoute
 import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.stringResource
 
@@ -33,7 +34,7 @@ fun SplashScreen(
     val alpha = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
-        AppUiState.startupRoute.first { it != AppUiState.StartupRoute.Loading }
+        AppViewState.startupRoute.first { it != StartupRoute.Loading }
         alpha.animateTo(
             targetValue = 0f,
             animationSpec = tween(durationMillis = 400),

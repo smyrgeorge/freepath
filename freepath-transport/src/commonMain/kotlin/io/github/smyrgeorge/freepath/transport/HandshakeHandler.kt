@@ -6,12 +6,11 @@ import io.github.smyrgeorge.freepath.transport.model.Frame
 import io.github.smyrgeorge.freepath.transport.model.FrameType
 import io.github.smyrgeorge.freepath.transport.model.SessionState
 import io.github.smyrgeorge.freepath.util.codec.Base58
-import kotlinx.coroutines.runBlocking
 import kotlin.io.encoding.Base64
 
 class HandshakeHandler(
     private val identity: Identity,
-    private val contactLookup: suspend (nodeIdRaw: ByteArray) -> ByteArray?,
+    private val contactLookup: suspend (peerIdRaw: ByteArray) -> ByteArray?,
 ) {
     fun createInitiatorFrame(streamId: String): Pair<Frame, InitiatorContext> {
         val ephemeral = CryptoProvider.generateX25519KeyPair()
@@ -32,10 +31,10 @@ class HandshakeHandler(
      * that the returned nodeId matches the peer they intended to connect to before
      * registering the session.
      */
-    fun completeInitiatorHandshake(ctx: InitiatorContext, responderFrame: Frame): Pair<String, SessionState> {
+    suspend fun completeInitiatorHandshake(ctx: InitiatorContext, responderFrame: Frame): Pair<String, SessionState> {
         val rawPayload1 = Base64.decode(responderFrame.payload)
         val fields = parseAndVerifyPayload(rawPayload1)
-        val verifiedPeerId = Base58.encode(fields.nodeIdRaw)
+        val verifiedPeerId = Base58.encode(fields.peerIdRaw)
         val session = deriveSession(
             localEphPriv = ctx.ephemeralPrivateKey,
             peerEphPub = fields.ephemeralKey,
@@ -52,10 +51,10 @@ class HandshakeHandler(
      * verify that the returned nodeId matches the peer they are responding to before
      * registering the session.
      */
-    fun processInitiatorFrame(initiatorFrame: Frame): Triple<Frame, SessionState, String> {
+    suspend fun processInitiatorFrame(initiatorFrame: Frame): Triple<Frame, SessionState, String> {
         val rawPayload0 = Base64.decode(initiatorFrame.payload)
         val fields = parseAndVerifyPayload(rawPayload0)
-        val verifiedPeerId = Base58.encode(fields.nodeIdRaw)
+        val verifiedPeerId = Base58.encode(fields.peerIdRaw)
 
         val ephemeral = CryptoProvider.generateX25519KeyPair()
         val rawPayload1 = buildPayload(ephemeral.publicKey)
@@ -85,27 +84,27 @@ class HandshakeHandler(
         return ephemeralPublicKey + identity.sigKeyPublic + identity.nodeIdRaw + signature
     }
 
-    private fun parseAndVerifyPayload(payload: ByteArray): HandshakeFields {
+    private suspend fun parseAndVerifyPayload(payload: ByteArray): HandshakeFields {
         if (payload.size != PAYLOAD_SIZE)
             throw HandshakeException("Invalid handshake payload size: ${payload.size}")
 
         val fields = HandshakeFields(
             ephemeralKey = payload.copyOfRange(0, 32),
             sigKey = payload.copyOfRange(32, 64),
-            nodeIdRaw = payload.copyOfRange(64, 80),
+            peerIdRaw = payload.copyOfRange(64, 80),
             signature = payload.copyOfRange(80, 144),
         )
 
         // Look up the peer's sigKey from the contact list — do NOT trust the received sigKey.
         // Verify the received SIGKEY matches the key on file (spec requirement), then verify
         // the signature using the trusted key from the contact list.
-        val trustedSigKey = runBlocking { contactLookup(fields.nodeIdRaw) }
+        val trustedSigKey = contactLookup(fields.peerIdRaw)
             ?: throw HandshakeException("Unknown peer nodeId")
 
         if (!fields.sigKey.contentEquals(trustedSigKey))
             throw HandshakeException("Received SIGKEY does not match contact list")
 
-        val signedData = fields.ephemeralKey + fields.nodeIdRaw
+        val signedData = fields.ephemeralKey + fields.peerIdRaw
         if (!CryptoProvider.ed25519Verify(trustedSigKey, signedData, fields.signature))
             throw HandshakeException("Handshake signature verification failed")
 
@@ -142,7 +141,7 @@ class HandshakeHandler(
     private class HandshakeFields(
         val ephemeralKey: ByteArray,
         val sigKey: ByteArray,
-        val nodeIdRaw: ByteArray,
+        val peerIdRaw: ByteArray,
         val signature: ByteArray,
     )
 

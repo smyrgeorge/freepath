@@ -48,7 +48,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_confirm_bod
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_confirm_button
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_confirm_title
 import io.github.smyrgeorge.freepath.AppResources
-import io.github.smyrgeorge.freepath.AppUiState
+import io.github.smyrgeorge.freepath.AppViewState
 import io.github.smyrgeorge.freepath.Protocol
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -59,7 +59,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun ResetDataDrawer() {
-    val isVisible by AppUiState.showResetDataConfirmation.collectAsState()
+    val isVisible by AppViewState.showResetDataConfirmation.collectAsState()
     val scope = rememberCoroutineScope()
 
     var drawerHeightPx by remember { mutableFloatStateOf(0f) }
@@ -93,7 +93,7 @@ fun ResetDataDrawer() {
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    onClick = { AppUiState.hideResetDataConfirmation() },
+                    onClick = { AppViewState.hideResetDataConfirmation() },
                 )
         )
 
@@ -144,7 +144,7 @@ fun ResetDataDrawer() {
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     FreepathButton(
-                        onClick = { AppUiState.hideResetDataConfirmation() },
+                        onClick = { AppViewState.hideResetDataConfirmation() },
                         modifier = Modifier.weight(1f),
                         variant = ButtonVariant.Outline,
                     ) {
@@ -157,7 +157,7 @@ fun ResetDataDrawer() {
                     FreepathButton(
                         onClick = {
                             scope.launch {
-                                AppUiState.hideResetDataConfirmation()
+                                AppViewState.hideResetDataConfirmation()
                                 AppResources.system.tell(Protocol.ResetData)
                             }
                         },

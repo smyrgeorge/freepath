@@ -17,7 +17,7 @@ fun main() {
         && Desktop.getDesktop().isSupported(APP_OPEN_URI)
     ) {
         Desktop.getDesktop().setOpenURIHandler { e ->
-            AppUiState.handleDeepLink(e.uri.toString())
+            AppViewState.handleDeepLink(e.uri.toString())
         }
     }
 

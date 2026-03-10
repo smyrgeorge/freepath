@@ -13,13 +13,13 @@ class MainActivity : ComponentActivity() {
         AppHooks.onCreate()
         AndroidContextHolder.applicationContext = applicationContext
         enableEdgeToEdge()
-        intent.data?.toString()?.let { AppUiState.handleDeepLink(it) }
+        intent.data?.toString()?.let { AppViewState.handleDeepLink(it) }
         setContent { App() }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.data?.toString()?.let { AppUiState.handleDeepLink(it) }
+        intent.data?.toString()?.let { AppViewState.handleDeepLink(it) }
     }
 
     override fun onStart() {

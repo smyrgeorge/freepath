@@ -11,6 +11,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class LanLinkAdapterTest {
 
@@ -93,16 +95,16 @@ class LanLinkAdapterTest {
             val nodeIdC = nodeIdString(identityC)
 
             // Simulate discovery: tell each adapter about every other adapter.
-            discoveryA.register(nodeIdB, LanPeerAddress.encode("127.0.0.1", adapterB.localPort))
-            discoveryA.register(nodeIdC, LanPeerAddress.encode("127.0.0.1", adapterC.localPort))
-            discoveryB.register(nodeIdA, LanPeerAddress.encode("127.0.0.1", adapterA.localPort))
-            discoveryB.register(nodeIdC, LanPeerAddress.encode("127.0.0.1", adapterC.localPort))
-            discoveryC.register(nodeIdA, LanPeerAddress.encode("127.0.0.1", adapterA.localPort))
-            discoveryC.register(nodeIdB, LanPeerAddress.encode("127.0.0.1", adapterB.localPort))
+            discoveryA.register(nodeIdB, LanPeerAddressCodec.encode("127.0.0.1", adapterB.localPort))
+            discoveryA.register(nodeIdC, LanPeerAddressCodec.encode("127.0.0.1", adapterC.localPort))
+            discoveryB.register(nodeIdA, LanPeerAddressCodec.encode("127.0.0.1", adapterA.localPort))
+            discoveryB.register(nodeIdC, LanPeerAddressCodec.encode("127.0.0.1", adapterC.localPort))
+            discoveryC.register(nodeIdA, LanPeerAddressCodec.encode("127.0.0.1", adapterA.localPort))
+            discoveryC.register(nodeIdB, LanPeerAddressCodec.encode("127.0.0.1", adapterB.localPort))
 
             // Wait until both sessions are established before sending.
-            withTimeout(5_000) {
-                while (!protocolA.hasSession(nodeIdB) || !protocolA.hasSession(nodeIdC)) delay(50)
+            withTimeout(5.seconds) {
+                while (!protocolA.hasSession(nodeIdB) || !protocolA.hasSession(nodeIdC)) delay(100.milliseconds)
             }
 
             // Send application messages
@@ -110,7 +112,7 @@ class LanLinkAdapterTest {
             protocolA.send(nodeIdB, message)
             protocolA.send(nodeIdC, message)
 
-            withTimeout(5_000) {
+            withTimeout(5.seconds) {
                 val (peerB, payloadB) = receivedByB.receive()
                 assertEquals(nodeIdA, peerB, "B should receive from A")
                 assertEquals("hello freepath", payloadB.decodeToString(), "B's message should match")

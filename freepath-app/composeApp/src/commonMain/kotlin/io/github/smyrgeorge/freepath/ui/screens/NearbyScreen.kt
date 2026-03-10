@@ -52,6 +52,7 @@ import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.state.model.DiscoveredPeer
 import io.github.smyrgeorge.freepath.ui.components.ButtonSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
 import io.github.smyrgeorge.freepath.ui.components.FreepathButton
@@ -164,7 +165,7 @@ private fun ScanningIndicator() {
 
 @Composable
 private fun RadarView(
-    peers: List<AppState.DiscoveredPeer>,
+    peers: List<DiscoveredPeer>,
     contactByNodeId: Map<String, ContactCardEntry>,
     modifier: Modifier = Modifier,
 ) {
@@ -263,7 +264,7 @@ private fun RadarView(
 }
 
 @Composable
-private fun PeerCard(peer: AppState.DiscoveredPeer, contact: ContactCardEntry?) {
+private fun PeerCard(peer: DiscoveredPeer, contact: ContactCardEntry?) {
     val scope = rememberCoroutineScope()
     val avatarBg = if (peer.isKnown) MaterialTheme.colorScheme.secondaryContainer
     else MaterialTheme.colorScheme.surfaceVariant

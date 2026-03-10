@@ -4,8 +4,8 @@ import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.transport.HandshakeHandler
 import io.github.smyrgeorge.freepath.transport.LinkAdapter
 import io.github.smyrgeorge.freepath.transport.PeerDiscovery
-import io.github.smyrgeorge.freepath.transport.lan.LanLinkAdapter.Companion.HANDSHAKE_TIMEOUT_MS
-import io.github.smyrgeorge.freepath.transport.lan.LanLinkAdapter.Companion.IDLE_TIMEOUT_MS
+import io.github.smyrgeorge.freepath.transport.lan.LanLinkAdapter.Companion.HANDSHAKE_TIMEOUT
+import io.github.smyrgeorge.freepath.transport.lan.LanLinkAdapter.Companion.IDLE_TIMEOUT
 import io.github.smyrgeorge.freepath.transport.model.Frame
 import io.github.smyrgeorge.freepath.transport.model.FrameType
 import io.github.smyrgeorge.freepath.util.codec.Base58
@@ -26,7 +26,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 class LanLinkAdapter(
@@ -64,7 +67,7 @@ class LanLinkAdapter(
      */
     private val onInboundConnectionEstablished: suspend (peerId: String) -> Unit = {},
     /**
-     * Called when a connection has been idle for [IDLE_TIMEOUT_MS]. The callback should
+     * Called when a connection has been idle for [IDLE_TIMEOUT]. The callback should
      * send a CLOSE frame (e.g. via StatefulProtocol.closeSession()) before the connection
      * is closed.
      */
@@ -143,7 +146,7 @@ class LanLinkAdapter(
         // for IDLE_TIMEOUT_MS. Stale entries for disconnected peers are evicted automatically.
         sc.launch {
             val lastActivity = mutableMapOf<String, TimeSource.Monotonic.ValueTimeMark>()
-            val timeout = IDLE_TIMEOUT_MS.milliseconds
+            val timeout = IDLE_TIMEOUT
             while (true) {
                 delay(timeout / 2)
                 // Drain all pending activity signals (non-blocking).
@@ -175,7 +178,7 @@ class LanLinkAdapter(
 
         // Advertise and discover
         val onDiscovered: suspend (String, String) -> Unit = { peerNodeId, address ->
-            val (host, port) = LanPeerAddress.decode(address)
+            val (host, port) = LanPeerAddressCodec.decode(address)
             sc.launch { connectToDiscoveredPeer(peerNodeId, host, port) }
         }
         val onRemoved: suspend (String) -> Unit = { peerNodeId ->
@@ -228,14 +231,14 @@ class LanLinkAdapter(
 
     /**
      * Called for every connection accepted by the server.
-     * The first frame must be a HANDSHAKE frame 0. We read it within [HANDSHAKE_TIMEOUT_MS],
+     * The first frame must be a HANDSHAKE frame 0. We read it within [HANDSHAKE_TIMEOUT],
      * extract the peer's Base58-encoded nodeId from the payload, verify the peer is in the
      * contact list, register the connection, then hand the frame to the protocol layer and
      * continue reading in [receiveLoop].
      */
     private suspend fun handleInbound(connection: LanConnection) {
         try {
-            val firstFrame = withTimeout(HANDSHAKE_TIMEOUT_MS) { connection.receiveFrame() } ?: return
+            val firstFrame = withTimeout(HANDSHAKE_TIMEOUT) { connection.receiveFrame() } ?: return
             if (firstFrame.type == FrameType.CONTACT_EXCHANGE) {
                 handleIncomingContactExchange(connection, firstFrame)
                 return
@@ -404,14 +407,14 @@ class LanLinkAdapter(
         try {
             val handler = onExchangeRequested ?: return
             val requestBytes = Base64.decode(frame.payload)
-            val request = Json.decodeFromString<ExchangeFramePayload.Request>(requestBytes.decodeToString())
+            val request = Json.decodeFromString<LanContactExchangeFramePayload.Request>(requestBytes.decodeToString())
             val peerCardBytes = Base64.decode(request.card)
 
             val localCardBytes = handler(request.pin, peerCardBytes)
             val response = if (localCardBytes != null) {
-                ExchangeFramePayload.Response(ok = true, card = Base64.encode(localCardBytes))
+                LanContactExchangeFramePayload.Response(ok = true, card = Base64.encode(localCardBytes))
             } else {
-                ExchangeFramePayload.Response(ok = false)
+                LanContactExchangeFramePayload.Response(ok = false)
             }
             val responseJson = Json.encodeToString(response)
             val responseFrame = Frame(
@@ -462,10 +465,10 @@ class LanLinkAdapter(
     }
 
     companion object {
-        const val LINK_MTU = 65_536
-        const val MAX_INBOUND_CONNECTIONS = 128
-        const val HANDSHAKE_TIMEOUT_MS = 10_000L
-        const val CONTACT_EXCHANGE_TIMEOUT_MS = 30_000L
-        const val IDLE_TIMEOUT_MS = 300_000L  // 5 minutes
+        const val LINK_MTU: Int = 65_536
+        const val MAX_INBOUND_CONNECTIONS: Int = 128
+        val HANDSHAKE_TIMEOUT: Duration = 10.seconds
+        val CONTACT_EXCHANGE_TIMEOUT: Duration = 30.seconds
+        val IDLE_TIMEOUT: Duration = 5.minutes
     }
 }

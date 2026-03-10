@@ -8,9 +8,8 @@ package io.github.smyrgeorge.freepath.transport.lan
  * (e.g. `[::1]`), and `port` is the decimal TCP port number.
  * Using the last `:` as the separator makes parsing unambiguous for both address families.
  */
-internal object LanPeerAddress {
+object LanPeerAddressCodec {
     fun encode(host: String, port: Int): String = "$host:$port"
-
     fun decode(address: String): Pair<String, Int> {
         val host = address.substringBeforeLast(":")
         val port = address.substringAfterLast(":").toIntOrNull()

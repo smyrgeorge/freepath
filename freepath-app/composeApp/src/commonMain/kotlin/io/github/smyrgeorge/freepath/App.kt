@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import io.github.smyrgeorge.freepath.state.model.StartupRoute
 import io.github.smyrgeorge.freepath.ui.components.FreepathTabBar
 import io.github.smyrgeorge.freepath.ui.components.LanExchangeDrawer
 import io.github.smyrgeorge.freepath.ui.components.ResetDataDrawer
@@ -49,14 +50,14 @@ private val APP_SCREENS = setOf(Screen.Nearby, Screen.Network, Screen.Me)
 @Composable
 fun App() {
     var screen by remember { mutableStateOf(Screen.Splash) }
-    val startupRoute by AppUiState.startupRoute.collectAsState()
-    val pendingDeepLink by AppUiState.pendingDeepLink.collectAsState()
+    val startupRoute by AppViewState.startupRoute.collectAsState()
+    val pendingDeepLink by AppViewState.pendingDeepLink.collectAsState()
 
     // Handle deep links when the app is already on a main screen (opened while running).
     LaunchedEffect(pendingDeepLink) {
         if (pendingDeepLink != null && screen in APP_SCREENS) {
             screen = Screen.Network
-            AppUiState.clearPendingDeepLink()
+            AppViewState.clearPendingDeepLink()
         }
     }
 
@@ -76,8 +77,8 @@ fun App() {
                     when (screen) {
                         Screen.Splash -> SplashScreen {
                             screen = when (startupRoute) {
-                                AppUiState.StartupRoute.Onboarding -> Screen.Onboarding
-                                AppUiState.StartupRoute.Network -> Screen.Network
+                                StartupRoute.Onboarding -> Screen.Onboarding
+                                StartupRoute.Network -> Screen.Network
                                 else -> Screen.Nearby
                             }
                         }

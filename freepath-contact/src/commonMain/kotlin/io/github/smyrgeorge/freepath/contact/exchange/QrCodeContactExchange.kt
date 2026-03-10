@@ -3,6 +3,7 @@ package io.github.smyrgeorge.freepath.contact.exchange
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.ContactCardSigned
+import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange.decode
 import kotlin.io.encoding.Base64
 
 /**
@@ -24,20 +25,6 @@ object QrCodeContactExchange : ContactExchange {
     private const val PATH_CONTACT = "contact"
     private const val VERSION = "v1"
     private const val PREFIX = "$SCHEME://$PATH_CONTACT/$VERSION/"
-
-    /**
-     * Encodes a [card] and [signature] into a QR code string.
-     *
-     * @param card The contact card to share.
-     * @param signature The Base64-encoded Ed25519 signature of the card.
-     * @return A QR code string ready for display.
-     */
-    fun encode(card: ContactCard, signature: String): String {
-        val signed = ContactCardSigned(card, signature)
-        val jsonBytes = ContactCardCodec.encode(signed)
-        val base64Url = Base64.encode(jsonBytes)
-        return "$PREFIX$base64Url"
-    }
 
     /**
      * Encodes a [card] by signing it with [sigKeyPrivate] and returns a QR code string.

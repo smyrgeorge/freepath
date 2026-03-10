@@ -1,16 +1,17 @@
-package io.github.smyrgeorge.freepath
+package io.github.smyrgeorge.freepath.state
 
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
+import io.github.smyrgeorge.freepath.state.model.ExchangeDrawerState
+import io.github.smyrgeorge.freepath.state.model.ResetOverlayState
+import io.github.smyrgeorge.freepath.state.model.StartupRoute
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-object AppUiState {
-    private val log = Logger.of(this::class)
-
-    enum class StartupRoute { Loading, Onboarding, Nearby, Network }
+abstract class AbstractViewState {
+    val log = Logger.of(this::class)
 
     private val _startupRoute = MutableStateFlow(StartupRoute.Loading)
     val startupRoute: StateFlow<StartupRoute> = _startupRoute.asStateFlow()
@@ -24,22 +25,14 @@ object AppUiState {
     private val _pendingDeepLink = MutableStateFlow<String?>(null)
     val pendingDeepLink: StateFlow<String?> = _pendingDeepLink.asStateFlow()
 
-    // LAN exchange drawer state
-    sealed class ExchangeDrawerState {
-        data object Hidden : ExchangeDrawerState()
-
-        /** Shown on requestor's device: display the generated PIN, waiting for peer response */
-        data class RequestorWaiting(val pin: String, val peerNodeId: String) : ExchangeDrawerState()
-
-        /** Shown on recipient's device: shows the requestor's card and asks for the PIN */
-        data class RecipientEnterPin(val peerCard: ContactCard) : ExchangeDrawerState()
-
-        /** Exchange failed, show error */
-        data class Failed(val reason: String) : ExchangeDrawerState()
-    }
+    private val _resetOverlay = MutableStateFlow<ResetOverlayState>(ResetOverlayState.Hidden)
+    val resetOverlay: StateFlow<ResetOverlayState> = _resetOverlay.asStateFlow()
 
     private val _exchangeDrawer = MutableStateFlow<ExchangeDrawerState>(ExchangeDrawerState.Hidden)
     val exchangeDrawer: StateFlow<ExchangeDrawerState> = _exchangeDrawer.asStateFlow()
+
+    private val _showResetDataConfirmation = MutableStateFlow(false)
+    val showResetDataConfirmation: StateFlow<Boolean> = _showResetDataConfirmation.asStateFlow()
 
     fun setStartupRoute(route: StartupRoute) {
         _startupRoute.value = route
@@ -87,9 +80,6 @@ object AppUiState {
         _exchangeDrawer.value = ExchangeDrawerState.Hidden
     }
 
-    private val _showResetDataConfirmation = MutableStateFlow(false)
-    val showResetDataConfirmation: StateFlow<Boolean> = _showResetDataConfirmation.asStateFlow()
-
     fun showResetDataConfirmation() {
         _showResetDataConfirmation.value = true
     }
@@ -97,17 +87,6 @@ object AppUiState {
     fun hideResetDataConfirmation() {
         _showResetDataConfirmation.value = false
     }
-
-    // Reset-data progress overlay state
-    sealed class ResetOverlayState {
-        data object Hidden : ResetOverlayState()
-        data object Clearing : ResetOverlayState()
-        data object Cleared : ResetOverlayState()
-        data object Failed : ResetOverlayState()
-    }
-
-    private val _resetOverlay = MutableStateFlow<ResetOverlayState>(ResetOverlayState.Hidden)
-    val resetOverlay: StateFlow<ResetOverlayState> = _resetOverlay.asStateFlow()
 
     fun showResetClearing() {
         _resetOverlay.value = ResetOverlayState.Clearing

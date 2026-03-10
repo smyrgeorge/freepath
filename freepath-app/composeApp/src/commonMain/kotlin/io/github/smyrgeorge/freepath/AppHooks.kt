@@ -24,7 +24,14 @@ object AppHooks {
         )
         val loggerFactory = SimpleLoggerFactory()
         val registry = SimpleActorRegistry(loggerFactory)
-            .factoryFor(AppActor::class) { AppActor() }
+            .factoryFor(AppActor::class) {
+                AppActor(
+                    key = AppActor.DEFAULT_KEY,
+                    state = AppState,
+                    viewState = AppViewState,
+                    resources = AppResources,
+                )
+            }
 
         ActorSystem
             .conf(conf)
@@ -33,12 +40,13 @@ object AppHooks {
             .start(registerShutdownHook = false)
 
         launch {
-            val system = ActorSystem.get(AppActor::class, AppActor.KEY)
+            val system = ActorSystem.get(AppActor::class, AppActor.DEFAULT_KEY)
             AppResources.initialize(system)
         }
     }
 
     fun onDestroy() {
+        // The use of `runBlocking` is intentional here.
         runBlocking { ActorSystem.shutdown() }
     }
 

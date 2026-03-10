@@ -7,7 +7,7 @@ import platform.UIKit.UIApplicationWillEnterForegroundNotification
 import platform.UIKit.UIApplicationWillTerminateNotification
 import platform.UIKit.UIViewController
 
-fun handleDeepLink(url: String) = AppUiState.handleDeepLink(url)
+fun handleDeepLink(url: String) = AppViewState.handleDeepLink(url)
 
 @Suppress("FunctionName")
 fun MainViewController(): UIViewController {

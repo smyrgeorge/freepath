@@ -19,8 +19,8 @@ class MdnsPeerDiscovery(override val nodeId: String) : PeerDiscovery {
 
     override suspend fun start(
         port: Int,
-        onPeerDiscovered: suspend (String, String) -> Unit,
-        onPeerRemoved: suspend (String) -> Unit,
+        onPeerDiscovered: suspend (peerId: String, address: String) -> Unit,
+        onPeerRemoved: suspend (peerId: String) -> Unit,
     ) {
         log.info { "mDNS starting on port $port (nodeId=$nodeId)" }
         bridge.setOnPeerRemoved { peerId: String? ->

@@ -15,6 +15,8 @@ import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class LanStatelessEnvelopeTest {
 
@@ -76,7 +78,7 @@ class LanStatelessEnvelopeTest {
             protocolB.start()
 
             launch { adapterA.connectToDiscoveredPeer(nodeIdB, "127.0.0.1", adapterB.localPort) }
-            withTimeout(5_000L) { while (!protocolA.hasSession(nodeIdB)) delay(50) }
+            withTimeout(5.seconds) { while (!protocolA.hasSession(nodeIdB)) delay(100.milliseconds) }
 
             val plaintext = "hello bob via StatelessEnvelope".encodeToByteArray()
             val envelope = StatelessEnvelopeCodec.seal(
@@ -88,7 +90,7 @@ class LanStatelessEnvelopeTest {
             )
             protocolA.send(nodeIdB, StatelessEnvelopeCodec.encode(envelope))
 
-            val (sender, envelopeBytes) = withTimeout(5_000L) { receivedByB.receive() }
+            val (sender, envelopeBytes) = withTimeout(5.seconds) { receivedByB.receive() }
             assertEquals(nodeIdA, sender)
 
             val recovered = StatelessEnvelopeCodec.open(
@@ -132,8 +134,8 @@ class LanStatelessEnvelopeTest {
 
             launch { adapterA.connectToDiscoveredPeer(nodeIdB, "127.0.0.1", adapterB.localPort) }
             launch { adapterB.connectToDiscoveredPeer(nodeIdC, "127.0.0.1", adapterC.localPort) }
-            withTimeout(5_000L) {
-                while (!protocolA.hasSession(nodeIdB) || !protocolB.hasSession(nodeIdC)) delay(50)
+            withTimeout(5.seconds) {
+                while (!protocolA.hasSession(nodeIdB) || !protocolB.hasSession(nodeIdC)) delay(100.milliseconds)
             }
 
             // Alice seals an envelope for Charlie and sends it to Bob.
@@ -148,7 +150,7 @@ class LanStatelessEnvelopeTest {
             protocolA.send(nodeIdB, StatelessEnvelopeCodec.encode(envelope))
 
             // Bob receives the frame, reads receiverId for routing, and forwards to Charlie.
-            val (fromA, receivedAtB) = withTimeout(5_000L) { receivedByB.receive() }
+            val (fromA, receivedAtB) = withTimeout(5.seconds) { receivedByB.receive() }
             assertEquals(nodeIdA, fromA, "Bob receives from Alice")
 
             val envelopeAtB = StatelessEnvelopeCodec.decode(receivedAtB)
@@ -158,7 +160,7 @@ class LanStatelessEnvelopeTest {
             protocolB.send(nodeIdC, StatelessEnvelopeCodec.encode(envelopeAtB))
 
             // Charlie receives the relayed envelope and decrypts it.
-            val (fromB, receivedAtC) = withTimeout(5_000L) { receivedByC.receive() }
+            val (fromB, receivedAtC) = withTimeout(5.seconds) { receivedByC.receive() }
             assertEquals(nodeIdB, fromB, "Charlie receives from Bob (relay leg)")
 
             val recovered = StatelessEnvelopeCodec.open(

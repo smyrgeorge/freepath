@@ -30,8 +30,8 @@ class MdnsPeerDiscovery(override val nodeId: String) : PeerDiscovery {
 
     override suspend fun start(
         port: Int,
-        onPeerDiscovered: suspend (String, String) -> Unit,
-        onPeerRemoved: suspend (String) -> Unit,
+        onPeerDiscovered: suspend (peerId: String, address: String) -> Unit,
+        onPeerRemoved: suspend (peerId: String) -> Unit,
     ) = withContext(Dispatchers.IO) {
         log.info { "mDNS starting on port $port (nodeId=$nodeId)" }
         // Bind to the first non-loopback, non-link-local IPv4 address so that JmDNS
@@ -87,7 +87,7 @@ class MdnsPeerDiscovery(override val nodeId: String) : PeerDiscovery {
                     ?: return
 
                 resolvedPeers[event.name] = peerNodeId
-                scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddress.encode(host, resolved.port)) }
+                scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddressCodec.encode(host, resolved.port)) }
             }
         }
 

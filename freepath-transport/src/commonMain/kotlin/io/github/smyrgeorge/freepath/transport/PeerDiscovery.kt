@@ -55,8 +55,8 @@ interface PeerDiscovery {
      */
     suspend fun start(
         port: Int,
-        onPeerDiscovered: suspend (nodeId: String, address: String) -> Unit,
-        onPeerRemoved: suspend (nodeId: String) -> Unit,
+        onPeerDiscovered: suspend (peerId: String, address: String) -> Unit,
+        onPeerRemoved: suspend (peerId: String) -> Unit,
     )
 
     /**

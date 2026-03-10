@@ -14,6 +14,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class LanExchangeTest {
@@ -57,7 +58,7 @@ class LanExchangeTest {
 
     @Test
     fun `exchangeFrame succeeds when peer returns card bytes for correct PIN`() = runBlocking {
-        withTimeout(5_000) {
+        withTimeout(5.seconds) {
             val identityA = createIdentity()
             val identityB = createIdentity()
 
@@ -103,7 +104,7 @@ class LanExchangeTest {
 
     @Test
     fun `exchangeFrame fails when peer rejects due to wrong PIN`() = runBlocking {
-        withTimeout(5_000) {
+        withTimeout(5.seconds) {
             val identityA = createIdentity()
             val identityB = createIdentity()
 
@@ -132,8 +133,9 @@ class LanExchangeTest {
                 val result = adapterB.contactExchangeFrame(nodeIdA, wrongPin, cardB, identityB.sigKeyPrivate)
 
                 assertFalse(result.isSuccess, "Exchange should fail with wrong PIN")
-                assertTrue(
-                    result.exceptionOrNull()?.message?.contains("invalid PIN", ignoreCase = true) == true,
+                assertEquals(
+                    result.exceptionOrNull()?.message?.contains("invalid PIN", ignoreCase = true),
+                    true,
                     "Failure should be due to PIN rejection, got: ${result.exceptionOrNull()}"
                 )
             } finally {

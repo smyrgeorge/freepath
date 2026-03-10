@@ -49,7 +49,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.me_copy_link
 import io.github.smyrgeorge.composeapp.generated.resources.me_share_qr
 import io.github.smyrgeorge.composeapp.generated.resources.me_title
 import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.AppUiState
+import io.github.smyrgeorge.freepath.AppViewState
 import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
@@ -104,7 +104,7 @@ private fun DeveloperSection() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(text = stringResource(Res.string.dev_section_title))
         FreepathButton(
-            onClick = { AppUiState.showResetDataConfirmation() },
+            onClick = { AppViewState.showResetDataConfirmation() },
             modifier = Modifier.fillMaxWidth(),
             variant = ButtonVariant.Destructive,
         ) {

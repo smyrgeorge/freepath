@@ -5,6 +5,7 @@ import io.github.smyrgeorge.freepath.contact.exchange.ContactExchangeMethod
 import io.github.smyrgeorge.freepath.contact.exchange.ContactExchangeSession
 import io.github.smyrgeorge.freepath.contact.exchange.LanContactExchange
 import io.github.smyrgeorge.freepath.transport.HandshakeHandler
+import io.github.smyrgeorge.freepath.transport.lan.LanLinkAdapter.Companion.CONTACT_EXCHANGE_TIMEOUT
 import io.github.smyrgeorge.freepath.transport.model.Frame
 import io.github.smyrgeorge.freepath.transport.model.FrameType
 import kotlinx.coroutines.withTimeout
@@ -35,10 +36,7 @@ class LanContactExchangeSession(
      */
     override suspend fun send(localCard: ContactCard, sigKeyPrivate: ByteArray): ByteArray {
         val encoded = LanContactExchange.encode(localCard, sigKeyPrivate)
-        val requestPayload = ExchangeFramePayload.Request(
-            pin = pin,
-            card = Base64.encode(encoded),
-        )
+        val requestPayload = LanContactExchangeFramePayload.Request(pin = pin, card = Base64.encode(encoded))
         val requestJson = Json.encodeToString(requestPayload)
         val requestFrame = Frame(
             schema = HandshakeHandler.SCHEMA,
@@ -58,11 +56,11 @@ class LanContactExchangeSession(
      * @return [Result.success] with the verified peer [ContactCard], or [Result.failure].
      */
     override suspend fun receive(): Result<ContactCard> = runCatching {
-        val responseFrame = withTimeout(LanLinkAdapter.CONTACT_EXCHANGE_TIMEOUT_MS) {
+        val responseFrame = withTimeout(CONTACT_EXCHANGE_TIMEOUT) {
             connection.receiveFrame()
         } ?: error("No response from responder")
         val responseBytes = Base64.decode(responseFrame.payload)
-        val response = Json.decodeFromString<ExchangeFramePayload.Response>(responseBytes.decodeToString())
+        val response = Json.decodeFromString<LanContactExchangeFramePayload.Response>(responseBytes.decodeToString())
         if (!response.ok) error("Exchange rejected: invalid PIN")
         val peerCardBytes = Base64.decode(response.card ?: error("No card in response"))
         LanContactExchange.decode(peerCardBytes).getOrThrow()

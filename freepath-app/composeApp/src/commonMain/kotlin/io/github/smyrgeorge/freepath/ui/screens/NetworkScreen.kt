@@ -82,7 +82,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.network_trust
 import io.github.smyrgeorge.composeapp.generated.resources.node_id_label
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.AppUiState
+import io.github.smyrgeorge.freepath.AppViewState
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.TrustLevel
@@ -346,7 +346,7 @@ private fun contactAge(createdAt: Instant): String {
  */
 @Composable
 fun AddContactDrawerOverlay() {
-    val show by AppUiState.showAddContactDrawer.collectAsState()
+    val show by AppViewState.showAddContactDrawer.collectAsState()
     var currentlyShown by remember { mutableStateOf(false) }
     var text by remember { mutableStateOf("") }
     var hasError by remember { mutableStateOf(false) }
@@ -368,14 +368,14 @@ fun AddContactDrawerOverlay() {
         scope.launch {
             dragOffsetPx = 0f
             offsetAnim.animateTo(offScreenPx(), tween(300))
-            AppUiState.closeAddContactDrawer()
+            AppViewState.closeAddContactDrawer()
             currentlyShown = false
             text = ""
             hasError = false
             offsetAnim.snapTo(offScreenPx())
             if (card != null) {
                 delay(50.milliseconds)
-                AppUiState.showContactCard(card)
+                AppViewState.showContactCard(card)
             }
         }
     }
@@ -578,7 +578,7 @@ private fun AddContactDrawer(
  */
 @Composable
 fun ContactDrawerOverlay() {
-    val pendingCard by AppUiState.pendingContactCard.collectAsState()
+    val pendingCard by AppViewState.pendingContactCard.collectAsState()
     // Keep the card alive during the exit animation.
     var currentCard by remember { mutableStateOf<ContactCard?>(null) }
 
@@ -600,7 +600,7 @@ fun ContactDrawerOverlay() {
         scope.launch {
             dragOffsetPx = 0f
             offsetAnim.animateTo(offScreenPx(), tween(300))
-            AppUiState.clearPendingContactCard()
+            AppViewState.clearPendingContactCard()
             currentCard = null
             offsetAnim.snapTo(offScreenPx())
         }
@@ -843,7 +843,7 @@ private fun AddButton() {
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(),
-                onClick = { AppUiState.openAddContactDrawer() },
+                onClick = { AppViewState.openAddContactDrawer() },
             ),
         contentAlignment = Alignment.Center,
     ) {

@@ -23,7 +23,8 @@ import io.github.smyrgeorge.composeapp.generated.resources.Res
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_overlay_cleared
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_overlay_clearing
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_overlay_failed
-import io.github.smyrgeorge.freepath.AppUiState
+import io.github.smyrgeorge.freepath.AppViewState
+import io.github.smyrgeorge.freepath.state.model.ResetOverlayState
 import io.github.smyrgeorge.freepath.ui.theme.DarkOnSuccessContainer
 import io.github.smyrgeorge.freepath.ui.theme.DarkSuccessContainer
 import io.github.smyrgeorge.freepath.ui.theme.LightOnSuccessContainer
@@ -32,28 +33,28 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ResetDataOverlay() {
-    val state by AppUiState.resetOverlay.collectAsState()
+    val state by AppViewState.resetOverlay.collectAsState()
 
-    if (state == AppUiState.ResetOverlayState.Hidden) return
+    if (state == ResetOverlayState.Hidden) return
 
     val darkTheme = isSystemInDarkTheme()
 
     val backgroundColor = when (state) {
-        AppUiState.ResetOverlayState.Clearing -> MaterialTheme.colorScheme.background
-        AppUiState.ResetOverlayState.Cleared ->
+        ResetOverlayState.Clearing -> MaterialTheme.colorScheme.background
+        ResetOverlayState.Cleared ->
             if (darkTheme) DarkSuccessContainer else LightSuccessContainer
 
-        AppUiState.ResetOverlayState.Failed -> MaterialTheme.colorScheme.errorContainer
-        AppUiState.ResetOverlayState.Hidden -> MaterialTheme.colorScheme.background
+        ResetOverlayState.Failed -> MaterialTheme.colorScheme.errorContainer
+        ResetOverlayState.Hidden -> MaterialTheme.colorScheme.background
     }
 
     val contentColor = when (state) {
-        AppUiState.ResetOverlayState.Clearing -> MaterialTheme.colorScheme.onBackground
-        AppUiState.ResetOverlayState.Cleared ->
+        ResetOverlayState.Clearing -> MaterialTheme.colorScheme.onBackground
+        ResetOverlayState.Cleared ->
             if (darkTheme) DarkOnSuccessContainer else LightOnSuccessContainer
 
-        AppUiState.ResetOverlayState.Failed -> MaterialTheme.colorScheme.onErrorContainer
-        AppUiState.ResetOverlayState.Hidden -> MaterialTheme.colorScheme.onBackground
+        ResetOverlayState.Failed -> MaterialTheme.colorScheme.onErrorContainer
+        ResetOverlayState.Hidden -> MaterialTheme.colorScheme.onBackground
     }
 
     Column(
@@ -64,17 +65,17 @@ fun ResetDataOverlay() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        if (state == AppUiState.ResetOverlayState.Clearing) {
+        if (state == ResetOverlayState.Clearing) {
             CircularProgressIndicator(color = contentColor)
             Spacer(modifier = Modifier.height(24.dp))
         }
 
         Text(
             text = when (state) {
-                AppUiState.ResetOverlayState.Clearing -> stringResource(Res.string.dev_reset_overlay_clearing)
-                AppUiState.ResetOverlayState.Cleared -> stringResource(Res.string.dev_reset_overlay_cleared)
-                AppUiState.ResetOverlayState.Failed -> stringResource(Res.string.dev_reset_overlay_failed)
-                AppUiState.ResetOverlayState.Hidden -> ""
+                ResetOverlayState.Clearing -> stringResource(Res.string.dev_reset_overlay_clearing)
+                ResetOverlayState.Cleared -> stringResource(Res.string.dev_reset_overlay_cleared)
+                ResetOverlayState.Failed -> stringResource(Res.string.dev_reset_overlay_failed)
+                ResetOverlayState.Hidden -> ""
             },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,

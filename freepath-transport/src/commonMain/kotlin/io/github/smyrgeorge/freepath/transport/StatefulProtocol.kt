@@ -24,7 +24,7 @@ import kotlin.time.TimeSource
 
 class StatefulProtocol(
     identity: Identity,
-    contactLookup: suspend (nodeIdRaw: ByteArray) -> ByteArray?,
+    contactLookup: suspend (peerIdRaw: ByteArray) -> ByteArray?,
     private val linkAdapter: LinkAdapter,
     private val onFrameReceived: suspend (peerId: String, frame: Frame, session: SessionState) -> Unit,
     private val handshakeTimeout: Duration = 30.minutes,
@@ -92,7 +92,7 @@ class StatefulProtocol(
                 }
             }
         }
-        for (peerId in expiredPeerIds) linkAdapter.closeConnection(peerId)
+        expiredPeerIds.forEach { peerId -> linkAdapter.closeConnection(peerId) }
     }
 
     /**

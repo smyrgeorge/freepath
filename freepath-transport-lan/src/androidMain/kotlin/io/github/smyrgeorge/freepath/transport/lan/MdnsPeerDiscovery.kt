@@ -48,8 +48,8 @@ class MdnsPeerDiscovery(
 
     override suspend fun start(
         port: Int,
-        onPeerDiscovered: suspend (nodeId: String, address: String) -> Unit,
-        onPeerRemoved: suspend (nodeId: String) -> Unit,
+        onPeerDiscovered: suspend (peerId: String, address: String) -> Unit,
+        onPeerRemoved: suspend (peerId: String) -> Unit,
     ) {
         if (!scope.isActive) scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         multicastLock.acquire()
@@ -166,7 +166,7 @@ class MdnsPeerDiscovery(
                         ?: return
 
                     resolvedPeers[info.serviceName] = peerNodeId
-                    scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddress.encode(host, info.port)) }
+                    scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddressCodec.encode(host, info.port)) }
                 }
 
                 override fun onServiceLost() {
@@ -212,7 +212,7 @@ class MdnsPeerDiscovery(
                 val host = serviceInfo.host?.hostAddress ?: return
 
                 resolvedPeers[serviceInfo.serviceName] = peerNodeId
-                scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddress.encode(host, serviceInfo.port)) }
+                scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddressCodec.encode(host, serviceInfo.port)) }
             }
         })
     }

@@ -2,7 +2,7 @@ package io.github.smyrgeorge.freepath.transport.lan
 
 import kotlinx.serialization.Serializable
 
-internal object ExchangeFramePayload {
+class LanContactExchangeFramePayload {
     @Serializable
     data class Request(val pin: String, val card: String)
 
