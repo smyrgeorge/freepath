@@ -24,7 +24,6 @@ sealed interface Protocol : ActorProtocol {
 
     // Peer lifecycle (from LAN adapter callbacks)
     data class PeerDiscovered(val nodeId: String) : Message<Ok>()
-    data class PeerLost(val nodeId: String) : Message<Ok>()
     data class PeerConnected(val nodeId: String) : Message<Ok>()
     data class PeerDisconnected(val nodeId: String) : Message<Ok>()
 

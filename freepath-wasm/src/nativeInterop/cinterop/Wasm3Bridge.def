@@ -1,0 +1,14 @@
+language = Objective-C
+package = Wasm3Bridge
+---
+#import <Foundation/Foundation.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+@interface Wasm3Bridge : NSObject
+- (nullable instancetype)initWithWasmBytes:(NSData *)wasmBytes
+                                     error:(NSError * _Nullable *)error;
+- (NSString *)call:(NSString *)function input:(NSString *)input;
+@end
+
+NS_ASSUME_NONNULL_END

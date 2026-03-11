@@ -95,10 +95,6 @@ abstract class AbstractAppResources(
                 log.info { "Peer discovered via mDNS: $peerId" }
                 system.tell(Protocol.PeerDiscovered(peerId)).logError()
             },
-            onPeerLost = { peerId ->
-                log.info { "Peer lost via mDNS: $peerId" }
-                system.tell(Protocol.PeerLost(peerId)).logError()
-            },
             onIdleTimeout = { peerId ->
                 log.info { "Idle timeout for $peerId — sending CLOSE" }
                 lanProtocol.closeSession(peerId)

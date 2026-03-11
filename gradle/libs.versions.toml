@@ -27,6 +27,8 @@ sqlx4k = "1.7.2"
 ksp = "2.3.6"
 # https://github.com/jmdns/jmdns
 jmdns = "3.6.3"
+# https://github.com/dylibso/chicory
+chicory = "1.7.3"
 # https://developer.android.com/studio/releases/gradle-plugin
 android-gradle-plugin = "9.0.0-alpha06"
 # https://github.com/alexzhirkevich/qrose
@@ -48,6 +50,7 @@ gradle-kotlin-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", v
 gradle-publish-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "publish" }
 gradle-dokka-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
 jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
+chicory-runtime = { module = "com.dylibso.chicory:runtime", version.ref = "chicory" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }

@@ -56,11 +56,6 @@ class LanLinkAdapter(
      */
     private val onPeerDiscovered: (suspend (nodeId: String) -> Unit)? = null,
     /**
-     * Called when a previously-discovered peer's mDNS service disappears. Use this to
-     * remove the peer from any UI list (especially unknown peers that have no TCP connection).
-     */
-    private val onPeerLost: (suspend (nodeId: String) -> Unit)? = null,
-    /**
      * Called immediately after a new inbound TCP connection is registered from a known peer.
      * Implementations should update peer state (e.g. call AppState.peerConnected) but must NOT
      * initiate a handshake — the remote side already sent one, which arrives via [inboundFrameHandler].
@@ -182,8 +177,17 @@ class LanLinkAdapter(
             sc.launch { connectToDiscoveredPeer(peerNodeId, host, port) }
         }
         val onRemoved: suspend (String) -> Unit = { peerNodeId ->
-            connectionMutex.withLock { discoveredAddresses.remove(peerNodeId) }
-            onPeerLost?.invoke(peerNodeId)
+            val connection = connectionMutex.withLock {
+                discoveredAddresses.remove(peerNodeId)
+                connections[peerNodeId]
+            }
+            if (connection != null) {
+                // Close the TCP connection — the receive loop will call onPeerDisconnected.
+                connection.close()
+            } else {
+                // Unknown peer (no TCP connection): notify directly.
+                onPeerDisconnected(peerNodeId)
+            }
         }
         discoveryPort = server.localPort
         discoveryOnPeerDiscovered = onDiscovered

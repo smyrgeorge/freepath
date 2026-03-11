@@ -25,3 +25,5 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+**/.build/
+freepath-wasm/src/test-fixtures/target/

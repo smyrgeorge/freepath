@@ -58,6 +58,8 @@ fun Project.configureSwiftTarget(
         sdk.set(sdkName)
         swiftTarget.set(swiftTriple)
         this.packageName.set(packageName)
+        cDependencyTargets.set(extension.cDependencyTargets)
+        cDefines.set(extension.cDefines)
     }
 
     val generateDefTask = tasks.register<GenerateDefFileTask>(

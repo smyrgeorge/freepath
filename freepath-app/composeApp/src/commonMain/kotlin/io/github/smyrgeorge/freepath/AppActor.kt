@@ -81,7 +81,6 @@ class AppActor(
                 is Protocol.AcceptContact -> state.acceptContact(m.card)
                 is Protocol.SetTrustLevel -> state.setTrustLevel(m.entry, m.level)
                 is Protocol.PeerDiscovered -> state.peerDiscovered(m.nodeId)
-                is Protocol.PeerLost -> state.peerLost(m.nodeId)
                 is Protocol.PeerConnected -> state.peerConnected(m.nodeId)
                 is Protocol.PeerDisconnected -> state.peerDisconnected(m.nodeId)
                 is Protocol.AppForegrounded -> {
@@ -146,7 +145,6 @@ class AppActor(
                 is Protocol.AcceptContact -> state.acceptContact(m.card)
                 is Protocol.SetTrustLevel -> state.setTrustLevel(m.entry, m.level)
                 is Protocol.PeerDiscovered -> state.peerDiscovered(m.nodeId)
-                is Protocol.PeerLost -> state.peerLost(m.nodeId)
                 is Protocol.PeerConnected -> state.peerConnected(m.nodeId)
                 is Protocol.PeerDisconnected -> state.peerDisconnected(m.nodeId)
                 is Protocol.AppForegrounded -> {

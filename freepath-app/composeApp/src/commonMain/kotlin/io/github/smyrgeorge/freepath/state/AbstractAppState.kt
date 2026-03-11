@@ -88,32 +88,20 @@ abstract class AbstractAppState(
 
     // Called only by AppActor
     fun peerDiscovered(nodeId: String) {
-        _discoveredPeers.update { current ->
-            if (nodeId !in current) current + (nodeId to DiscoveredPeer(nodeId = nodeId, isKnown = false))
-            else current
+        _discoveredPeers.update { peers ->
+            if (nodeId !in peers) peers + (nodeId to DiscoveredPeer(nodeId = nodeId, isKnown = false))
+            else peers
         }
     }
 
     // Called only by AppActor
     fun peerConnected(nodeId: String) {
-        _discoveredPeers.update { it + (nodeId to DiscoveredPeer(nodeId = nodeId, isKnown = true)) }
-    }
-
-    // Called only by AppActor
-    fun peerLost(nodeId: String) {
-        // Ignore mDNS loss for a peer that is actively connected (isKnown=true).
-        // iOS re-registers mDNS with a new service name on foreground, which JmDNS reports as
-        // "old service removed" followed by "new service found". The TCP connection is still alive,
-        // so the mDNS event is spurious. Only peerDisconnected (TCP teardown) removes a connected peer.
-        _discoveredPeers.update { current ->
-            val peer = current[nodeId]
-            if (peer == null || peer.isKnown) current else current - nodeId
-        }
+        _discoveredPeers.update { peers -> peers + (nodeId to DiscoveredPeer(nodeId = nodeId, isKnown = true)) }
     }
 
     // Called only by AppActor
     fun peerDisconnected(nodeId: String) {
-        _discoveredPeers.update { it - nodeId }
+        _discoveredPeers.update { peers -> peers - nodeId }
     }
 
     // Called only by AppActor — marks accepted contact as known in the live peer map

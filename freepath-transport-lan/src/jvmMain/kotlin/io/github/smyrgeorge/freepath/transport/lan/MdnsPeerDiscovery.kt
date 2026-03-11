@@ -44,15 +44,20 @@ class MdnsPeerDiscovery(override val nodeId: String) : PeerDiscovery {
             ?.filterIsInstance<Inet4Address>()
             ?.firstOrNull { !it.isLinkLocalAddress && !it.isLoopbackAddress }
         log.info { "mDNS binding to $localAddress" }
-        val jm = if (localAddress != null) JmDNS.create(localAddress) else JmDNS.create()
+        val jm = if (localAddress != null) JmDNS.create(localAddress, "freepath", 100) else JmDNS.create()
         jmdns = jm
 
         // Register this node's service for other peers to discover.
         val suffix = "%04x".format(Random.nextInt(0x10000))
-        val props = HashMap<String, String>()
-        props["v"] = PROTOCOL_VERSION
-        props["nodeId"] = nodeId
-        val info = ServiceInfo.create(SERVICE_TYPE, "Freepath ($suffix)", port, 0, 0, props)
+        val props = mapOf("v" to PROTOCOL_VERSION, "nodeId" to nodeId)
+        val info = ServiceInfo.create(
+            /* type = */ SERVICE_TYPE,
+            /* name = */ "Freepath ($suffix)",
+            /* port = */ port,
+            /* weight = */ 0,
+            /* priority = */ 0,
+            /* props = */ props
+        )
         serviceInfo = info
         jm.registerService(info)
         log.info { "mDNS service registered: ${info.name} on ${jm.inetAddress}" }
