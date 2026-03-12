@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package io.github.smyrgeorge.freepath
 
 import androidx.compose.ui.window.ComposeUIViewController

@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import io.github.smyrgeorge.freepath.database.ContactCardEntry
 import io.github.smyrgeorge.freepath.state.model.StartupRoute
 import io.github.smyrgeorge.freepath.ui.components.FreepathTabBar
 import io.github.smyrgeorge.freepath.ui.components.LanExchangeDrawer
@@ -26,6 +27,7 @@ import io.github.smyrgeorge.freepath.ui.components.ResetDataDrawer
 import io.github.smyrgeorge.freepath.ui.components.ResetDataOverlay
 import io.github.smyrgeorge.freepath.ui.components.TabItem
 import io.github.smyrgeorge.freepath.ui.screens.AddContactDrawerOverlay
+import io.github.smyrgeorge.freepath.ui.screens.ChatScreen
 import io.github.smyrgeorge.freepath.ui.screens.ContactDrawerOverlay
 import io.github.smyrgeorge.freepath.ui.screens.MeScreen
 import io.github.smyrgeorge.freepath.ui.screens.NearbyScreen
@@ -34,7 +36,7 @@ import io.github.smyrgeorge.freepath.ui.screens.OnboardingScreen
 import io.github.smyrgeorge.freepath.ui.screens.SplashScreen
 import io.github.smyrgeorge.freepath.ui.theme.FreepathTheme
 
-private enum class Screen { Splash, Onboarding, Nearby, Network, Me }
+private enum class Screen { Splash, Onboarding, Nearby, Network, Me, Chat }
 
 private val APP_TABS = listOf(
     TabItem(icon = "◎", label = "Nearby", isCircle = true),
@@ -50,6 +52,7 @@ private val APP_SCREENS = setOf(Screen.Nearby, Screen.Network, Screen.Me)
 @Composable
 fun App() {
     var screen by remember { mutableStateOf(Screen.Splash) }
+    var chatContact by remember { mutableStateOf<ContactCardEntry?>(null) }
     val startupRoute by AppViewState.startupRoute.collectAsState()
     val pendingDeepLink by AppViewState.pendingDeepLink.collectAsState()
 
@@ -88,8 +91,19 @@ fun App() {
                         }
 
                         Screen.Nearby -> NearbyScreen()
-                        Screen.Network -> NetworkScreen()
+                        Screen.Network -> NetworkScreen(
+                            onContactClick = { entry ->
+                                chatContact = entry
+                                screen = Screen.Chat
+                            }
+                        )
                         Screen.Me -> MeScreen()
+                        Screen.Chat -> chatContact?.let { entry ->
+                            ChatScreen(
+                                contact = entry,
+                                onBack = { screen = Screen.Network },
+                            )
+                        }
                     }
 
                     // Tab bar — overlays content at the bottom

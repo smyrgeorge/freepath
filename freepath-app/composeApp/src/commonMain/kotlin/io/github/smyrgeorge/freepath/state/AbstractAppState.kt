@@ -10,6 +10,7 @@ import io.github.smyrgeorge.freepath.database.ContactCardEntry
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
+import io.github.smyrgeorge.freepath.state.model.ChatMessage
 import io.github.smyrgeorge.freepath.state.model.DiscoveredPeer
 import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.log4k.Logger
@@ -39,6 +40,16 @@ abstract class AbstractAppState(
 
     private val _contacts = MutableStateFlow<List<ContactCardEntry>>(emptyList())
     val contacts: StateFlow<List<ContactCardEntry>> = _contacts.asStateFlow()
+
+    private val _chats = MutableStateFlow<Map<String, List<ChatMessage>>>(emptyMap())
+    val chats: StateFlow<Map<String, List<ChatMessage>>> = _chats.asStateFlow()
+
+    fun appendMessage(peerId: String, message: ChatMessage) {
+        _chats.update { current ->
+            val updated = (current[peerId] ?: emptyList()) + message
+            current + (peerId to updated)
+        }
+    }
 
     lateinit var identity: Identity
     lateinit var identityEntry: IdentityEntry

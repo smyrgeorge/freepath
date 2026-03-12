@@ -115,7 +115,10 @@ abstract class AbstractAppResources(
                 contact?.let { Base64.decode(it.card.sigKey) }
             },
             linkAdapter = lanAdapter,
-            onFrameReceived = { peerId, _, _ -> log.info { "Frame received from $peerId" } },
+            onFrameReceived = { peerId, frame, _ ->
+                val text = Base64.decode(frame.payload).decodeToString()
+                system.tell(Protocol.ChatMessageReceived(peerId, text)).logError()
+            },
         )
         lanProtocol.start()
         log.info { "LAN protocol started on port ${lanAdapter.localPort}" }

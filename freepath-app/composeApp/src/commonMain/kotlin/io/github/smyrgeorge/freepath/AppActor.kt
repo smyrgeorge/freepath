@@ -6,12 +6,14 @@ import io.github.smyrgeorge.freepath.database.ContactCardEntry
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.state.AbstractAppState
 import io.github.smyrgeorge.freepath.state.AbstractViewState
+import io.github.smyrgeorge.freepath.state.model.ChatMessage
 import io.github.smyrgeorge.freepath.state.model.StartupRoute
 import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.impl.extensions.doEvery
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.measureTime
 
@@ -113,6 +115,21 @@ class AppActor(
                     }
                 }
 
+                is Protocol.SendChatMessage -> {
+                    resources.lanProtocol.send(m.peerId, m.text.encodeToByteArray())
+                    state.appendMessage(
+                        peerId = m.peerId,
+                        message = ChatMessage(fromMe = true, text = m.text, timestamp = Clock.System.now())
+                    )
+                }
+
+                is Protocol.ChatMessageReceived -> {
+                    state.appendMessage(
+                        peerId = m.peerId,
+                        message = ChatMessage(fromMe = false, text = m.text, timestamp = Clock.System.now())
+                    )
+                }
+
                 is Protocol.ResetData -> {
                     log.info("[normal] Resetting app data...")
                     ctx.become(reset)
@@ -189,6 +206,14 @@ class AppActor(
                     log.warn("[exchange] Exchange failed (${m.reason}) — resetting.")
                     state.cancelContactExchange()
                     ctx.become(normal)
+                }
+
+                is Protocol.SendChatMessage -> log.warn("[exchange] Ignoring SendChatMessage — exchange in progress.")
+                is Protocol.ChatMessageReceived -> {
+                    state.appendMessage(
+                        m.peerId,
+                        ChatMessage(fromMe = false, text = m.text, timestamp = Clock.System.now())
+                    )
                 }
 
                 is Protocol.IncomingContactExchange -> m.result.complete(null) // reject: already in exchange

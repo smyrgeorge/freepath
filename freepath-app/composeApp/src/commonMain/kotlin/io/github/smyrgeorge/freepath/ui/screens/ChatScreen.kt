@@ -1,0 +1,252 @@
+package io.github.smyrgeorge.freepath.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import io.github.smyrgeorge.freepath.AppResources
+import io.github.smyrgeorge.freepath.AppState
+import io.github.smyrgeorge.freepath.Protocol
+import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
+import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
+import kotlinx.coroutines.launch
+
+@Composable
+fun ChatScreen(
+    contact: ContactCardEntry,
+    onBack: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val discoveredPeers by AppState.discoveredPeers.collectAsState()
+    val chats by AppState.chats.collectAsState()
+    val messages = chats[contact.nodeId] ?: emptyList()
+    val listState = rememberLazyListState()
+    var inputText by remember { mutableStateOf("") }
+
+    val localName = contact.name?.takeIf { it.isNotBlank() }
+    val cardName = contact.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+    val displayName = localName ?: cardName ?: contact.nodeId.take(12)
+
+    val isOnline = contact.nodeId in discoveredPeers
+
+    // Scroll to bottom whenever messages change
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    }
+
+    fun sendMessage() {
+        val text = inputText.trim()
+        if (text.isBlank()) return
+        inputText = ""
+        scope.launch {
+            AppResources.system.tell(Protocol.SendChatMessage(contact.nodeId, text))
+        }
+    }
+
+    // imePadding() shifts the Column above the keyboard; navigationBarsPadding() handles home bar
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+    ) {
+        FreepathTopBar(
+            title = displayName,
+            leftAction = {
+                IconButton(onClick = onBack) {
+                    Text(
+                        text = "←",
+                        fontSize = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            },
+            rightAction = {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(if (isOnline) Color(0xFF4CAF50) else Color(0xFFBDBDBD))
+                )
+            },
+            content = {
+                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    FreepathFingerprint(text = contact.nodeId)
+                }
+            },
+        )
+
+        // Chat area — tap anywhere to dismiss keyboard
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .pointerInput(Unit) {
+                    detectTapGestures { focusManager.clearFocus() }
+                }
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(messages) { msg ->
+                    ChatBubble(text = msg.text, fromMe = msg.fromMe)
+                }
+            }
+        }
+
+        // Input row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = { inputText = it },
+                modifier = Modifier
+                    .weight(1f)
+                    // Desktop: Enter sends, Shift+Enter inserts newline
+                    .onKeyEvent { event ->
+                        if (event.key == Key.Enter &&
+                            !event.isShiftPressed &&
+                            event.type == KeyEventType.KeyDown
+                        ) {
+                            sendMessage()
+                            true
+                        } else false
+                    },
+                placeholder = {
+                    Text(
+                        text = "Message…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                textStyle = MaterialTheme.typography.bodySmall,
+                shape = RoundedCornerShape(24.dp),
+                maxLines = 4,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { sendMessage() }),
+            )
+
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (inputText.isNotBlank()) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                IconButton(
+                    onClick = { sendMessage() },
+                    enabled = inputText.isNotBlank(),
+                ) {
+                    Text(
+                        text = "↑",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (inputText.isNotBlank())
+                            MaterialTheme.colorScheme.onPrimary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatBubble(text: String, fromMe: Boolean) {
+    val bubbleColor = if (fromMe)
+        MaterialTheme.colorScheme.primary
+    else
+        MaterialTheme.colorScheme.surfaceVariant
+
+    val textColor = if (fromMe)
+        MaterialTheme.colorScheme.onPrimary
+    else
+        MaterialTheme.colorScheme.onSurface
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (fromMe) Arrangement.End else Arrangement.Start,
+    ) {
+        if (fromMe) Spacer(modifier = Modifier.width(48.dp))
+        Box(
+            modifier = Modifier
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomStart = if (fromMe) 16.dp else 4.dp,
+                        bottomEnd = if (fromMe) 4.dp else 16.dp,
+                    )
+                )
+                .background(bubbleColor)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = textColor,
+            )
+        }
+        if (!fromMe) Spacer(modifier = Modifier.width(48.dp))
+    }
+}

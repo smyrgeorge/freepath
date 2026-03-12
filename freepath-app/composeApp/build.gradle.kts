@@ -56,6 +56,7 @@ kotlin {
             implementation(libs.kotlin.test)
         }
         androidMain.dependencies {
+            implementation(libs.log4k.slf4j)
             implementation(libs.androidx.activity.compose)
             // Preview tooling - only needed at compile time
             compileOnly(libs.androidx.ui.tooling)
@@ -63,6 +64,7 @@ kotlin {
             compileOnly(libs.androidx.customview.poolingcontainer)
         }
         jvmMain.dependencies {
+            implementation(libs.log4k.slf4j)
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
         }

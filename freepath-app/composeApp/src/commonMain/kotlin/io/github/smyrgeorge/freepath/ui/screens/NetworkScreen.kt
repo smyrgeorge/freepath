@@ -102,7 +102,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 @Composable
-fun NetworkScreen(modifier: Modifier = Modifier) {
+fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactCardEntry) -> Unit)? = null) {
     val contacts by AppState.contacts.collectAsState()
 
     val trusted = contacts.filter { it.trustLevel == TrustLevel.TRUSTED }
@@ -141,7 +141,7 @@ fun NetworkScreen(modifier: Modifier = Modifier) {
                         "${stringResource(Res.string.network_section_trusted)} (${trusted.size})"
                     )
                 }
-                items(trusted, key = { it.nodeId }) { entry -> ContactRow(entry) }
+                items(trusted, key = { it.nodeId }) { entry -> ContactRow(entry, onContactClick = onContactClick) }
             }
 
             if (known.isNotEmpty()) {
@@ -151,7 +151,7 @@ fun NetworkScreen(modifier: Modifier = Modifier) {
                         "${stringResource(Res.string.network_section_known)} (${known.size})"
                     )
                 }
-                items(known, key = { it.nodeId }) { entry -> ContactRow(entry) }
+                items(known, key = { it.nodeId }) { entry -> ContactRow(entry, onContactClick = onContactClick) }
             }
 
             if (blocked.isNotEmpty()) {
@@ -229,7 +229,11 @@ private fun NetworkSectionHeader(text: String) {
 }
 
 @Composable
-private fun ContactRow(entry: ContactCardEntry, grayed: Boolean = false) {
+private fun ContactRow(
+    entry: ContactCardEntry,
+    grayed: Boolean = false,
+    onContactClick: ((ContactCardEntry) -> Unit)? = null,
+) {
     val scope = rememberCoroutineScope()
     val onSurface = MaterialTheme.colorScheme.onSurface
     val contentAlpha = if (grayed) 0.5f else 1f
@@ -250,6 +254,15 @@ private fun ContactRow(entry: ContactCardEntry, grayed: Boolean = false) {
             .background(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 RoundedCornerShape(12.dp),
+            )
+            .then(
+                if (onContactClick != null && !grayed)
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(),
+                        onClick = { onContactClick(entry) },
+                    )
+                else Modifier
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
