@@ -1,0 +1,180 @@
+@file:OptIn(ExperimentalForeignApi::class)
+
+package io.github.smyrgeorge.freepath.libp2p
+
+import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_dial
+import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_send_request
+import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_send_response
+import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_send_response_failed
+import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_set_log_callback
+import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_start
+import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_stop
+import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetrics
+import io.github.smyrgeorge.freepath.libp2p.util.AbstractLibp2pModule
+import io.github.smyrgeorge.log4k.impl.extensions.launch
+import kotlinx.cinterop.COpaquePointer
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.StableRef
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.convert
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.usePinned
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.channels.onFailure
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.AtomicReference
+import kotlin.time.Duration.Companion.seconds
+
+actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds) {
+
+    actual val metrics: Libp2pMetrics = Libp2pMetrics()
+
+    init {
+        libp2p_set_log_callback(Libp2pLogger.iosLogDispatcher)
+    }
+
+    private val mutex = Mutex()
+    private var nodePtr: COpaquePointer? = null
+    private var handlerRef: StableRef<AtomicReference<((Libp2pEvent) -> Unit)?>>? = null
+
+    // The AtomicReference holds the internal dispatcher; its address is pinned across the FFI.
+    private val dispatcherRef = AtomicReference<((Libp2pEvent) -> Unit)?>(null)
+
+    private var appHandler: ((Libp2pEvent) -> Unit)? = null
+    private var mdns: MdnsPeerDiscovery? = null
+
+    // null = not started, non-null = started (CAS from null → Unit)
+    private val mdnsStarted = AtomicReference<Unit?>(null)
+
+    actual fun setEventHandler(handler: (Libp2pEvent) -> Unit) {
+        appHandler = handler
+    }
+
+    actual suspend fun start(
+        nodeId: String,
+        sigKeyPrivate: ByteArray,
+        listenAddrs: String,
+    ) {
+        mutex.withLock {
+            if (nodePtr != null) return
+            mdns = MdnsPeerDiscovery(nodeId)
+            dispatcherRef.value = ::dispatch
+            val ref = StableRef.create(dispatcherRef)
+            val ptr = sigKeyPrivate.usePinned { pinned ->
+                libp2p_start(
+                    node_id = nodeId,
+                    sig_key_private = pinned.addressOf(0).reinterpret(),
+                    sig_key_len = sigKeyPrivate.size.convert(),
+                    listen_addr = listenAddrs,
+                    event_callback = ref.asCPointer(),
+                    event_fun = Libp2pCallback.eventDispatcher,
+                )
+            }
+            if (ptr == null) {
+                ref.dispose()
+                dispatcherRef.value = null
+                mdns = null
+                throw Libp2pException("libp2p_start returned null")
+            }
+            handlerRef = ref
+            nodePtr = ptr
+        }
+    }
+
+    actual suspend fun stop() {
+        mutex.withLock {
+            val ptr = nodePtr ?: return
+            nodePtr = null
+            requests.close()
+            mdns?.stop()
+            mdns = null
+            mdnsStarted.value = null
+            scope.coroutineContext.cancelChildren()
+            handlerRef?.dispose()
+            handlerRef = null
+            dispatcherRef.value = null
+            metrics.close()
+            libp2p_stop(ptr)
+        }
+    }
+
+    actual suspend fun dial(multiaddr: String) {
+        val ptr = mutex.withLock { nodePtr } ?: return
+        libp2p_dial(ptr, multiaddr)
+    }
+
+    actual override suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray) {
+        val ptr = mutex.withLock { nodePtr } ?: return
+        payload.usePinned { pinned ->
+            libp2p_send_request(
+                node = ptr,
+                peer_id = peerId,
+                req_id = reqId.toULong(),
+                payload = if (payload.isEmpty()) null else pinned.addressOf(0).reinterpret(),
+                payload_len = payload.size.convert(),
+            )
+        }
+    }
+
+    actual suspend fun sendResponse(reqId: Long, payload: ByteArray) {
+        val ptr = mutex.withLock { nodePtr } ?: return
+        payload.usePinned { pinned ->
+            libp2p_send_response(
+                node = ptr,
+                req_id = reqId.toULong(),
+                payload = if (payload.isEmpty()) null else pinned.addressOf(0).reinterpret(),
+                payload_len = payload.size.convert(),
+            )
+        }
+    }
+
+    actual suspend fun sendResponseFailed(reqId: Long, error: String) {
+        val ptr = mutex.withLock { nodePtr } ?: return
+        libp2p_send_response_failed(node = ptr, req_id = reqId.toULong(), error = error)
+    }
+
+    // ── Internal dispatcher ────────────────────────────────────────────────────
+
+    private fun dispatch(event: Libp2pEvent) {
+        onEvent(event)
+        metrics.onEvent(event)
+        appHandler?.invoke(event)
+    }
+
+    private fun onEvent(event: Libp2pEvent) {
+        when (event) {
+            is Libp2pEvent.RequestReceived -> {
+                requests.trySend(event).onFailure {
+                    log.error { "Failed to send message to requests channel: $it" }
+                }
+            }
+
+            is Libp2pEvent.ResponseReceived -> launch { rpc.response(event.reqId, event) }
+            is Libp2pEvent.RequestFailed -> launch { rpc.response(event.reqId, event) }
+            else -> Unit
+        }
+
+        if (event !is Libp2pEvent.NewListenAddr) return
+        // Only start mDNS once, using the first IPv4 listen address with a real port.
+        if (!event.addr.startsWith("/ip4/")) return
+        val port = event.addr.substringAfterLast("/tcp/").toIntOrNull() ?: return
+        if (port == 0) return
+        if (!mdnsStarted.compareAndSet(null, Unit)) return
+        val m = mdns ?: return
+        scope.launch {
+            m.start(
+                port = port,
+                onPeerDiscovered = { nodeId, address ->
+                    val multiaddr = lanAddressToMultiaddr(address) ?: return@start
+                    scope.launch { dial(multiaddr) }
+                    dispatch(Libp2pEvent.MdnsPeerDiscovered(nodeId, address))
+                },
+                onPeerRemoved = { nodeId ->
+                    dispatch(Libp2pEvent.MdnsPeerExpired(nodeId))
+                },
+            )
+        }
+    }
+}

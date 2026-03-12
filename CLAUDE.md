@@ -2,7 +2,7 @@
 
 Protocol specification and reference implementation. Specs live in `spec/`; Kotlin Multiplatform implementation in
 `freepath-util`, `freepath-crypto`, `freepath-contact`, `freepath-transport`, `freepath-transport-lan`,
-`freepath-database`, and `freepath-app`.
+`freepath-database`, `freepath-libp2p`, `freepath-wasm`, and `freepath-app`.
 
 ## Commands
 
@@ -25,6 +25,15 @@ Protocol specification and reference implementation. Specs live in `spec/`; Kotl
 
 # Android APK
 ./gradlew :freepath-app:androidApp:assembleDebug
+
+# Build freepath-libp2p native lib for JVM host (requires cargo)
+./gradlew :freepath-libp2p:buildRustJvm
+
+# Build freepath-libp2p JNI libs for Android (requires cargo-ndk + Android NDK)
+./gradlew :freepath-libp2p:buildRustAndroid
+
+# Run freepath-wasm tests (requires: rustup target add wasm32-unknown-unknown)
+./gradlew :freepath-wasm:jvmTest
 ```
 
 ## Repository structure
@@ -38,9 +47,11 @@ Protocol specification and reference implementation. Specs live in `spec/`; Kotl
 | `freepath-transport/`     | Protocol core: handshake, session, frame codec, crypto                                                    |
 | `freepath-transport-lan/` | LAN adapter library: TCP + mDNS peer discovery (JVM + Android + iOS)                                      |
 | `freepath-database/`      | SQLite persistence: sqlx4k + KSP-generated repos, migrations, `ContactCardEntry`, `IdentityEntry`         |
+| `freepath-libp2p/`        | Rust libp2p swarm wrapper (KMP): `Libp2pModule` expect/actual, `Libp2pEvent`, mDNS via Swift `MdnsBridge`; Rust crate via cinterop (iOS) / JNI (Android) / native dylib (JVM) |
+| `freepath-wasm/`          | WASM runtime (KMP): `WasmModule` interface + `loadWasmModule(ByteArray)`; Chicory on JVM/Android, wasm3 via cinterop on iOS |
 | `freepath-app/`           | Compose Multiplatform mobile app (composeApp, androidApp, iosApp)                                         |
 | `examples/transport-lan/` | JVM demo app: multi-node heartbeat demo + Docker setup                                                    |
-| `build-logic/`            | Gradle convention plugins (`freepath.dokka`, `freepath.swift.interop`)                                    |
+| `build-logic/`            | Gradle convention plugins (`freepath.dokka`, `freepath.swift.interop`, `freepath.rust.interop`)           |
 | `docs/`                   | Published HTML documentation                                                                              |
 | `tools/`                  | Pandoc templates and Lua filters for PDF/HTML generation                                                  |
 | `README.md`               | Project vision and concept overview                                                                       |
@@ -110,13 +121,14 @@ Kotlin Multiplatform library (JVM, Android, iOS). Provides the `CryptoProvider` 
 
 Kotlin Multiplatform library (JVM, Android, iOS). Implements specs 1 and 2:
 
-- **`ContactCard`** — `@Serializable data class`; wire-format public identity card: `schema`, `nodeId` (Base58),
-  `sigKey` / `encKey` (Base64), `updatedAt`; optional `name`, `bio`, `avatar`, `location`
+- **`ContactCard`** — `@Serializable data class`; wire-format public identity card: `schema`, `sigKey` / `encKey`
+  (Base64), `updatedAt`; optional `name`, `bio`, `avatar`, `location`; `nodeId` is a `@Transient lazy val`
+  computed locally as `Base58([0x12, 0x20] ∥ SHA-256(sigKey))` — never transmitted
 - **`ContactEntry`** — local-only record (not serialized); combines a `ContactCard` with trust level, timestamps,
   personal notes, pin/mute flags, and user-defined tags
 - **`TrustLevel`** — `enum { TRUSTED, KNOWN, BLOCKED }` per spec 2
 - **`SignedContactCard`** — transmission wrapper: card + Base64 Ed25519 signature over JSON-encoded card bytes
-- **`ContactCardCodec`** — Node ID derivation (`Base58(SHA-256(sigKey)[0..15])`), sign/verify, seal/open,
+- **`ContactCardCodec`** — Node ID derivation (`Base58([0x12,0x20] ∥ SHA-256(sigKey))` — libp2p multihash format), sign/verify, seal/open,
   card-update rules (`shouldUpdate`), JSON encode/decode
 
 **Key dependencies:** `project(":freepath-crypto")`, `project(":freepath-util")`, `kotlinx-serialization-json`
@@ -173,6 +185,37 @@ Kotlin Multiplatform library (JVM and Android). Implements:
 
 **Key dependencies:** `sqlx4k-sqlite` (Rust-backed SQLite via `sqlx4k`), `ksp`
 
+### `freepath-libp2p` — Rust libp2p wrapper
+
+Kotlin Multiplatform library (JVM, Android, iOS). Wraps a Rust libp2p swarm via cinterop/JNI. Provides:
+
+- **`Libp2pModule`** — `expect`/`actual`; `start(nodeId, sigKeyPrivate, listenAddrs)` / `stop()` / `dial(multiaddr)` /
+  `sendRequest` / `sendResponse` / `sendResponseFailed`; default listen addrs: TCP + QUIC-v1 on IPv4 + IPv6,
+  OS-assigned ports
+- **`Libp2pEvent`** — sealed event hierarchy: `PeerConnected`, `PeerDisconnected`, `NewListenAddr`, `PeerIdentified`,
+  `MdnsPeerDiscovered`, `MdnsPeerExpired`, `RequestReceived`, `ResponseReceived`, `RequestFailed`
+- **`RpcManager`** — coroutine-based request/response correlation over raw libp2p request events
+- **`LanPeerAddressCodec`** — converts `"host:port"` LAN addresses to libp2p multiaddr strings; skips link-local
+  IPv6 (`fe80::`) addresses — they require a scope ID and cannot be dialled reliably across devices
+
+**Build prerequisites:** Rust toolchain (`cargo`); for Android: `cargo-ndk` + Android NDK installed via SDK Manager.
+
+**Key dependencies:** Rust libp2p (Rust crate), Swift `MdnsBridge` (iOS mDNS), `jmdns` (JVM mDNS)
+
+### `freepath-wasm` — WASM runtime
+
+Kotlin Multiplatform library (JVM, Android, iOS). Provides a thin, uniform interface for executing WASM modules:
+
+- **`WasmModule`** — `fun call(function: String, input: String): String`; WASM modules must export `wasm_alloc(i32)->i32`,
+  `wasm_dealloc(i32,i32)`, `wasm_result_ptr()->i32`, and each callable as `(ptr: i32, len: i32) -> i32`
+- **`loadWasmModule(ByteArray): WasmModule`** — `expect`/`actual`; Chicory runtime on JVM/Android, wasm3 via cinterop
+  (`Wasm3Bridge`) on iOS
+
+**Test prerequisites:** `wasm32-unknown-unknown` Rust target (`rustup target add wasm32-unknown-unknown`);
+`buildTestFixtures` runs automatically before `jvmTest`.
+
+**Key dependencies:** `chicory-runtime` (JVM/Android), wasm3 via SPM (iOS)
+
 ### `freepath-app` — Compose Multiplatform mobile app
 
 Multi-target app (Android, iOS, JVM desktop) using Compose Multiplatform. Key files in `composeApp/src/commonMain`:
@@ -221,6 +264,7 @@ ID = file name):
 |-----------------------------------------------|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
 | `io.github.smyrgeorge.freepath.dokka`         | `io.github.smyrgeorge.freepath.dokka.gradle.kts`         | Applies Dokka + configures GitHub source links                                                                          |
 | `io.github.smyrgeorge.freepath.swift.interop` | `io.github.smyrgeorge.freepath.swift.interop.gradle.kts` | Builds a Swift Package, generates the cinterop `.def` with embedded linker opts, wires up cinterops for all iOS targets |
+| `io.github.smyrgeorge.freepath.rust.interop`  | `io.github.smyrgeorge.freepath.rust.interop.gradle.kts`  | Builds a Rust crate for iOS (cinterop static lib), JVM (native dylib via `buildRustJvm`/`copyNativeLibJvm`), and Android (JNI via `buildRustAndroid` using `cargo-ndk`) |
 
 **`swift.interop` plugin DSL** — configure in any module that has iOS targets and a Swift package:
 
@@ -236,10 +280,24 @@ swiftInterop {
 Helper classes (`BuildSwiftPackageTask`, `GenerateDefFileTask`, `SwiftInteropExtension`) live in
 `build-logic/src/main/kotlin/io/github/smyrgeorge/freepath/swift/`.
 
+**`rust.interop` plugin DSL** — configure in any module with a Rust crate and iOS/JVM/Android targets:
+
+```kotlin
+rustInterop {
+    crateName = "freepath_libp2p"              // required; cinterop name and JNI lib name
+    linkerOpts = "-framework SystemConfiguration -framework Security"  // Apple frameworks
+    // cargoDir = "src/rust"                   // default
+    // headerDir = "src/nativeInterop/cinterop"  // default
+}
+```
+
+Helper classes (`RustBuildTask`, `RustGenerateDefFileTask`, `RustInteropExtension`) live in
+`build-logic/src/main/kotlin/io/github/smyrgeorge/freepath/rust/`.
+
 ## Key design decisions (apply across all specs and implementation)
 
 - Two-key identity model: `sigKey` (Ed25519) for signing, `encKey` (X25519) for encryption — both derived from one seed
-- `nodeId` is transmitted for convenience but always verified locally: `Base58(SHA-256(sigKey)[0..15])`
+- `nodeId` is a `@Transient lazy val` on `ContactCard`, never transmitted; derived as `Base58([0x12, 0x20] ∥ SHA-256(sigKey))` (libp2p multihash format — always starts with `Qm`, 46 chars)
 - HandshakeHandler looks up sigKey from contact list — never trusts the received key directly; unknown peers are
   rejected (no TOFU)
 - Content IDs are derived from body hash — never assigned externally

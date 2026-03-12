@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(./gradlew :freepath-libp2p:compileKotlinJvm 2>&1 | tail -20)",
+      "Bash(./gradlew :freepath-libp2p:jvmTest 2>&1 | tail -40)",
+      "Bash(./gradlew :freepath-libp2p:jvmTest 2>&1 | tail -20)",
+      "Bash(./gradlew :freepath-libp2p:compileKotlinJvm 2>&1 | tail -10)",
+      "Bash(./gradlew :freepath-app:composeApp:compileKotlinJvm 2>&1 | tail -30)",
+      "Bash(./gradlew :freepath-libp2p:jvmTest 2>&1 | tail -15)"
     ]
   }
 }

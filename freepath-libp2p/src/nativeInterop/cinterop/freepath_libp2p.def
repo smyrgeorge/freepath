@@ -1,0 +1,4 @@
+headers = freepath_libp2p.h
+package = io.github.smyrgeorge.freepath.libp2p.cinterop
+
+---

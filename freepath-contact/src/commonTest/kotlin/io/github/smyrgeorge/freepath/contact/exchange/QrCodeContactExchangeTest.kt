@@ -26,7 +26,6 @@ class QrCodeContactExchangeTest {
     ): ContactCard =
         ContactCard(
             schema = ContactCard.SCHEMA,
-            nodeId = ContactCardCodec.deriveNodeId(sigKp.publicKey),
             sigKey = Base64.encode(sigKp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
             updatedAt = updatedAt,
@@ -219,28 +218,6 @@ class QrCodeContactExchangeTest {
 
         assertTrue(result.isFailure)
         assertEquals(result.exceptionOrNull()?.message?.contains("Invalid card signature"), true)
-    }
-
-    // ── decode failure: Node ID verification ──────────────────────────────────
-
-    @Test
-    fun decode_failsForMismatchedNodeId() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val kp2 = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-
-        // Create card with wrong nodeId but valid signature for the tampered card
-        val wrongNodeIdCard = card.copy(nodeId = ContactCardCodec.deriveNodeId(kp2.publicKey))
-        val signed =
-            ContactCardSigned(wrongNodeIdCard, Base64.encode(ContactCardCodec.sign(wrongNodeIdCard, kp.privateKey)))
-        val base64Url = Base64.encode(ContactCardCodec.encode(signed))
-        val qrCode = "freepath://contact/v1/$base64Url"
-
-        val result = QrCodeContactExchange.decode(qrCode)
-
-        assertTrue(result.isFailure)
-        assertEquals(result.exceptionOrNull()?.message?.contains("Node ID mismatch"), true)
     }
 
     // ── decodeRaw ─────────────────────────────────────────────────────────────

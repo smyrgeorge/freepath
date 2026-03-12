@@ -36,8 +36,7 @@ fun FreepathFingerprint(
 ) {
     val isLight = MaterialTheme.colorScheme.background == FingerprintBackground
     val backgroundColor = if (isLight) FingerprintBackground else DarkFingerprintBackground
-
-    val formatted = text.chunked(11).joinToString(" ")
+    val formatted = text.chunked(26).joinToString("\n") { it.chunked(13).joinToString(" ") }
 
     Box(
         modifier = modifier

@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -36,8 +37,7 @@ kotlin {
             implementation(project(":freepath-contact"))
             implementation(project(":freepath-crypto"))
             implementation(project(":freepath-database"))
-            implementation(project(":freepath-transport"))
-            implementation(project(":freepath-transport-lan"))
+            implementation(project(":freepath-libp2p"))
             implementation(project(":freepath-util"))
 
             implementation(libs.log4k)
@@ -51,6 +51,7 @@ kotlin {
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(libs.kotlinx.serialization.protobuf)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

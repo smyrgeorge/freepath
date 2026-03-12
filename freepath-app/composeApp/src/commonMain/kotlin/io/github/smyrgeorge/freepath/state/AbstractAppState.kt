@@ -1,26 +1,24 @@
 package io.github.smyrgeorge.freepath.state
 
+import io.github.smyrgeorge.freepath.client.model.ContactInfo
+import io.github.smyrgeorge.freepath.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.contact.TrustLevel
-import io.github.smyrgeorge.freepath.contact.exchange.ContactExchange
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
-import io.github.smyrgeorge.freepath.state.model.ChatMessage
-import io.github.smyrgeorge.freepath.state.model.DiscoveredPeer
-import io.github.smyrgeorge.freepath.util.codec.Base58
+import io.github.smyrgeorge.freepath.state.model.ConnectionSource
 import io.github.smyrgeorge.log4k.Logger
-import io.github.smyrgeorge.log4k.impl.extensions.launch
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
@@ -35,21 +33,25 @@ abstract class AbstractAppState(
     private val identityRepository: IdentityEntryRepository = resources.identityRepository
     private val contactCardRepository: ContactCardEntryRepository = resources.contactCardRepository
 
-    private val _discoveredPeers = MutableStateFlow<Map<String, DiscoveredPeer>>(emptyMap())
-    val discoveredPeers: StateFlow<Map<String, DiscoveredPeer>> = _discoveredPeers.asStateFlow()
-
     private val _contacts = MutableStateFlow<List<ContactCardEntry>>(emptyList())
     val contacts: StateFlow<List<ContactCardEntry>> = _contacts.asStateFlow()
 
     private val _chats = MutableStateFlow<Map<String, List<ChatMessage>>>(emptyMap())
     val chats: StateFlow<Map<String, List<ChatMessage>>> = _chats.asStateFlow()
 
-    fun appendMessage(peerId: String, message: ChatMessage) {
-        _chats.update { current ->
-            val updated = (current[peerId] ?: emptyList()) + message
-            current + (peerId to updated)
-        }
-    }
+    val nearbyPeers: StateFlow<Map<String, ConnectionSource>> =
+        resources.libp2p.metrics.value.map {
+            it.mdnsPeers
+                .filterKeys { peerId -> peerId != identityEntry.nodeId }
+                .mapValues { ConnectionSource.LAN }
+        }.stateIn(emptyMap())
+
+    val connectedKnownPeers: StateFlow<Map<String, ConnectionSource>> =
+        resources.libp2p.metrics.value.map {
+            it.identifiedPeers
+                .filter { peerId -> peerId != identityEntry.nodeId }
+                .associateWith { ConnectionSource.LAN }
+        }.stateIn(emptyMap())
 
     lateinit var identity: Identity
     lateinit var identityEntry: IdentityEntry
@@ -57,20 +59,16 @@ abstract class AbstractAppState(
     lateinit var contactCardEntry: ContactCardEntry
 
     // Contact exchange state — only valid during an active exchange
-    var contactExchangeJob: Job? = null
-    var contactExchangeIncomingDeferred: CompletableDeferred<ByteArray?>? = null
     var contactExchangeIncomingPin: String? = null
-    var contactExchangeIncomingCodec: ContactExchange? = null
+    var contactExchangeIncomingPeerId: String? = null
     var contactExchangeIncomingPeerCard: ContactCard? = null
 
-    // Called only by AppActor
     suspend fun initialize() {
         loadIdentity()
         loadOwnContactCard()
         loadContacts()
     }
 
-    // Called only by AppActor
     suspend fun acceptContact(card: ContactCard) {
         val existing = contactCardRepository.findOneByNodeId(db, card.nodeId).getOrThrow()
         if (existing == null) {
@@ -80,90 +78,38 @@ abstract class AbstractAppState(
             val entry = existing.merge(ContactCardEntry(nodeId = card.nodeId, card = card))
             contactCardRepository.update(db, entry).getOrThrow()
         }
-        markPeerKnown(card.nodeId)
         loadContacts()
     }
 
-    // Called only by AppActor
     suspend fun setTrustLevel(entry: ContactCardEntry, level: TrustLevel) {
         val updated = entry.copy(trustLevel = level, updatedAt = Clock.System.now())
         contactCardRepository.update(db, updated).getOrThrow()
         loadContacts()
     }
 
-    // Called only by AppActor
     suspend fun loadContacts() {
         val ownNodeId = contactCardEntry.nodeId
         _contacts.value = contactCardRepository.findAll(db).getOrThrow().filter { it.nodeId != ownNodeId }
     }
 
-    // Called only by AppActor
-    fun peerDiscovered(nodeId: String) {
-        _discoveredPeers.update { peers ->
-            if (nodeId !in peers) peers + (nodeId to DiscoveredPeer(nodeId = nodeId, isKnown = false))
-            else peers
-        }
-    }
-
-    // Called only by AppActor
-    fun peerConnected(nodeId: String) {
-        _discoveredPeers.update { peers -> peers + (nodeId to DiscoveredPeer(nodeId = nodeId, isKnown = true)) }
-    }
-
-    // Called only by AppActor
-    fun peerDisconnected(nodeId: String) {
-        _discoveredPeers.update { peers -> peers - nodeId }
-    }
-
-    // Called only by AppActor — marks accepted contact as known in the live peer map
-    fun markPeerKnown(nodeId: String) {
-        _discoveredPeers.update { peers ->
-            peers[nodeId]?.let { peer -> peers + (nodeId to peer.copy(isKnown = true)) } ?: peers
-        }
-    }
-
-    // Called only by AppActor
-    fun initiateContactExchange(
-        nodeId: String,
-        exchanger: suspend (pin: String) -> Result<ContactCard>,
-        onResult: suspend (Result<ContactCard>) -> Unit,
-    ) {
+    fun initiateContactExchange(peerId: String): String {
         val pin = (0 until 4).map { ('0'..'9').random() }.joinToString("")
-        viewState.showRequestorDrawer(pin, nodeId)
-        log.info("[exchange] Exchange initiated with $nodeId, PIN $pin")
-        contactExchangeJob = launch {
-            val result = exchanger(pin)
-            contactExchangeJob = null
-            onResult(result)
-        }
+        viewState.showRequestorDrawer(pin, peerId)
+        log.info("[exchange] Exchange initiated with $peerId, PIN $pin")
+        return pin
     }
 
-    // Called only by AppActor
     fun resetContactExchange() {
-        val job = contactExchangeJob
-        val deferred = contactExchangeIncomingDeferred
-        contactExchangeJob = null
-        contactExchangeIncomingDeferred = null
         contactExchangeIncomingPin = null
-        contactExchangeIncomingCodec = null
+        contactExchangeIncomingPeerId = null
         contactExchangeIncomingPeerCard = null
-        job?.cancel()
-        deferred?.complete(null)
     }
 
-    // Called only by AppActor
     fun cancelContactExchange() {
         resetContactExchange()
         viewState.hideExchangeDrawer()
     }
 
-    // Called only by AppActor
-    fun handleContactExchangeSuccess(peerCard: ContactCard) {
-        viewState.hideExchangeDrawer()
-        viewState.showContactCard(peerCard)
-    }
-
-    // Called only by AppActor
     fun handleContactExchangeFailure(reason: String) {
         log.info("[exchange] Exchange failed: $reason")
         viewState.exchangeFailed(reason)
@@ -184,7 +130,29 @@ abstract class AbstractAppState(
         contactCard = contactCardEntry.card
     }
 
-    // Called only by AppActor — dev/testing only
+    fun appendMessage(message: ChatMessage) {
+        // The chat map is keyed by the remote peer's node ID so the UI can look up
+        // messages with chats[contact.nodeId]. Use whichever side is not us.
+        val conversationKey =
+            if (message.senderId == contactCard.nodeId) message.receiverId
+            else message.senderId
+        _chats.update { current ->
+            current + (conversationKey to (current[conversationKey] ?: emptyList()) + message)
+        }
+    }
+
+    fun contactLookup(peerIdRaw: ByteArray): ContactInfo? {
+        return contacts.value.firstOrNull {
+            val peerId = CryptoProvider.sha256(Base64.decode(it.card.sigKey))
+            peerId.contentEquals(peerIdRaw)
+        }?.let { entry ->
+            ContactInfo(
+                sigKeyPublic = Base64.decode(entry.card.sigKey),
+                encKeyPublic = Base64.decode(entry.card.encKey),
+            )
+        }
+    }
+
     suspend fun resetData(): Boolean {
         viewState.showResetClearing()
         return runCatching {
@@ -220,7 +188,6 @@ abstract class AbstractAppState(
 
         val card = ContactCard(
             schema = ContactCard.SCHEMA,
-            nodeId = nodeId,
             sigKey = Base64.encode(identity.sigKeyPublic),
             encKey = Base64.encode(identity.encKeyPublic),
             updatedAt = Clock.System.now(),
@@ -235,8 +202,8 @@ abstract class AbstractAppState(
     private suspend fun createAndSaveIdentity(): IdentityEntry {
         val sigKeyPair: KeyPair = CryptoProvider.generateEd25519KeyPair()
         val encKeyPair: KeyPair = CryptoProvider.generateX25519KeyPair()
-        val nodeIdRaw = CryptoProvider.sha256(sigKeyPair.publicKey).copyOf(16)
-        val nodeId = Base58.encode(nodeIdRaw)
+        val nodeIdRaw = CryptoProvider.sha256(sigKeyPair.publicKey)
+        val nodeId = ContactCardCodec.deriveNodeId(sigKeyPair.publicKey)
 
         val identity = Identity(
             nodeIdRaw = nodeIdRaw,

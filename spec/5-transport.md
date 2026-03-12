@@ -262,7 +262,7 @@ EPHEMERAL_KEY (32 bytes) | SIGKEY (32 bytes) | NODEID_RAW (16 bytes) | SIGNATURE
   used as the verification key. The receiver MUST look up the sender's `sigKey` from their local contact list
   and verify the signature using that key. Using the received `SIGKEY` for verification would allow an attacker
   to substitute an arbitrary key and forge a valid signature.
-- `NODEID_RAW`: the raw 16-byte Node ID: `SHA-256(sigKey)[0..15]`.
+- `NODEID_RAW`: the raw 32-byte Node ID: `SHA-256(sigKey)`.
 - `SIGNATURE`: Ed25519 signature over `(EPHEMERAL_KEY ∥ NODEID_RAW)` using the sender's long-term Ed25519
   private key. Note that `SIGKEY` is not covered by this signature; its authenticity is established solely
   by the contact list lookup.

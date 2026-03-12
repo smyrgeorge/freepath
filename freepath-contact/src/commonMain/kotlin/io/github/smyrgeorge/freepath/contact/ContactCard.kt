@@ -2,14 +2,13 @@ package io.github.smyrgeorge.freepath.contact
 
 import io.github.smyrgeorge.freepath.contact.ContactCard.Companion.SCHEMA
 import kotlinx.serialization.Serializable
+import kotlin.io.encoding.Base64
 import kotlin.time.Instant
 
 @Serializable
 data class ContactCard(
     /** Schema version. Always [SCHEMA] for cards produced by this implementation. */
     val schema: Int,
-    /** Base58-encoded Node ID: Base58(SHA-256(sigKey)[0..15]). Convenience field; always verified locally. */
-    val nodeId: String,
     /** Base64-encoded Ed25519 public key. Used to verify the card signature and all attributed content. */
     val sigKey: String,
     /** Base64-encoded X25519 public key. Used to derive shared secrets for end-to-end encryption. */
@@ -25,11 +24,13 @@ data class ContactCard(
     /** Free-text location hint. Max 128 chars. Never verified. */
     val location: String? = null,
 ) {
+    /** Base58-encoded Node ID derived locally from [sigKey]: Base58(SHA-256(sigKey)). Never transmitted. */
+    val nodeId: String by lazy {
+        ContactCardCodec.deriveNodeId(Base64.decode(sigKey))
+    }
+
     init {
         require(schema == SCHEMA) { "Unsupported schema version: $schema (expected $SCHEMA)" }
-        require(nodeId.matches(BASE58_REGEX)) {
-            "nodeId must be a 22-character Base58 string"
-        }
         require(sigKey.isNotEmpty() && sigKey.length == BASE64_PUBKEY_LENGTH) {
             "sigKey must be a $BASE64_PUBKEY_LENGTH-character Base64-encoded Ed25519 public key"
         }
@@ -67,7 +68,6 @@ data class ContactCard(
         const val MAX_BIO_LENGTH = 256
         const val MAX_AVATAR_SIZE = 65536 // 64 KB
         const val MAX_LOCATION_LENGTH = 128
-        private val BASE58_REGEX = Regex("[1-9A-HJ-NP-Za-km-z]{22}")
         private const val BASE64_PUBKEY_LENGTH = 44 // 32 bytes base64-encoded
     }
 }

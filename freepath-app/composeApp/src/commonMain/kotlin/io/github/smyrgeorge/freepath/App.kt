@@ -97,6 +97,7 @@ fun App() {
                                 screen = Screen.Chat
                             }
                         )
+
                         Screen.Me -> MeScreen()
                         Screen.Chat -> chatContact?.let { entry ->
                             ChatScreen(

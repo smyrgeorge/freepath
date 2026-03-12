@@ -52,4 +52,10 @@
     <string name="dev_reset_overlay_clearing">Clearing data…</string>
     <string name="dev_reset_overlay_cleared">Data cleared.\nThe app will close automatically.\nIf it doesn\'t, you can close it manually.</string>
     <string name="dev_reset_overlay_failed">Failed to clear data.\nPlease restart the app and try again.</string>
+    <string name="dev_libp2p_metrics_title">libp2p Metrics</string>
+    <string name="dev_libp2p_listen_addresses">Listen addresses</string>
+    <string name="dev_libp2p_connected_peers">Connected peers</string>
+    <string name="dev_libp2p_identified_peers">Identified peers</string>
+    <string name="dev_libp2p_mdns_peers">mDNS peers</string>
+    <string name="dev_libp2p_none">none</string>
 </resources>

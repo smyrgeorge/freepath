@@ -2,18 +2,17 @@ package io.github.smyrgeorge.freepath
 
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.actor4k.actor.impl.BehaviorActor
+import io.github.smyrgeorge.freepath.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.state.AbstractAppState
 import io.github.smyrgeorge.freepath.state.AbstractViewState
-import io.github.smyrgeorge.freepath.state.model.ChatMessage
 import io.github.smyrgeorge.freepath.state.model.StartupRoute
 import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.impl.extensions.doEvery
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.measureTime
 
@@ -34,17 +33,21 @@ class AppActor(
     override suspend fun onActivate(m: Protocol) {
         log.info("[onActivate] Activating... ($m)")
         val time = measureTime {
-            resources.openDatabase()
+            resources.initializeDatabase()
             state.initialize()
-            launch {
-                log.info("[onActivate] Starting up LAN protocol in the background...")
-                resources.startupLan(state.identityEntry.nodeId, state.identity)
-            }
+            resources.initializeAppClient(state = state)
+            resources.startLibp2p(
+                nodeId = state.contactCard.nodeId,
+                sigKeyPrivate = state.identity.sigKeyPrivate,
+                identityEntry = state.identityEntry,
+                contactLookup = { state.contactLookup(it) },
+            )
         }
 
         log.info("[onActivate] Identity: ${state.identityEntry}")
         log.info("[onActivate] ContactCard: ${state.contactCardEntry}")
         log.info("[onActivate] Initialization took $time")
+
 
         val route = when {
             ContactCardEntry.TAG_ONBOARDING in state.contactCardEntry.tags -> StartupRoute.Onboarding
@@ -65,8 +68,8 @@ class AppActor(
         log.info("[onShutdown] Shutting down...")
         timer.cancel()
         state.resetContactExchange() // Cancel any ongoing contact exchange flow.
+        resources.stopLibp2p()
         resources.closeDatabase()
-        resources.shutdownLan()
         log.info("[onShutdown] Shutdown complete.")
     }
 
@@ -82,54 +85,27 @@ class AppActor(
                 is Protocol.Ping -> return@normal Behavior.Reply(Protocol.Pong)
                 is Protocol.AcceptContact -> state.acceptContact(m.card)
                 is Protocol.SetTrustLevel -> state.setTrustLevel(m.entry, m.level)
-                is Protocol.PeerDiscovered -> state.peerDiscovered(m.nodeId)
-                is Protocol.PeerConnected -> state.peerConnected(m.nodeId)
-                is Protocol.PeerDisconnected -> state.peerDisconnected(m.nodeId)
-                is Protocol.AppForegrounded -> {
-                    log.info("[normal] App foregrounded — restarting mDNS discovery.")
-                    resources.lanAdapter.restartDiscovery()
-                }
-
-                is Protocol.AppBackgrounded -> log.info("[normal] App backgrounded.")
                 is Protocol.InitiateContactExchange -> {
-                    state.initiateContactExchange(m.nodeId, m.exchanger) { result ->
-                        val msg = if (result.isSuccess) Protocol.ContactExchangeSucceeded(result.getOrThrow())
-                        else Protocol.ContactExchangeFailed(result.exceptionOrNull()?.message ?: "unknown error")
-                        ctx.tell(msg).getOrThrow()
-                    }
+                    state.initiateContactExchange(m.peerId)
                     ctx.become(exchange)
                 }
 
                 is Protocol.IncomingContactExchange -> {
-                    val peerCard = m.codec.decode(m.peerCardBytes).getOrNull()
-                    if (peerCard == null) {
-                        log.warn("[normal] IncomingContactExchange: failed to decode peer card — rejecting.")
-                        m.result.complete(null)
-                    } else {
-                        state.contactExchangeIncomingDeferred = m.result
-                        state.contactExchangeIncomingPin = m.pin
-                        state.contactExchangeIncomingCodec = m.codec
-                        state.contactExchangeIncomingPeerCard = peerCard
-                        viewState.showRecipientDrawer(peerCard)
-                        ctx.become(exchange)
-                    }
+                    state.contactExchangeIncomingPin = m.pin
+                    state.contactExchangeIncomingPeerId = m.peerId
+                    state.contactExchangeIncomingPeerCard = m.peerCard
+                    viewState.showRecipientDrawer(m.peerCard)
+                    ctx.become(exchange)
                 }
 
                 is Protocol.SendChatMessage -> {
-                    resources.lanProtocol.send(m.peerId, m.text.encodeToByteArray())
-                    state.appendMessage(
-                        peerId = m.peerId,
-                        message = ChatMessage(fromMe = true, text = m.text, timestamp = Clock.System.now())
-                    )
+                    val message = ChatMessage(state.identityEntry.nodeId, m.peerId, m.text)
+                    resources.client.send(message)
+                        .onSuccess { state.appendMessage(message) }
+                        .onFailure { log.error("Failed to send chat message: ${it.message}") }
                 }
 
-                is Protocol.ChatMessageReceived -> {
-                    state.appendMessage(
-                        peerId = m.peerId,
-                        message = ChatMessage(fromMe = false, text = m.text, timestamp = Clock.System.now())
-                    )
-                }
-
+                is Protocol.ChatMessageReceived -> state.appendMessage(m.message)
                 is Protocol.ResetData -> {
                     log.info("[normal] Resetting app data...")
                     ctx.become(reset)
@@ -139,15 +115,13 @@ class AppActor(
                         exitApplication(if (success) 0 else 1)
                     }
                 }
-                // Exchange-result messages are irrelevant in normal mode — ignore
-                is Protocol.ContactExchangePinSubmitted -> log.warn("[normal] Ignoring RecipientPinSubmitted — not in exchange.")
+
                 is Protocol.ContactExchangeCancelled -> {
                     state.cancelContactExchange()
                     ctx.become(normal)
                 }
 
-                is Protocol.ContactExchangeSucceeded -> log.warn("[normal] Ignoring ExchangeSucceeded — not in exchange.")
-                is Protocol.ContactExchangeFailed -> log.warn("[normal] Ignoring ExchangeFailed — not in exchange.")
+                else -> log.warn("[normal] (ignored $m)")
             }
             Behavior.Reply(Protocol.Ok)
         }
@@ -155,34 +129,19 @@ class AppActor(
         private val exchange: suspend (AppActor, Protocol) -> Behavior<Protocol.Response> = exchange@{ ctx, m ->
             val log = ctx.log
             val state = ctx.state
-            val resources = ctx.resources
+            val viewState = ctx.viewState
             when (m) {
                 is Protocol.Ping -> return@exchange Behavior.Reply(Protocol.Pong)
-                // Normal peer/app lifecycle — still processed during exchange
                 is Protocol.AcceptContact -> state.acceptContact(m.card)
-                is Protocol.SetTrustLevel -> state.setTrustLevel(m.entry, m.level)
-                is Protocol.PeerDiscovered -> state.peerDiscovered(m.nodeId)
-                is Protocol.PeerConnected -> state.peerConnected(m.nodeId)
-                is Protocol.PeerDisconnected -> state.peerDisconnected(m.nodeId)
-                is Protocol.AppForegrounded -> {
-                    log.info("[exchange] App foregrounded — restarting mDNS discovery.")
-                    resources.lanAdapter.restartDiscovery()
-                }
-
-                is Protocol.AppBackgrounded -> log.info("[exchange] App backgrounded.")
-                // Exchange-specific handlers
                 is Protocol.ContactExchangePinSubmitted -> {
-                    val deferred = state.contactExchangeIncomingDeferred
                     val pin = state.contactExchangeIncomingPin
-                    val codec = state.contactExchangeIncomingCodec
+                    val peerId = state.contactExchangeIncomingPeerId
                     val peerCard = state.contactExchangeIncomingPeerCard
                     state.resetContactExchange()
-                    if (m.enteredPin == pin && codec != null && peerCard != null) {
-                        val responseBytes = codec.encode(state.contactCard, state.identity.sigKeyPrivate)
-                        deferred?.complete(responseBytes)
-                        state.handleContactExchangeSuccess(peerCard)
+                    if (m.enteredPin == pin && peerId != null && peerCard != null) {
+                        state.acceptContact(peerCard)
+                        viewState.hideExchangeDrawer()
                     } else {
-                        deferred?.complete(null)
                         val reason = if (m.enteredPin != pin) "Invalid PIN" else "Exchange error"
                         state.handleContactExchangeFailure(reason)
                     }
@@ -196,29 +155,19 @@ class AppActor(
 
                 is Protocol.ContactExchangeSucceeded -> {
                     state.resetContactExchange()
-                    state.handleContactExchangeSuccess(m.peerCard)
+                    state.acceptContact(m.peerCard) // requestor auto-accepts — they initiated
+                    state.cancelContactExchange()   // hides the requestor PIN drawer
                     ctx.become(normal)
                 }
 
                 is Protocol.ContactExchangeFailed -> {
-                    // Transport/network error on the requestor side — cancel silently so the
-                    // user can tap "Add" again immediately without dismissing an error drawer.
                     log.warn("[exchange] Exchange failed (${m.reason}) — resetting.")
                     state.cancelContactExchange()
                     ctx.become(normal)
                 }
 
-                is Protocol.SendChatMessage -> log.warn("[exchange] Ignoring SendChatMessage — exchange in progress.")
-                is Protocol.ChatMessageReceived -> {
-                    state.appendMessage(
-                        m.peerId,
-                        ChatMessage(fromMe = false, text = m.text, timestamp = Clock.System.now())
-                    )
-                }
-
-                is Protocol.IncomingContactExchange -> m.result.complete(null) // reject: already in exchange
-                is Protocol.InitiateContactExchange -> log.warn("[exchange] Ignoring InitiateExchange — already in exchange.")
-                is Protocol.ResetData -> log.warn("[exchange] Ignoring ResetData — exchange in progress.")
+                is Protocol.ChatMessageReceived -> state.appendMessage(m.message)
+                else -> log.warn("[exchange] Contact exchange in process.. (ignored $m)")
             }
             Behavior.Reply(Protocol.Ok)
         }

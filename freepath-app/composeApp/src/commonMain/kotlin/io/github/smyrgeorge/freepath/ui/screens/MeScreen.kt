@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,6 +43,12 @@ import io.github.alexzhirkevich.qrose.options.roundCorners
 import io.github.alexzhirkevich.qrose.options.solid
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import io.github.smyrgeorge.composeapp.generated.resources.Res
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_connected_peers
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_identified_peers
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_listen_addresses
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_mdns_peers
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_metrics_title
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_none
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_data
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_data_subtitle
 import io.github.smyrgeorge.composeapp.generated.resources.dev_section_title
@@ -48,12 +56,16 @@ import io.github.smyrgeorge.composeapp.generated.resources.me_copied
 import io.github.smyrgeorge.composeapp.generated.resources.me_copy_link
 import io.github.smyrgeorge.composeapp.generated.resources.me_share_qr
 import io.github.smyrgeorge.composeapp.generated.resources.me_title
+import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.AppViewState
 import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
+import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetricsSnapshot
+import io.github.smyrgeorge.freepath.state.abbrev
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
 import io.github.smyrgeorge.freepath.ui.components.FreepathButton
+import io.github.smyrgeorge.freepath.ui.components.FreepathDivider
 import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
 import io.github.smyrgeorge.freepath.ui.components.SectionTitle
@@ -83,7 +95,7 @@ fun MeScreen(modifier: Modifier = Modifier) {
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
@@ -101,8 +113,10 @@ fun MeScreen(modifier: Modifier = Modifier) {
 
 @Composable
 private fun DeveloperSection() {
+    val metrics by AppResources.libp2pMetrics.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(text = stringResource(Res.string.dev_section_title))
+        Libp2pMetricsPanel(metrics = metrics, selfNodeId = AppState.contactCard.nodeId)
         FreepathButton(
             onClick = { AppViewState.showResetDataConfirmation() },
             modifier = Modifier.fillMaxWidth(),
@@ -125,6 +139,69 @@ private fun DeveloperSection() {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun Libp2pMetricsPanel(metrics: Libp2pMetricsSnapshot, selfNodeId: String) {
+    val none = stringResource(Res.string.dev_libp2p_none)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                RoundedCornerShape(12.dp),
+            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(Res.string.dev_libp2p_metrics_title),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        FreepathDivider()
+        MetricRow(
+            label = stringResource(Res.string.dev_libp2p_listen_addresses),
+            value = metrics.listenAddresses.takeIf { it.isNotEmpty() }
+                ?.joinToString("\n") ?: none,
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libp2p_connected_peers),
+            value = metrics.connectedPeers.size.toString(),
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libp2p_identified_peers),
+            value = metrics.identifiedPeers.takeIf { it.isNotEmpty() }
+                ?.joinToString("\n") { it.abbrev() } ?: none,
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libp2p_mdns_peers),
+            value = metrics.mdnsPeers.takeIf { it.isNotEmpty() }
+                ?.entries?.joinToString("\n") { (nodeId, addr) ->
+                    val suffix = if (nodeId == selfNodeId) " (self)" else ""
+                    "${nodeId.abbrev()} @ $addr$suffix"
+                } ?: none,
+        )
+    }
+}
+
+
+@Composable
+private fun MetricRow(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelSmall,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

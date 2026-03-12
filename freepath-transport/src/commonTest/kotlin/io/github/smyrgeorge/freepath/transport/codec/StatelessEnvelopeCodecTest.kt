@@ -4,7 +4,6 @@ import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.transport.model.ContactInfo
 import io.github.smyrgeorge.freepath.util.codec.Base58
-import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -15,7 +14,7 @@ class StatelessEnvelopeCodecTest {
     private fun makeIdentity(): Identity {
         val sigKp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val nodeIdRaw = CryptoProvider.randomBytes(16)
+        val nodeIdRaw = CryptoProvider.randomBytes(32)
         return Identity(nodeIdRaw, sigKp.publicKey, sigKp.privateKey, encKp.publicKey, encKp.privateKey)
     }
 
@@ -62,8 +61,8 @@ class StatelessEnvelopeCodecTest {
         assertEquals(42_000L, envelope.timestamp)
         assertEquals(0, envelope.fragmentIndex)
         assertEquals(1, envelope.fragmentCount)
-        assertEquals(12, Base64.decode(envelope.nonce).size)
-        assertEquals(64, Base64.decode(envelope.signature).size)
+        assertEquals(12, envelope.nonce.size)
+        assertEquals(64, envelope.signature.size)
     }
 
     @Test
@@ -113,8 +112,8 @@ class StatelessEnvelopeCodecTest {
         val bob = makeIdentity()
         val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = 1L)
 
-        val tamperedSig = Base64.decode(envelope.signature).also { it[0] = it[0].inc() }
-        val tampered = envelope.copy(signature = Base64.encode(tamperedSig))
+        val tamperedSig = envelope.signature.copyOf().also { it[0] = it[0].inc() }
+        val tampered = envelope.copy(signature = tamperedSig)
 
         assertFailsWith<StatelessEnvelopeCodec.EnvelopeException> {
             StatelessEnvelopeCodec.open(tampered, bob, contactLookupFor(alice))
@@ -127,8 +126,8 @@ class StatelessEnvelopeCodecTest {
         val bob = makeIdentity()
         val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = 1L)
 
-        val tamperedCt = Base64.decode(envelope.payload).also { it[0] = it[0].inc() }
-        val tampered = envelope.copy(payload = Base64.encode(tamperedCt))
+        val tamperedCt = envelope.payload.copyOf().also { it[0] = it[0].inc() }
+        val tampered = envelope.copy(payload = tamperedCt)
 
         assertFailsWith<StatelessEnvelopeCodec.EnvelopeException> {
             StatelessEnvelopeCodec.open(tampered, bob, contactLookupFor(alice))

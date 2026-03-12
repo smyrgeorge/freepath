@@ -118,12 +118,7 @@ object QrCodeContactExchange : ContactExchange {
             return Result.failure(IllegalStateException("Unsupported card schema: ${signed.card.schema}"))
         }
 
-        // (2) Verify Node ID - per spec 3: step 2
-        if (!ContactCardCodec.validateNodeId(signed.card)) {
-            return Result.failure(IllegalStateException("Node ID mismatch"))
-        }
-
-        // (3) Verify signature - per spec 3: step 3
+        // (2) Verify signature - per spec 3: step 2
         val signatureBytes = Base64.decode(signed.signature)
         if (!ContactCardCodec.verify(signed.card, signatureBytes)) {
             return Result.failure(IllegalStateException("Invalid card signature"))

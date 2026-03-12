@@ -11,14 +11,37 @@ object ContactCardCodec {
 
     // ── Node ID ───────────────────────────────────────────────────────────────
 
-    /** Derives the Node ID from a raw Ed25519 public key per spec 1. */
-    fun deriveNodeId(sigKeyPublicBytes: ByteArray): String =
-        Base58.encode(CryptoProvider.sha256(sigKeyPublicBytes).copyOfRange(0, 16)).padStart(22, '1')
+    /**
+     * Derives the Node ID from a raw Ed25519 public key following the modern libp2p Peer ID spec.
+     *
+     * Steps:
+     * 1. Protobuf-encode as `PublicKey { KeyType=Ed25519(1), Data=pubKey }`:
+     *    `[0x08, 0x01, 0x12, 0x20] ∥ pubKey` = 36 bytes.
+     * 2. Wrap in an identity multihash `[0x00, 0x24] ∥ protobuf` = 38 bytes.
+     *    `0x00` = identity hash code (key is small enough to inline, no hashing needed).
+     *    `0x24` = varint 36 (protobuf byte length).
+     * 3. Base58-encode the 38-byte multihash (no multibase prefix per libp2p spec).
+     *
+     * Always produces a 52-character Base58 string starting with "1".
+     * Compatible with libp2p Peer IDs for Ed25519 keys.
+     */
+    fun deriveNodeId(ed25519PubKey: ByteArray): String {
+        require(ed25519PubKey.size == 32) { "Ed25519 public key must be 32 bytes" }
+        // protobuf encode PublicKey
+        val protobuf = ByteArray(2 + 2 + 32)
+        var i = 0
+        protobuf[i++] = 0x08
+        protobuf[i++] = 0x01
+        protobuf[i++] = 0x12
+        protobuf[i++] = 0x20
+        ed25519PubKey.copyInto(protobuf, i)
 
-    /** Returns `true` if [card].nodeId matches the value derived locally from [card].sigKey. */
-    fun validateNodeId(card: ContactCard): Boolean {
-        val sigKeyBytes = Base64.decode(card.sigKey)
-        return deriveNodeId(sigKeyBytes) == card.nodeId
+        // multihash identity
+        val multihash = ByteArray(2 + protobuf.size)
+        multihash[0] = 0x00
+        multihash[1] = protobuf.size.toByte()
+        protobuf.copyInto(multihash, 2)
+        return Base58.encode(multihash)
     }
 
     // ── Signing ───────────────────────────────────────────────────────────────
@@ -42,12 +65,12 @@ object ContactCardCodec {
 
     /**
      * Fully verifies a [ContactCardSigned] per spec-3:
-     * (1) schema check, (2) Node ID verification, (3) signature verification.
+     * (1) schema check, (2) signature verification.
+     * Node ID is always correct by construction (derived lazily from sigKey).
      */
     fun open(signed: ContactCardSigned): Result<ContactCard> = runCatching {
         val card = signed.card
         require(card.schema == ContactCard.SCHEMA) { "Unsupported card schema: ${card.schema}" }
-        require(validateNodeId(card)) { "Node ID mismatch" }
         val signatureBytes = Base64.decode(signed.signature)
         require(verify(card, signatureBytes)) { "Invalid card signature" }
         card
@@ -59,14 +82,12 @@ object ContactCardCodec {
      * Returns `true` if [incoming] should replace [stored] in the local contact list.
      *
      * Rules (applied in order):
-     * 1. `incoming.nodeId` must match the value derived from `incoming.sigKey`.
-     * 2. `incoming.sigKey` must equal `stored.sigKey` (no key rotation).
-     * 3. `incoming.updatedAt` must be strictly greater than `stored.updatedAt`.
+     * 1. `incoming.sigKey` must equal `stored.sigKey` (no key rotation).
+     * 2. `incoming.updatedAt` must be strictly greater than `stored.updatedAt`.
      *
      * Callers are responsible for verifying the card signature separately before calling this.
      */
     fun shouldUpdate(stored: ContactCard, incoming: ContactCard): Boolean {
-        if (!validateNodeId(incoming)) return false
         if (stored.sigKey != incoming.sigKey) return false
         return incoming.updatedAt > stored.updatedAt
     }

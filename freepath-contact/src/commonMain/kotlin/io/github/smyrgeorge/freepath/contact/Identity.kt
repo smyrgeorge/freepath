@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.contact
 
 data class Identity(
-    /** Raw 16-byte Node ID: SHA-256(sigKey)[0..15]. */
+    /** Raw 32-byte Node ID: SHA-256(sigKey). */
     val nodeIdRaw: ByteArray,
     /** Ed25519 public key (32 bytes). */
     val sigKeyPublic: ByteArray,

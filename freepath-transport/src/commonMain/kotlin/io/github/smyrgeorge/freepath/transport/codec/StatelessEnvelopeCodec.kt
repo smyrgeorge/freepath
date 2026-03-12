@@ -5,8 +5,8 @@ import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.transport.model.ContactInfo
 import io.github.smyrgeorge.freepath.transport.model.StatelessEnvelope
 import io.github.smyrgeorge.freepath.util.codec.Base58
-import io.github.smyrgeorge.freepath.util.codec.JsonCodec
-import kotlin.io.encoding.Base64
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.protobuf.ProtoBuf
 
 object StatelessEnvelopeCodec {
 
@@ -42,11 +42,11 @@ object StatelessEnvelopeCodec {
             senderId = Base58.encode(senderIdRaw),
             receiverId = Base58.encode(receiverIdRaw),
             timestamp = timestamp,
-            nonce = Base64.encode(nonce),
+            nonce = nonce,
             fragmentIndex = fragmentIndex,
             fragmentCount = fragmentCount,
-            payload = Base64.encode(ciphertext),
-            signature = Base64.encode(signature),
+            payload = ciphertext,
+            signature = signature,
         )
     }
 
@@ -72,14 +72,10 @@ object StatelessEnvelopeCodec {
         val contact = contactLookup(senderIdRaw)
             ?: throw EnvelopeException("Unknown sender nodeId")
 
-        val nonce = runCatching { Base64.decode(envelope.nonce) }
-            .getOrElse { throw EnvelopeException("Invalid nonce encoding") }
+        val nonce = envelope.nonce
         if (nonce.size != 12) throw EnvelopeException("Nonce must be 12 bytes, got ${nonce.size}")
-
-        val ciphertext = runCatching { Base64.decode(envelope.payload) }
-            .getOrElse { throw EnvelopeException("Invalid payload encoding") }
-        val signature = runCatching { Base64.decode(envelope.signature) }
-            .getOrElse { throw EnvelopeException("Invalid signature encoding") }
+        val ciphertext = envelope.payload
+        val signature = envelope.signature
 
         val aad = buildAad(
             envelope.schema, senderIdRaw, receiverIdRaw,
@@ -95,11 +91,15 @@ object StatelessEnvelopeCodec {
         }.getOrElse { throw EnvelopeException("AEAD decryption failed") }
     }
 
-    /** Serialises [envelope] to UTF-8 JSON bytes. */
-    fun encode(envelope: StatelessEnvelope): ByteArray = JsonCodec.json.encodeToString(envelope).encodeToByteArray()
+    /** Serialises [envelope] to protobuf bytes. */
+    @OptIn(ExperimentalSerializationApi::class)
+    fun encode(envelope: StatelessEnvelope): ByteArray =
+        ProtoBuf.encodeToByteArray(StatelessEnvelope.serializer(), envelope)
 
-    /** Deserialises a [StatelessEnvelope] from UTF-8 JSON [bytes]. */
-    fun decode(bytes: ByteArray): StatelessEnvelope = JsonCodec.json.decodeFromString(bytes.decodeToString())
+    /** Deserialises a [StatelessEnvelope] from protobuf [bytes]. */
+    @OptIn(ExperimentalSerializationApi::class)
+    fun decode(bytes: ByteArray): StatelessEnvelope =
+        ProtoBuf.decodeFromByteArray(StatelessEnvelope.serializer(), bytes)
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -116,10 +116,7 @@ object StatelessEnvelopeCodec {
         return CryptoProvider.hkdfSha256(ikm = sharedSecret, salt = ByteArray(32), info = info, outputLen = 32)
     }
 
-    /**
-     * AAD = schema(4BE) ∥ senderIdRaw(16) ∥ receiverIdRaw(16) ∥ timestamp(8BE)
-     *       ∥ nonce(12) ∥ fragmentIndex(4BE) ∥ fragmentCount(4BE)
-     */
+    // AAD = schema(4BE) ∥ senderIdRaw(32) ∥ receiverIdRaw(32) ∥ timestamp(8BE) ∥ nonce(12) ∥ fragmentIndex(4BE) ∥ fragmentCount(4BE)
     private fun buildAad(
         schema: Int,
         senderIdRaw: ByteArray,
@@ -129,11 +126,11 @@ object StatelessEnvelopeCodec {
         fragmentIndex: Int,
         fragmentCount: Int,
     ): ByteArray {
-        val buf = ByteArray(4 + 16 + 16 + 8 + 12 + 4 + 4)
+        val buf = ByteArray(4 + 32 + 32 + 8 + 12 + 4 + 4)
         var off = 0
         off = BinaryCodec.writeInt32BE(buf, off, schema)
-        senderIdRaw.copyInto(buf, off); off += 16
-        receiverIdRaw.copyInto(buf, off); off += 16
+        senderIdRaw.copyInto(buf, off); off += 32
+        receiverIdRaw.copyInto(buf, off); off += 32
         off = BinaryCodec.writeInt64BE(buf, off, timestamp)
         nonce.copyInto(buf, off); off += 12
         off = BinaryCodec.writeInt32BE(buf, off, fragmentIndex)

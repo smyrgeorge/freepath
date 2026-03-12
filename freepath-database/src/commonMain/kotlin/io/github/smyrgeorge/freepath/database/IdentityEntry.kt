@@ -28,7 +28,7 @@ data class IdentityEntry(
     init {
         require(id >= 0) { "id must be non-negative" }
         require(nodeId.matches(BASE58_REGEX)) {
-            "nodeId must be a 22-character Base58 string"
+            "nodeId must be a 52-character Base58 string"
         }
     }
 
@@ -37,6 +37,6 @@ data class IdentityEntry(
     }
 
     companion object {
-        private val BASE58_REGEX = Regex("[1-9A-HJ-NP-Za-km-z]{22}")
+        private val BASE58_REGEX = Regex("[1-9A-HJ-NP-Za-km-z]{52}")
     }
 }

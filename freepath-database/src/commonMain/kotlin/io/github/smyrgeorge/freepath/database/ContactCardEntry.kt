@@ -46,7 +46,7 @@ data class ContactCardEntry(
     init {
         require(id >= 0) { "id must be non-negative" }
         require(nodeId.matches(BASE58_REGEX)) {
-            "nodeId must be a 22-character Base58 string"
+            "nodeId must be a 52-character Base58 string"
         }
         require(notes.isNullOrEmpty() || notes.isNotBlank()) { "notes cannot be blank" }
         require(notes == null || notes.length <= MAX_NOTES_LENGTH) {
@@ -90,7 +90,7 @@ data class ContactCardEntry(
         const val MAX_NOTES_LENGTH = 1024
         const val MAX_TAGS_COUNT = 16
         const val MAX_TAG_LENGTH = 32
-        private val BASE58_REGEX = Regex("[1-9A-HJ-NP-Za-km-z]{22}")
+        private val BASE58_REGEX = Regex("[1-9A-HJ-NP-Za-km-z]{52}")
 
         /** Tag applied to the user's own card on first creation. Used to route to the onboarding screen. */
         const val TAG_ONBOARDING = "ONBOARDING"

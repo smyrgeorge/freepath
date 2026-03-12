@@ -65,7 +65,7 @@ fun ChatScreen(
 ) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
-    val discoveredPeers by AppState.discoveredPeers.collectAsState()
+    val nearbyPeers by AppState.connectedKnownPeers.collectAsState()
     val chats by AppState.chats.collectAsState()
     val messages = chats[contact.nodeId] ?: emptyList()
     val listState = rememberLazyListState()
@@ -75,7 +75,7 @@ fun ChatScreen(
     val cardName = contact.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
     val displayName = localName ?: cardName ?: contact.nodeId.take(12)
 
-    val isOnline = contact.nodeId in discoveredPeers
+    val isOnline = contact.nodeId in nearbyPeers
 
     // Scroll to bottom whenever messages change
     LaunchedEffect(messages.size) {
@@ -139,7 +139,7 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(messages) { msg ->
-                    ChatBubble(text = msg.text, fromMe = msg.fromMe)
+                    ChatBubble(text = msg.text, fromMe = msg.senderId == AppState.contactCard.nodeId)
                 }
             }
         }

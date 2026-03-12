@@ -91,8 +91,8 @@ class HandshakeHandler(
         val fields = HandshakeFields(
             ephemeralKey = payload.copyOfRange(0, 32),
             sigKey = payload.copyOfRange(32, 64),
-            peerIdRaw = payload.copyOfRange(64, 80),
-            signature = payload.copyOfRange(80, 144),
+            peerIdRaw = payload.copyOfRange(64, 96),
+            signature = payload.copyOfRange(96, 160),
         )
 
         // Look up the peer's sigKey from the contact list — do NOT trust the received sigKey.
@@ -149,6 +149,6 @@ class HandshakeHandler(
 
     companion object {
         const val SCHEMA = 1
-        const val PAYLOAD_SIZE = 144  // 32 + 32 + 16 + 64
+        const val PAYLOAD_SIZE = 160  // 32 + 32 + 32 + 64
     }
 }

@@ -26,7 +26,6 @@ class LanContactExchangeTest {
     ): ContactCard =
         ContactCard(
             schema = ContactCard.SCHEMA,
-            nodeId = ContactCardCodec.deriveNodeId(sigKp.publicKey),
             sigKey = Base64.encode(sigKp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
             updatedAt = updatedAt,
@@ -124,26 +123,6 @@ class LanContactExchangeTest {
 
         // Sign with wrong key
         val signed = ContactCardCodec.seal(card, kp2.privateKey)
-        val encoded = ContactCardCodec.encode(signed)
-
-        val result = LanContactExchange.decode(encoded)
-
-        assertTrue(result.isFailure)
-    }
-
-    @Test
-    fun decode_rejectsMismatchedNodeId() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val kp2 = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-
-        // Corrupt the nodeId; re-sign the modified card so signature itself is valid
-        val wrongNodeIdCard = card.copy(nodeId = ContactCardCodec.deriveNodeId(kp2.publicKey))
-        val signed = ContactCardSigned(
-            wrongNodeIdCard,
-            Base64.encode(ContactCardCodec.sign(wrongNodeIdCard, kp.privateKey))
-        )
         val encoded = ContactCardCodec.encode(signed)
 
         val result = LanContactExchange.decode(encoded)

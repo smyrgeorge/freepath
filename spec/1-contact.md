@@ -94,10 +94,13 @@ trusted blindly. Upon receiving a card, the recipient independently derives the 
 using the fixed derivation:
 
 ```
-nodeId = Base58( SHA-256(sigKey)[0..15] )
+multihash = [0x12, 0x20] ∥ SHA-256(sigKey)
+nodeId    = Base58( multihash )
 ```
 
-This produces a 22-character Base58 string (e.g. `4mXkR9qWzJvTsLpYcBnD2e`).
+`0x12` is the SHA2-256 hash function code and `0x20` is the 32-byte digest length, following the
+[multihash](https://github.com/multiformats/multihash) format used by libp2p. This produces a
+46-character Base58 string starting with `Qm` (e.g. `QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N`).
 
 If the transmitted `nodeId` does not match the locally derived value, the card is rejected. The `sigKey` is always
 the source of truth — the `nodeId` in the card is a convenience field, not an authority.
