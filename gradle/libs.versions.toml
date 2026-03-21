@@ -1,6 +1,6 @@
 [versions]
 # https://plugins.gradle.org/plugin/org.jetbrains.kotlin.jvm
-kotlin = "2.3.10"
+kotlin = "2.3.20"
 # https://github.com/Kotlin/kotlinx.coroutines
 kotlinx-coroutines = "1.10.2"
 # https://github.com/vanniktech/gradle-maven-publish-plugin
@@ -20,7 +20,7 @@ bouncycastle = "1.83"
 # https://github.com/ionspin/kotlin-multiplatform-bignum
 bignum = "0.3.10"
 # https://github.com/InsertKoinIO/koin
-koin = "4.1.1"
+koin = "4.2.0"
 # https://github.com/smyrgeorge/sqlx4k
 sqlx4k = "1.7.2"
 # https://github.com/google/ksp
@@ -34,12 +34,12 @@ android-gradle-plugin = "9.0.0-alpha06"
 # https://github.com/alexzhirkevich/qrose
 qrose = "1.1.2"
 # https://github.com/arrow-kt/arrow
-arrow = "2.2.2"
+arrow = "2.2.2.1"
 material3 = "1.9.0"
 compose-hot-reload = "1.0.0"
-compose-multiplatform = "1.10.2"
+compose-multiplatform = "1.10.3"
 androidx-activity-compose = "1.13.0"
-androidx-lifecycle = "2.9.6"
+androidx-lifecycle = "2.10.0"
 android-compileSdk = "36"
 android-minSdk = "26"
 android-targetSdk = "36"
