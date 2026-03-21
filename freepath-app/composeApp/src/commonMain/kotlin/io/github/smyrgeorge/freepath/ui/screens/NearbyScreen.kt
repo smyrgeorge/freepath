@@ -33,9 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -51,11 +49,13 @@ import io.github.smyrgeorge.composeapp.generated.resources.nearby_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.Protocol
+import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
 import io.github.smyrgeorge.freepath.state.abbrev
-
+import io.github.smyrgeorge.freepath.ui.components.AvatarSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
+import io.github.smyrgeorge.freepath.ui.components.FreepathAvatar
 import io.github.smyrgeorge.freepath.ui.components.FreepathButton
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
 import kotlinx.coroutines.launch
@@ -70,6 +70,7 @@ fun NearbyScreen(
 ) {
     val nearbyPeers by AppState.nearbyPeers.collectAsState()
     val contacts by AppState.contacts.collectAsState()
+    val contactContents by AppState.contactContents.collectAsState()
     val contactByNodeId = contacts.associateBy { it.nodeId }
     val allPeers = nearbyPeers.keys.toList()
     val knownPeers = allPeers.filter { it in contactByNodeId }
@@ -87,7 +88,7 @@ fun NearbyScreen(
                 .padding(top = 24.dp, bottom = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            RadarView(peers = allPeers, contactByNodeId = contactByNodeId)
+            RadarView(peers = allPeers, contactByNodeId = contactByNodeId, contactContents = contactContents)
         }
 
         Text(
@@ -116,7 +117,7 @@ fun NearbyScreen(
         ) {
             if (knownPeers.isNotEmpty()) {
                 items(knownPeers, key = { it }) { nodeId ->
-                    PeerCard(nodeId, contactByNodeId[nodeId])
+                    PeerCard(nodeId, contactByNodeId[nodeId], contactContents[nodeId])
                 }
             }
 
@@ -125,7 +126,7 @@ fun NearbyScreen(
                     item { Spacer(modifier = Modifier.height(4.dp)) }
                 }
                 items(unknownPeers, key = { it }) { nodeId ->
-                    PeerCard(nodeId, null)
+                    PeerCard(nodeId, null, null)
                 }
             }
         }
@@ -168,14 +169,13 @@ private fun ScanningIndicator() {
 private fun RadarView(
     peers: List<String>,
     contactByNodeId: Map<String, ContactCardEntry>,
+    contactContents: Map<String, ContentBody.Contact>,
     modifier: Modifier = Modifier,
 ) {
     val radarSize = 200.dp
     val ringColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
     val onSurface = MaterialTheme.colorScheme.onSurface
     val surface = MaterialTheme.colorScheme.surface
-    val secondaryContainer = MaterialTheme.colorScheme.secondaryContainer
-    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
     val infiniteTransition = rememberInfiniteTransition(label = "radar")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -229,24 +229,16 @@ private fun RadarView(
 
             val contact = contactByNodeId[nodeId]
             val isKnown = contact != null
-            val bgColor = if (isKnown) secondaryContainer else surfaceVariant
             val contactName = contact?.resolvedDisplayName()
             val avatarLabel = if (isKnown) (contactName ?: nodeId).first().uppercaseChar().toString() else "?"
+            val avatar = contactContents[nodeId]?.avatar
 
-            Box(
-                modifier = Modifier
-                    .offset(x = offsetX, y = offsetY)
-                    .size(28.dp)
-                    .background(bgColor, CircleShape)
-                    .border(2.dp, onSurface, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = avatarLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                )
-            }
+            FreepathAvatar(
+                label = avatarLabel,
+                avatar = avatar,
+                size = AvatarSize.Small,
+                modifier = Modifier.offset(x = offsetX, y = offsetY),
+            )
         }
 
         // Center "LAN" mode label
@@ -267,12 +259,9 @@ private fun RadarView(
 }
 
 @Composable
-private fun PeerCard(nodeId: String, contact: ContactCardEntry?) {
+private fun PeerCard(nodeId: String, contact: ContactCardEntry?, content: ContentBody.Contact?) {
     val scope = rememberCoroutineScope()
     val isKnown = contact != null
-    val avatarBg = if (isKnown) MaterialTheme.colorScheme.secondaryContainer
-    else MaterialTheme.colorScheme.surfaceVariant
-    val onSurface = MaterialTheme.colorScheme.onSurface
     val displayName = if (isKnown) contact.resolvedDisplayName() ?: nodeId.abbrev() else "#${nodeId.abbrev()}"
     val avatarLabel = if (isKnown) displayName.first().uppercaseChar().toString() else "?"
     val statusText =
@@ -290,20 +279,7 @@ private fun PeerCard(nodeId: String, contact: ContactCardEntry?) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .background(avatarBg, CircleShape)
-                .border(2.dp, onSurface, CircleShape)
-                .clip(CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = avatarLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-            )
-        }
+        FreepathAvatar(label = avatarLabel, avatar = content?.avatar, size = AvatarSize.Medium)
 
         Column(modifier = Modifier.weight(1f)) {
             Text(

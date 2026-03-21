@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android)
 }
 
@@ -32,9 +33,11 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(project(":freepath-contact"))
+                implementation(project(":freepath-content"))
                 implementation(project(":freepath-crypto"))
                 implementation(project(":freepath-util"))
                 api(libs.sqlx4k.sqlite)
+                implementation(libs.kotlinx.serialization.json)
             }
             // Config if your code is under the commonMain module.
             kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin")

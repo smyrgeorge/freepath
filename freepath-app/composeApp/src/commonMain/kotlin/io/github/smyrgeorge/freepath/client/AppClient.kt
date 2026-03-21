@@ -8,6 +8,8 @@ import io.github.smyrgeorge.freepath.client.model.failure
 import io.github.smyrgeorge.freepath.client.model.success
 import io.github.smyrgeorge.freepath.client.model.toResult
 import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.content.ContentCodec
+import io.github.smyrgeorge.freepath.content.ContentEnvelope
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.state.AbstractAppState
@@ -43,6 +45,12 @@ class AppClient(
         return libp2p.request(message.receiverId, payload).toResult().map { }
     }
 
+    suspend fun send(envelope: ContentEnvelope, receiverId: String): Result<Unit> {
+        val receiver = onlineRecieverOf(receiverId).getOrElse { return Result.failure(it) }
+        val payload = seal(receiver, TYPE_CONTENT, ContentCodec.encode(envelope))
+        return libp2p.request(receiverId, payload).toResult().map { }
+    }
+
     private suspend fun ack(reqId: Long) {
         libp2p.sendResponse(reqId, ByteArray(0))
     }
@@ -74,6 +82,24 @@ class AppClient(
                 }
             }
 
+            TYPE_CONTENT -> {
+                val envelope = ContentCodec.decode(plaintext).getOrElse {
+                    val reason = "Failed to decode content from $senderId: ${it.message}"
+                    log.error { "[openRequest]: $reason" }
+                    nack(reqId, reason)
+                    return@open
+                }
+                val cmd = Protocol.ContentReceived(envelope)
+                system.tell(cmd).getOrElse {
+                    val reason = "Failed to deliver content from $senderId"
+                    log.error { "[openRequest]: $reason" }
+                    nack(reqId, reason)
+                    return@open
+                }.also {
+                    ack(reqId)
+                }
+            }
+
             else -> {
                 val reason = "Unknown message type $type from $senderId"
                 log.warn { "[openRequest]: $reason" }
@@ -93,5 +119,6 @@ class AppClient(
 
     companion object {
         const val TYPE_CHAT: Byte = 1
+        const val TYPE_CONTENT: Byte = 2
     }
 }

@@ -1,5 +1,3 @@
-// freepath-libp2p/src/rust/src/core/node.rs
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,8 +13,6 @@ use crate::core::event::RawLibP2pEvent;
 use crate::core::messaging::{FreepathCodec, FreepathProtocol};
 use crate::core::utils::{EventCallback, SwarmCommand, RUNTIME};
 
-// ── LibP2pNode ────────────────────────────────────────────────────────────────
-
 pub struct LibP2pNode {
     pub swarm_tx: mpsc::Sender<SwarmCommand>,
 }
@@ -27,8 +23,6 @@ impl Drop for LibP2pNode {
     }
 }
 
-// ── libp2p Behaviour ──────────────────────────────────────────────────────────
-
 #[derive(NetworkBehaviour)]
 #[behaviour(prelude = "libp2p_swarm::derive_prelude")]
 pub struct Behaviour {
@@ -36,8 +30,6 @@ pub struct Behaviour {
     pub ping: ping::Behaviour,
     pub messaging: request_response::Behaviour<FreepathCodec>,
 }
-
-// ── Node startup ──────────────────────────────────────────────────────────────
 
 pub fn start_node(
     node_id: &str,

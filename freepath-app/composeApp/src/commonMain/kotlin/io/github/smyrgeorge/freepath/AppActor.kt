@@ -106,6 +106,12 @@ class AppActor(
                 }
 
                 is Protocol.ChatMessageReceived -> state.appendMessage(m.message)
+                is Protocol.ContentReceived -> state.receiveContent(m.envelope)
+                is Protocol.PeerIdentified -> {
+                    resources.client.send(state.contactCardContentEnvelope, m.peerId)
+                        .onFailure { log.warn("[PeerIdentified] Failed to push contact card to ${m.peerId}: ${it.message}") }
+                }
+
                 is Protocol.ResetData -> {
                     log.info("[normal] Resetting app data...")
                     ctx.become(reset)
@@ -167,6 +173,7 @@ class AppActor(
                 }
 
                 is Protocol.ChatMessageReceived -> state.appendMessage(m.message)
+                is Protocol.ContentReceived -> state.receiveContent(m.envelope)
                 else -> log.warn("[exchange] Contact exchange in process.. (ignored $m)")
             }
             Behavior.Reply(Protocol.Ok)

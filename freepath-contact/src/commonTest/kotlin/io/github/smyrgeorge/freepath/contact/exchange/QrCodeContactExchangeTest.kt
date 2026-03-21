@@ -21,8 +21,6 @@ class QrCodeContactExchangeTest {
         encKp: KeyPair,
         updatedAt: Instant = Clock.System.now(),
         name: String? = null,
-        bio: String? = null,
-        location: String? = null,
     ): ContactCard =
         ContactCard(
             schema = ContactCard.SCHEMA,
@@ -30,8 +28,6 @@ class QrCodeContactExchangeTest {
             encKey = Base64.encode(encKp.publicKey),
             updatedAt = updatedAt,
             name = name,
-            bio = bio,
-            location = location,
         )
 
     private fun makeQrCode(
@@ -72,20 +68,12 @@ class QrCodeContactExchangeTest {
     fun encode_includesAllCardFields() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(
-            kp,
-            encKp,
-            name = "Alice",
-            bio = "Hello world",
-            location = "NYC",
-        )
+        val card = makeCard(kp, encKp, name = "Alice")
         val qrCode = makeQrCode(card, kp.privateKey)
 
         // Decode and verify all fields are preserved
         val decodedCard = QrCodeContactExchange.decode(qrCode).getOrThrow()
         assertEquals(card.name, decodedCard.name)
-        assertEquals(card.bio, decodedCard.bio)
-        assertEquals(card.location, decodedCard.location)
     }
 
     @Test
@@ -97,9 +85,6 @@ class QrCodeContactExchangeTest {
 
         val decodedCard = QrCodeContactExchange.decode(qrCode).getOrThrow()
         assertEquals(card.name, decodedCard.name)
-        assertEquals(card.bio, decodedCard.bio)
-        assertEquals(card.avatar, decodedCard.avatar)
-        assertEquals(card.location, decodedCard.location)
     }
 
     // ── decode success ────────────────────────────────────────────────────────
@@ -120,19 +105,11 @@ class QrCodeContactExchangeTest {
     fun decode_withAllOptionalFields() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(
-            kp,
-            encKp,
-            name = "Bob",
-            bio = "Developer",
-            location = "San Francisco",
-        )
+        val card = makeCard(kp, encKp, name = "Bob")
         val qrCode = makeQrCode(card, kp.privateKey)
 
         val decodedCard = QrCodeContactExchange.decode(qrCode).getOrThrow()
         assertEquals("Bob", decodedCard.name)
-        assertEquals("Developer", decodedCard.bio)
-        assertEquals("San Francisco", decodedCard.location)
     }
 
     // ── decode failure: invalid format ────────────────────────────────────────
@@ -265,13 +242,7 @@ class QrCodeContactExchangeTest {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
         val minimalCard = makeCard(kp, encKp)
-        val fullCard = makeCard(
-            kp,
-            encKp,
-            name = "Alice",
-            bio = "Hello world",
-            location = "New York",
-        )
+        val fullCard = makeCard(kp, encKp, name = "Alice")
 
         val minimalLength = QrCodeContactExchange.estimateQrCodeLength(minimalCard)
         val fullLength = QrCodeContactExchange.estimateQrCodeLength(fullCard)

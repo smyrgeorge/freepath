@@ -1,6 +1,3 @@
-// freepath-libp2p/src/rust/src/ffi/mod.rs
-//! C ABI exports for iOS cinterop.
-
 #[no_mangle]
 pub extern "C" fn libp2p_set_log_callback(
     cb: unsafe extern "C" fn(

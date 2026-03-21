@@ -1,4 +1,3 @@
-// freepath-libp2p/src/rust/src/logging.rs
 use std::sync::OnceLock;
 
 pub type LogFn =

@@ -1,5 +1,3 @@
-// freepath-libp2p/src/rust/src/core/mod.rs
-
 pub mod event;
 pub mod messaging;
 pub mod node;

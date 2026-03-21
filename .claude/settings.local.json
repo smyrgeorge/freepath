@@ -7,7 +7,17 @@
       "Bash(./gradlew :freepath-libp2p:jvmTest 2>&1 | tail -20)",
       "Bash(./gradlew :freepath-libp2p:compileKotlinJvm 2>&1 | tail -10)",
       "Bash(./gradlew :freepath-app:composeApp:compileKotlinJvm 2>&1 | tail -30)",
-      "Bash(./gradlew :freepath-libp2p:jvmTest 2>&1 | tail -15)"
+      "Bash(./gradlew :freepath-libp2p:jvmTest 2>&1 | tail -15)",
+      "Bash(./gradlew :freepath-content:jvmTest)",
+      "Bash(./gradlew :freepath-database:kspCommonMainKotlinMetadata 2>&1)",
+      "Bash(./gradlew :freepath-app:composeApp:compileKotlinJvm)",
+      "Bash(./gradlew :freepath-app:composeApp:commonTest)",
+      "Bash(./gradlew :freepath-app:composeApp:jvmTest -q)",
+      "Bash(./gradlew :freepath-app:composeApp:jvmTest --info)",
+      "Bash(./gradlew :freepath-app:composeApp:jvmTest :freepath-content:jvmTest :freepath-database:jvmTest)",
+      "Bash(./gradlew :freepath-app:composeApp:jvmTest)",
+      "Bash(./gradlew :freepath-contact:jvmTest)",
+      "Bash(./gradlew :freepath-contact:compileTestKotlinJvm)"
     ]
   }
 }

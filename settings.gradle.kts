@@ -20,6 +20,7 @@ dependencyResolutionManagement {
 include("freepath-app:composeApp")
 include("freepath-app:androidApp")
 include("freepath-contact")
+include("freepath-content")
 include("freepath-crypto")
 include("freepath-database")
 include("freepath-util")

@@ -34,6 +34,9 @@ abstract class AbstractViewState {
     private val _showResetDataConfirmation = MutableStateFlow(false)
     val showResetDataConfirmation: StateFlow<Boolean> = _showResetDataConfirmation.asStateFlow()
 
+    private val _showDeleteContentConfirmation = MutableStateFlow(false)
+    val showDeleteContentConfirmation: StateFlow<Boolean> = _showDeleteContentConfirmation.asStateFlow()
+
     fun setStartupRoute(route: StartupRoute) {
         _startupRoute.value = route
     }
@@ -86,6 +89,14 @@ abstract class AbstractViewState {
 
     fun hideResetDataConfirmation() {
         _showResetDataConfirmation.value = false
+    }
+
+    fun showDeleteContentConfirmation() {
+        _showDeleteContentConfirmation.value = true
+    }
+
+    fun hideDeleteContentConfirmation() {
+        _showDeleteContentConfirmation.value = false
     }
 
     fun showResetClearing() {

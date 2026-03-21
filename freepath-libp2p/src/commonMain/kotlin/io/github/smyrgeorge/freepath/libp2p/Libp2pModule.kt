@@ -19,7 +19,7 @@ expect class Libp2pModule() : AbstractLibp2pModule {
     val metrics: Libp2pMetrics
 
     /** Register a handler invoked on each swarm event. Call before start(). */
-    fun setEventHandler(handler: (Libp2pEvent) -> Unit)
+    fun setEventHandler(handler: suspend (Libp2pEvent) -> Unit)
 
     /**
      * Start the libp2p node. Idempotent — subsequent calls are no-ops.

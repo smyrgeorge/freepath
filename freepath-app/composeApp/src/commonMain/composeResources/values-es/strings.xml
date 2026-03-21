@@ -12,6 +12,7 @@
     <string name="bio_hint">Sobre ti (opcional)</string>
     <string name="location_label">Ubicación</string>
     <string name="location_hint">Ciudad o región (opcional)</string>
+    <string name="onboarding_random_profile_note">Este es un perfil generado aleatoriamente. Puedes cambiarlo más adelante.</string>
     <string name="continue_button">Continuar</string>
     <string name="finish_button">Finalizar</string>
     <string name="security_note">Tus claves se almacenan solo en este dispositivo y nunca lo abandonan</string>
@@ -43,8 +44,15 @@
     <string name="network_paste_link">Pegar desde portapapeles</string>
     <string name="network_invalid_link">Enlace inválido — no es una URL de contacto Freepath</string>
     <string name="dev_section_title">Desarrollador</string>
-    <string name="dev_reset_data">Restablecer datos</string>
-    <string name="dev_reset_data_subtitle">Eliminar todos los contactos y reiniciar</string>
+    <string name="dev_generate_content">Generar contenido aleatorio</string>
+    <string name="dev_generate_content_subtitle">Poblar el feed con artículos e imágenes de contactos</string>
+    <string name="dev_delete_content">Eliminar todo el contenido</string>
+    <string name="dev_delete_content_subtitle">Borrar todas las entradas del feed</string>
+    <string name="dev_delete_content_confirm_title">¿Eliminar todo el contenido?</string>
+    <string name="dev_delete_content_confirm_body">Todo el contenido del feed se eliminará permanentemente. La app permanecerá abierta — los contactos y la identidad no se ven afectados.</string>
+    <string name="dev_delete_content_confirm_button">Eliminar contenido</string>
+    <string name="dev_reset_data">Restablecer todos los datos</string>
+    <string name="dev_reset_data_subtitle">Eliminar todos los datos y reiniciar</string>
     <string name="dev_reset_confirm_title">¿Restablecer datos?</string>
     <string name="dev_reset_confirm_body">Se eliminarán todos los contactos y la aplicación se cerrará. Tu par de claves de identidad se conserva — la app arrancará desde cero en el próximo inicio.</string>
     <string name="dev_reset_confirm_button">Restablecer</string>

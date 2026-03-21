@@ -3,6 +3,8 @@ package io.github.smyrgeorge.freepath.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,10 +26,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -43,6 +50,10 @@ import io.github.alexzhirkevich.qrose.options.roundCorners
 import io.github.alexzhirkevich.qrose.options.solid
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import io.github.smyrgeorge.composeapp.generated.resources.Res
+import io.github.smyrgeorge.composeapp.generated.resources.dev_delete_content
+import io.github.smyrgeorge.composeapp.generated.resources.dev_delete_content_subtitle
+import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_content
+import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_content_subtitle
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_connected_peers
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_identified_peers
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_listen_addresses
@@ -62,6 +73,7 @@ import io.github.smyrgeorge.freepath.AppViewState
 import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetricsSnapshot
+import io.github.smyrgeorge.freepath.state.RandomAvatarGenerator
 import io.github.smyrgeorge.freepath.state.abbrev
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
 import io.github.smyrgeorge.freepath.ui.components.FreepathButton
@@ -69,8 +81,11 @@ import io.github.smyrgeorge.freepath.ui.components.FreepathDivider
 import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
 import io.github.smyrgeorge.freepath.ui.components.SectionTitle
+import io.github.smyrgeorge.freepath.util.toImageBitmap
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+import kotlin.io.encoding.Base64
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -84,6 +99,37 @@ fun MeScreen(modifier: Modifier = Modifier) {
     val avatarLabel = remember(card) {
         val name = card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
         (name?.firstOrNull()?.uppercaseChar() ?: nodeId.first().uppercaseChar()).toString()
+    }
+    var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var isRefreshingAvatar by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(nodeId) {
+        val stored = AppState.contactCardContent.avatar
+        if (stored != null) {
+            avatarBitmap = runCatching { Base64.decode(stored).toImageBitmap() }.getOrNull()
+            return@LaunchedEffect
+        }
+        // No stored avatar yet — fetch from DiceBear
+        val name = card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") } ?: return@LaunchedEffect
+        RandomAvatarGenerator.randomAvatar(name)?.let { b64 ->
+            avatarBitmap = runCatching { Base64.decode(b64).toImageBitmap() }.getOrNull()
+        }
+    }
+    val onRefreshAvatar: () -> Unit = {
+        if (!isRefreshingAvatar) {
+            val name = card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+            if (name != null) {
+                scope.launch {
+                    isRefreshingAvatar = true
+                    val b64 = RandomAvatarGenerator.randomAvatar(name)
+                    if (b64 != null) {
+                        AppState.updateAvatar(b64)
+                        avatarBitmap = runCatching { Base64.decode(b64).toImageBitmap() }.getOrNull()
+                    }
+                    isRefreshingAvatar = false
+                }
+            }
+        }
     }
     val qrData = remember(card) {
         val signed = ContactCardCodec.seal(card, AppState.identity.sigKeyPrivate)
@@ -101,6 +147,9 @@ fun MeScreen(modifier: Modifier = Modifier) {
             item {
                 IdentityCard(
                     avatarLabel = avatarLabel,
+                    avatarBitmap = avatarBitmap,
+                    isRefreshingAvatar = isRefreshingAvatar,
+                    onRefreshAvatar = onRefreshAvatar,
                     displayName = displayName,
                     nodeId = nodeId,
                     qrData = qrData,
@@ -114,9 +163,54 @@ fun MeScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun DeveloperSection() {
     val metrics by AppResources.libp2pMetrics.collectAsState()
+    val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(text = stringResource(Res.string.dev_section_title))
         Libp2pMetricsPanel(metrics = metrics, selfNodeId = AppState.contactCard.nodeId)
+        FreepathButton(
+            onClick = { scope.launch { AppState.generateRandomContent() } },
+            modifier = Modifier.fillMaxWidth(),
+            variant = ButtonVariant.Outline,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.dev_generate_content),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(Res.string.dev_generate_content_subtitle),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        FreepathButton(
+            onClick = { AppViewState.showDeleteContentConfirmation() },
+            modifier = Modifier.fillMaxWidth(),
+            variant = ButtonVariant.Destructive,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.dev_delete_content),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onError,
+                )
+                Text(
+                    text = stringResource(Res.string.dev_delete_content_subtitle),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onError.copy(alpha = 0.7f),
+                )
+            }
+        }
         FreepathButton(
             onClick = { AppViewState.showResetDataConfirmation() },
             modifier = Modifier.fillMaxWidth(),
@@ -208,6 +302,9 @@ private fun MetricRow(label: String, value: String) {
 @Composable
 private fun IdentityCard(
     avatarLabel: String,
+    avatarBitmap: ImageBitmap?,
+    isRefreshingAvatar: Boolean,
+    onRefreshAvatar: () -> Unit,
     displayName: String,
     nodeId: String,
     qrData: String,
@@ -225,19 +322,51 @@ private fun IdentityCard(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
-                .border(2.dp, onSurface, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = avatarLabel,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-            )
+        Box(modifier = Modifier.size(64.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+                    .border(2.dp, onSurface, CircleShape)
+                    .clip(CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (avatarBitmap != null) {
+                    Image(
+                        painter = BitmapPainter(avatarBitmap),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Text(
+                        text = avatarLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        enabled = !isRefreshingAvatar,
+                        onClick = onRefreshAvatar,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "↺",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
         }
 
         Text(

@@ -172,7 +172,7 @@ class ContactCardCodecTest {
     fun encodeDecodeContactCard_roundTripWithOptionalFields() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp).copy(name = "Alice", bio = "Hello world", location = "NYC")
+        val card = makeCard(kp, encKp).copy(name = "Alice")
         assertEquals(card, ContactCardCodec.decode(ContactCardCodec.encode(card)))
     }
 
@@ -183,9 +183,6 @@ class ContactCardCodecTest {
         val card = makeCard(kp, encKp)
         val jsonStr = ContactCardCodec.encode(card).decodeToString()
         assertFalse(jsonStr.contains("name"))
-        assertFalse(jsonStr.contains("bio"))
-        assertFalse(jsonStr.contains("avatar"))
-        assertFalse(jsonStr.contains("location"))
     }
 
     @Test
@@ -203,11 +200,7 @@ class ContactCardCodecTest {
     fun contactCard_validation_acceptsValidCard() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp).copy(
-            name = "Alice",
-            bio = "Hello world",
-            location = "New York"
-        )
+        val card = makeCard(kp, encKp).copy(name = "Alice")
         assertEquals("Alice", card.name)
     }
 
@@ -228,63 +221,6 @@ class ContactCardCodecTest {
         val maxName = "a".repeat(ContactCard.MAX_NAME_LENGTH)
         val card = makeCard(kp, encKp).copy(name = maxName)
         assertEquals(ContactCard.MAX_NAME_LENGTH, card.name?.length)
-    }
-
-    @Test
-    fun contactCard_validation_rejectsBioTooLong() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val longBio = "a".repeat(ContactCard.MAX_BIO_LENGTH + 1)
-        assertFails {
-            makeCard(kp, encKp).copy(bio = longBio)
-        }
-    }
-
-    @Test
-    fun contactCard_validation_acceptsMaxBioLength() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val maxBio = "a".repeat(ContactCard.MAX_BIO_LENGTH)
-        val card = makeCard(kp, encKp).copy(bio = maxBio)
-        assertEquals(ContactCard.MAX_BIO_LENGTH, card.bio?.length)
-    }
-
-    @Test
-    fun contactCard_validation_rejectsAvatarTooLarge() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val largeAvatar = "a".repeat(ContactCard.MAX_AVATAR_SIZE + 1)
-        assertFails {
-            makeCard(kp, encKp).copy(avatar = largeAvatar)
-        }
-    }
-
-    @Test
-    fun contactCard_validation_acceptsMaxAvatarSize() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val maxAvatar = "a".repeat(ContactCard.MAX_AVATAR_SIZE)
-        val card = makeCard(kp, encKp).copy(avatar = maxAvatar)
-        assertEquals(ContactCard.MAX_AVATAR_SIZE, card.avatar?.length)
-    }
-
-    @Test
-    fun contactCard_validation_rejectsLocationTooLong() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val longLocation = "a".repeat(ContactCard.MAX_LOCATION_LENGTH + 1)
-        assertFails {
-            makeCard(kp, encKp).copy(location = longLocation)
-        }
-    }
-
-    @Test
-    fun contactCard_validation_acceptsMaxLocationLength() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val maxLocation = "a".repeat(ContactCard.MAX_LOCATION_LENGTH)
-        val card = makeCard(kp, encKp).copy(location = maxLocation)
-        assertEquals(ContactCard.MAX_LOCATION_LENGTH, card.location?.length)
     }
 
     @Test

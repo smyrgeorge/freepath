@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.database
 
 import io.github.smyrgeorge.freepath.contact.ContactCard
-import io.github.smyrgeorge.freepath.contact.ContactCardConverter
+import io.github.smyrgeorge.freepath.database.util.ContactCardConverter
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.database.util.Auditable
 import io.github.smyrgeorge.freepath.database.util.InstantConverter

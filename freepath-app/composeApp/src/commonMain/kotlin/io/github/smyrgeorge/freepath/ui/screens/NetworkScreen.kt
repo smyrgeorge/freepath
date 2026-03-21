@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
@@ -88,7 +89,9 @@ import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.ui.components.AvatarSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
+import io.github.smyrgeorge.freepath.ui.components.FreepathAvatar
 import io.github.smyrgeorge.freepath.ui.components.FreepathButton
 import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
@@ -104,6 +107,7 @@ import kotlin.time.Instant
 @Composable
 fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactCardEntry) -> Unit)? = null) {
     val contacts by AppState.contacts.collectAsState()
+    val contactContents by AppState.contactContents.collectAsState()
 
     val trusted = contacts.filter { it.trustLevel == TrustLevel.TRUSTED }
     val known = contacts.filter { it.trustLevel == TrustLevel.KNOWN }
@@ -141,7 +145,13 @@ fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactCardEn
                         "${stringResource(Res.string.network_section_trusted)} (${trusted.size})"
                     )
                 }
-                items(trusted, key = { it.nodeId }) { entry -> ContactRow(entry, onContactClick = onContactClick) }
+                items(trusted, key = { it.nodeId }) { entry ->
+                    ContactRow(
+                        entry,
+                        contactContents[entry.nodeId],
+                        onContactClick = onContactClick
+                    )
+                }
             }
 
             if (known.isNotEmpty()) {
@@ -151,7 +161,13 @@ fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactCardEn
                         "${stringResource(Res.string.network_section_known)} (${known.size})"
                     )
                 }
-                items(known, key = { it.nodeId }) { entry -> ContactRow(entry, onContactClick = onContactClick) }
+                items(known, key = { it.nodeId }) { entry ->
+                    ContactRow(
+                        entry,
+                        contactContents[entry.nodeId],
+                        onContactClick = onContactClick
+                    )
+                }
             }
 
             if (blocked.isNotEmpty()) {
@@ -161,7 +177,13 @@ fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactCardEn
                         "${stringResource(Res.string.network_section_blocked)} (${blocked.size})"
                     )
                 }
-                items(blocked, key = { it.nodeId }) { entry -> ContactRow(entry, grayed = true) }
+                items(blocked, key = { it.nodeId }) { entry ->
+                    ContactRow(
+                        entry,
+                        contactContents[entry.nodeId],
+                        grayed = true
+                    )
+                }
             }
 
             item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -231,6 +253,7 @@ private fun NetworkSectionHeader(text: String) {
 @Composable
 private fun ContactRow(
     entry: ContactCardEntry,
+    content: io.github.smyrgeorge.freepath.content.ContentBody.Contact?,
     grayed: Boolean = false,
     onContactClick: ((ContactCardEntry) -> Unit)? = null,
 ) {
@@ -241,12 +264,7 @@ private fun ContactRow(
     val localName = entry.name?.takeIf { it.isNotBlank() }
     val cardName = entry.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
     val displayName = localName ?: cardName ?: entry.nodeId.take(12)
-    val avatarLabel = displayName.first().uppercaseChar().toString()
-
-    val avatarBg = if (entry.trustLevel == TrustLevel.TRUSTED)
-        MaterialTheme.colorScheme.secondaryContainer
-    else
-        MaterialTheme.colorScheme.surfaceVariant
+    val avatarLabel = if (grayed) "✕" else displayName.first().uppercaseChar().toString()
 
     Row(
         modifier = Modifier
@@ -268,19 +286,12 @@ private fun ContactRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .background(avatarBg.copy(alpha = contentAlpha), CircleShape)
-                .border(2.dp, onSurface.copy(alpha = contentAlpha), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = if (grayed) "✕" else avatarLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White.copy(alpha = contentAlpha),
-            )
-        }
+        FreepathAvatar(
+            label = avatarLabel,
+            avatar = if (grayed) null else content?.avatar,
+            size = AvatarSize.Medium,
+            modifier = Modifier.alpha(contentAlpha),
+        )
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -775,17 +786,6 @@ private fun ContactDrawer(
             textAlign = TextAlign.Center,
         )
 
-        // Location
-        val location = card.location
-        if (!location.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = location,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -799,18 +799,6 @@ private fun ContactDrawer(
         Spacer(modifier = Modifier.height(4.dp))
         FreepathFingerprint(text = card.nodeId)
 
-        // Bio
-        val bio = card.bio
-        if (!bio.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = bio,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
 
         Spacer(modifier = Modifier.height(24.dp))
 

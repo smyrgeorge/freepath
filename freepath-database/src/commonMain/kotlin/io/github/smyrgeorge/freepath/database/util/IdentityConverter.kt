@@ -1,5 +1,6 @@
-package io.github.smyrgeorge.freepath.contact
+package io.github.smyrgeorge.freepath.database.util
 
+import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.sqlx4k.ResultSet
 import io.github.smyrgeorge.sqlx4k.ValueEncoder
 import kotlin.io.encoding.Base64

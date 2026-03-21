@@ -1,4 +1,3 @@
-// freepath-libp2p/src/rust/src/core/messaging.rs
 //! FreepathCodec — length-prefixed binary codec for request_response.
 //! Both requests and responses carry raw `Vec<u8>` payloads with a 4-byte big-endian length prefix.
 

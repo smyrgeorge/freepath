@@ -42,13 +42,13 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
     // The AtomicReference holds the internal dispatcher; its address is pinned across the FFI.
     private val dispatcherRef = AtomicReference<((Libp2pEvent) -> Unit)?>(null)
 
-    private var appHandler: ((Libp2pEvent) -> Unit)? = null
+    private var appHandler: (suspend (Libp2pEvent) -> Unit)? = null
     private var mdns: MdnsPeerDiscovery? = null
 
     // null = not started, non-null = started (CAS from null → Unit)
     private val mdnsStarted = AtomicReference<Unit?>(null)
 
-    actual fun setEventHandler(handler: (Libp2pEvent) -> Unit) {
+    actual fun setEventHandler(handler: suspend (Libp2pEvent) -> Unit) {
         appHandler = handler
     }
 
@@ -140,7 +140,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
     private fun dispatch(event: Libp2pEvent) {
         onEvent(event)
         metrics.onEvent(event)
-        appHandler?.invoke(event)
+        scope.launch { runCatching { appHandler?.invoke(event) } }
     }
 
     private fun onEvent(event: Libp2pEvent) {

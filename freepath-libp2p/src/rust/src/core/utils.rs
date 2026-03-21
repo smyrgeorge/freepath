@@ -1,16 +1,10 @@
-// freepath-libp2p/src/rust/src/core/utils.rs
-
 use std::ffi::c_void;
 use std::sync::OnceLock;
 use tokio::runtime::Runtime;
 
 use crate::core::event::RawLibP2pEvent;
 
-// ── Tokio runtime ─────────────────────────────────────────────────────────────
-
 pub static RUNTIME: OnceLock<Runtime> = OnceLock::new();
-
-// ── Callback types ────────────────────────────────────────────────────────────
 
 pub struct EventCallback {
     pub ptr: *mut c_void,
@@ -18,8 +12,6 @@ pub struct EventCallback {
 }
 unsafe impl Send for EventCallback {}
 unsafe impl Sync for EventCallback {}
-
-// ── SwarmCommand ──────────────────────────────────────────────────────────────
 
 pub enum SwarmCommand {
     Stop,

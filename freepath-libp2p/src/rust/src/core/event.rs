@@ -1,5 +1,3 @@
-// freepath-libp2p/src/rust/src/core/event.rs
-
 /// Event kinds:
 ///   0 = PeerConnected    (peer_id + addr)
 ///   1 = PeerDisconnected (peer_id)

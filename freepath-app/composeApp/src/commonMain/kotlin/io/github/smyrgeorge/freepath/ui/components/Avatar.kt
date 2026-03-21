@@ -1,5 +1,6 @@
 package io.github.smyrgeorge.freepath.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -10,12 +11,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.smyrgeorge.freepath.util.toImageBitmap
+import kotlin.io.encoding.Base64
 
 enum class AvatarSize {
     Small,
@@ -28,6 +39,7 @@ fun FreepathAvatar(
     label: String,
     modifier: Modifier = Modifier,
     size: AvatarSize = AvatarSize.Medium,
+    avatar: String? = null,
     isHub: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
@@ -47,6 +59,11 @@ fun FreepathAvatar(
     val backgroundColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
     val borderColor = MaterialTheme.colorScheme.outline
 
+    var avatarBitmap by remember(avatar) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(avatar) {
+        avatarBitmap = avatar?.let { runCatching { Base64.decode(it).toImageBitmap() }.getOrNull() }
+    }
+
     Box(
         modifier = modifier
             .size(dimension)
@@ -55,11 +72,20 @@ fun FreepathAvatar(
             .border(2.dp, borderColor, shape),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = textStyle
-        )
+        if (avatarBitmap != null) {
+            Image(
+                painter = BitmapPainter(avatarBitmap!!),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(dimension),
+            )
+        } else {
+            Text(
+                text = label,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = textStyle,
+            )
+        }
     }
 }
 

@@ -1,16 +1,20 @@
 package io.github.smyrgeorge.freepath.state
 
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
+import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.client.AppClient
 import io.github.smyrgeorge.freepath.client.model.ContactInfo
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
+import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.database.generated.ContactCardEntryRepositoryImpl
+import io.github.smyrgeorge.freepath.database.generated.ContentEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.IdentityEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
+import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
 import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetricsSnapshot
 import io.github.smyrgeorge.freepath.util.exitApplication
@@ -37,10 +41,15 @@ abstract class AbstractAppResources(
 
     val identityRepository: IdentityEntryRepository = IdentityEntryRepositoryImpl
     val contactCardRepository: ContactCardEntryRepository = ContactCardEntryRepositoryImpl
+    val contentEntryRepository: ContentEntryRepository = ContentEntryRepositoryImpl
 
     val libp2p: Libp2pModule = Libp2pModule().also { module ->
         module.setEventHandler { event ->
             log.info { "Libp2pEvent: $event" }
+            when (event) {
+                is Libp2pEvent.PeerIdentified -> system.tell(Protocol.PeerIdentified(event.peerId)).getOrThrow()
+                else -> Unit
+            }
         }
     }
     val libp2pMetrics: StateFlow<Libp2pMetricsSnapshot> = libp2p.metrics.value

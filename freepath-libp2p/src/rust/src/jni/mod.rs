@@ -1,6 +1,3 @@
-// freepath-libp2p/src/rust/src/jni/mod.rs
-//! JNI exports for JVM and Android.
-
 #![cfg(not(target_os = "ios"))]
 
 use crate::core::{EventCallback, LibP2pNode, RawLibP2pEvent};
@@ -302,7 +299,10 @@ pub extern "C" fn Java_io_github_smyrgeorge_freepath_libp2p_Libp2pJni_sendRespon
     req_id: jlong,
     error: JString<'_>,
 ) {
-    assert!(node != 0, "JNI sendResponseFailed: node handle must not be zero");
+    assert!(
+        node != 0,
+        "JNI sendResponseFailed: node handle must not be zero"
+    );
     let error_str: String = match env.with_env(|env| error.try_to_string(env)).into_outcome() {
         jni::Outcome::Ok(s) => s,
         jni::Outcome::Err(e) => {

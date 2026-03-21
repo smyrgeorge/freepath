@@ -21,8 +21,6 @@ class LanContactExchangeTest {
         encKp: KeyPair,
         updatedAt: Instant = Clock.System.now(),
         name: String? = null,
-        bio: String? = null,
-        location: String? = null,
     ): ContactCard =
         ContactCard(
             schema = ContactCard.SCHEMA,
@@ -30,8 +28,6 @@ class LanContactExchangeTest {
             encKey = Base64.encode(encKp.publicKey),
             updatedAt = updatedAt,
             name = name,
-            bio = bio,
-            location = location,
         )
 
     // ── method ────────────────────────────────────────────────────────────────
@@ -64,20 +60,12 @@ class LanContactExchangeTest {
     fun encode_then_decode_preservesOptionalFields() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(
-            kp,
-            encKp,
-            name = "Alice",
-            bio = "Hello world",
-            location = "NYC",
-        )
+        val card = makeCard(kp, encKp, name = "Alice")
 
         val encoded = LanContactExchange.encode(card, kp.privateKey)
         val decoded = LanContactExchange.decode(encoded).getOrThrow()
 
         assertEquals(card.name, decoded.name)
-        assertEquals(card.bio, decoded.bio)
-        assertEquals(card.location, decoded.location)
     }
 
     @Test

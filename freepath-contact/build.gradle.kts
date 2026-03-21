@@ -33,7 +33,6 @@ kotlin {
                 implementation(project(":freepath-util"))
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.sqlx4k)
             }
         }
         commonTest {

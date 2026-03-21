@@ -34,8 +34,10 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(libs.ktor.client.core)
             implementation(project(":freepath-contact"))
             implementation(project(":freepath-crypto"))
+            implementation(project(":freepath-content"))
             implementation(project(":freepath-database"))
             implementation(project(":freepath-libp2p"))
             implementation(project(":freepath-util"))
@@ -57,6 +59,7 @@ kotlin {
             implementation(libs.kotlin.test)
         }
         androidMain.dependencies {
+            implementation(libs.ktor.client.cio)
             implementation(libs.log4k.slf4j)
             implementation(libs.androidx.activity.compose)
             // Preview tooling - only needed at compile time
@@ -64,7 +67,11 @@ kotlin {
             compileOnly(libs.androidx.emoji2)
             compileOnly(libs.androidx.customview.poolingcontainer)
         }
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+        }
         jvmMain.dependencies {
+            implementation(libs.ktor.client.cio)
             implementation(libs.log4k.slf4j)
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)

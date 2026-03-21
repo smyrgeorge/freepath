@@ -12,6 +12,7 @@
     <string name="bio_hint">About you (optional)</string>
     <string name="location_label">Location</string>
     <string name="location_hint">City or region (optional)</string>
+    <string name="onboarding_random_profile_note">This is a randomly generated profile. You can change it later.</string>
     <string name="continue_button">Continue</string>
     <string name="finish_button">Finish</string>
     <string name="security_note">Your keys are stored only on this device and never leave it</string>
@@ -43,8 +44,15 @@
     <string name="network_paste_link">Paste from clipboard</string>
     <string name="network_invalid_link">Invalid link — not a Freepath contact URL</string>
     <string name="dev_section_title">Developer</string>
+    <string name="dev_generate_content">Generate random content</string>
+    <string name="dev_generate_content_subtitle">Seed feed with articles and images from contacts</string>
+    <string name="dev_delete_content">Delete all content</string>
+    <string name="dev_delete_content_subtitle">Clear all feed entries</string>
+    <string name="dev_delete_content_confirm_title">Delete all content?</string>
+    <string name="dev_delete_content_confirm_body">All feed content will be permanently deleted. The app will stay open — contacts and identity are not affected.</string>
+    <string name="dev_delete_content_confirm_button">Delete content</string>
     <string name="dev_reset_data">Reset app data</string>
-    <string name="dev_reset_data_subtitle">Delete all contacts and restart</string>
+    <string name="dev_reset_data_subtitle">Delete all data and restart</string>
     <string name="dev_reset_confirm_title">Reset app data?</string>
     <string name="dev_reset_confirm_body">All contacts will be deleted and the app will close. Your identity keypair is preserved — the app will start fresh on next launch.</string>
     <string name="dev_reset_confirm_button">Reset &amp; close</string>
