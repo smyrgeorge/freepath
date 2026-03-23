@@ -66,4 +66,9 @@
     <string name="dev_libp2p_identified_peers">Identified peers</string>
     <string name="dev_libp2p_mdns_peers">mDNS peers</string>
     <string name="dev_libp2p_none">none</string>
+    <string name="dev_libble_metrics_title">libble Metrics</string>
+    <string name="dev_libble_discovered_peripherals">Discovered peripherals</string>
+    <string name="dev_libble_none">none</string>
+    <string name="dev_libble_tx_power">TX power</string>
+    <string name="dev_libble_connectable">Connectable</string>
 </resources>

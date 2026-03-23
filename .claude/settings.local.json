@@ -17,7 +17,9 @@
       "Bash(./gradlew :freepath-app:composeApp:jvmTest :freepath-content:jvmTest :freepath-database:jvmTest)",
       "Bash(./gradlew :freepath-app:composeApp:jvmTest)",
       "Bash(./gradlew :freepath-contact:jvmTest)",
-      "Bash(./gradlew :freepath-contact:compileTestKotlinJvm)"
+      "Bash(./gradlew :freepath-contact:compileTestKotlinJvm)",
+      "Bash(./gradlew :freepath-libble:jvmTest)",
+      "Bash(./gradlew :freepath-libble:compileKotlinJvm)"
     ]
   }
 }

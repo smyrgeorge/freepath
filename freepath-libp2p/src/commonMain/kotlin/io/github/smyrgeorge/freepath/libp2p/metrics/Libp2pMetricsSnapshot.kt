@@ -1,8 +1,5 @@
 package io.github.smyrgeorge.freepath.libp2p.metrics
 
-/**
- * Point-in-time snapshot of all libp2p metrics.
- */
 data class Libp2pMetricsSnapshot(
     /** Multiaddr strings the node is currently listening on. */
     val listenAddresses: List<String> = emptyList(),

@@ -54,6 +54,11 @@ import io.github.smyrgeorge.composeapp.generated.resources.dev_delete_content
 import io.github.smyrgeorge.composeapp.generated.resources.dev_delete_content_subtitle
 import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_content
 import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_content_subtitle
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_connectable
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_discovered_peripherals
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_metrics_title
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_none
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_tx_power
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_connected_peers
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_identified_peers
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_listen_addresses
@@ -72,6 +77,7 @@ import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.AppViewState
 import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
+import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetricsSnapshot
 import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetricsSnapshot
 import io.github.smyrgeorge.freepath.state.RandomAvatarGenerator
 import io.github.smyrgeorge.freepath.state.abbrev
@@ -162,11 +168,13 @@ fun MeScreen(modifier: Modifier = Modifier) {
 
 @Composable
 private fun DeveloperSection() {
-    val metrics by AppResources.libp2pMetrics.collectAsState()
+    val libp2pMetrics by AppResources.libp2p.metrics.value.collectAsState()
+    val libbleMetrics by AppResources.libble.metrics.value.collectAsState()
     val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(text = stringResource(Res.string.dev_section_title))
-        Libp2pMetricsPanel(metrics = metrics, selfNodeId = AppState.contactCard.nodeId)
+        Libp2pMetricsPanel(metrics = libp2pMetrics, selfNodeId = AppState.contactCard.nodeId)
+        LibbleMetricsPanel(metrics = libbleMetrics)
         FreepathButton(
             onClick = { scope.launch { AppState.generateRandomContent() } },
             modifier = Modifier.fillMaxWidth(),
@@ -233,6 +241,41 @@ private fun DeveloperSection() {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun LibbleMetricsPanel(metrics: LibbleMetricsSnapshot) {
+    val none = stringResource(Res.string.dev_libble_none)
+    val txPowerLabel = stringResource(Res.string.dev_libble_tx_power)
+    val connectableLabel = stringResource(Res.string.dev_libble_connectable)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                RoundedCornerShape(12.dp),
+            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(Res.string.dev_libble_metrics_title),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        FreepathDivider()
+        MetricRow(
+            label = stringResource(Res.string.dev_libble_discovered_peripherals),
+            value = metrics.discoveredPeripherals.takeIf { it.isNotEmpty() }
+                ?.values?.joinToString("\n") { p ->
+                    val label = p.peripheralName ?: p.name ?: p.peripheralId
+                    val tx = p.txPower?.let { " | $txPowerLabel: ${it}dBm" } ?: ""
+                    val connectable = p.isConnectable?.let { " | $connectableLabel: $it" } ?: ""
+                    "$label (rssi: ${p.rssi}dBm$tx$connectable)"
+                } ?: none,
+        )
     }
 }
 

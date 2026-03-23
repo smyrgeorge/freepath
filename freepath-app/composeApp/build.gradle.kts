@@ -39,6 +39,7 @@ kotlin {
             implementation(project(":freepath-crypto"))
             implementation(project(":freepath-content"))
             implementation(project(":freepath-database"))
+            implementation(project(":freepath-libble"))
             implementation(project(":freepath-libp2p"))
             implementation(project(":freepath-util"))
 

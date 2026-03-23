@@ -6,6 +6,8 @@
         <true/>
         <key>NSLocalNetworkUsageDescription</key>
         <string>Freepath uses the local network to discover and connect to nearby peers.</string>
+        <key>NSBluetoothAlwaysUsageDescription</key>
+        <string>Freepath uses Bluetooth to discover nearby devices.</string>
         <key>NSBonjourServices</key>
         <array>
             <string>_freepath._tcp</string>

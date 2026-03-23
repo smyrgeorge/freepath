@@ -27,6 +27,8 @@ sqlx4k = "1.7.2"
 ksp = "2.3.6"
 # https://github.com/jmdns/jmdns
 jmdns = "3.6.3"
+# https://github.com/juullabs/kable
+kable = "0.42.0"
 # https://github.com/dylibso/chicory
 chicory = "1.7.3"
 # https://developer.android.com/studio/releases/gradle-plugin
@@ -52,6 +54,7 @@ gradle-kotlin-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", v
 gradle-publish-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "publish" }
 gradle-dokka-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
 jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
+kable-core = { module = "com.juul.kable:kable-core", version.ref = "kable" }
 chicory-runtime = { module = "com.dylibso.chicory:runtime", version.ref = "chicory" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
@@ -59,6 +62,7 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-serialization-protobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version.ref = "kotlinx-serialization" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 arrow-core = { module = "io.arrow-kt:arrow-core", version.ref = "arrow" }
 log4k = { module = "io.github.smyrgeorge:log4k", version.ref = "log4k" }
 log4k-slf4j = { module = "io.github.smyrgeorge:log4k-slf4j", version.ref = "log4k" }

@@ -14,16 +14,15 @@ import io.github.smyrgeorge.freepath.database.generated.ContentEntryRepositoryIm
 import io.github.smyrgeorge.freepath.database.generated.IdentityEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
+import io.github.smyrgeorge.freepath.libble.LibbleModule
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
-import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetricsSnapshot
 import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import io.github.smyrgeorge.sqlx4k.ConnectionPool
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration.Companion.seconds
 
 abstract class AbstractAppResources(
@@ -43,16 +42,17 @@ abstract class AbstractAppResources(
     val contactCardRepository: ContactCardEntryRepository = ContactCardEntryRepositoryImpl
     val contentEntryRepository: ContentEntryRepository = ContentEntryRepositoryImpl
 
-    val libp2p: Libp2pModule = Libp2pModule().also { module ->
-        module.setEventHandler { event ->
-            log.info { "Libp2pEvent: $event" }
-            when (event) {
-                is Libp2pEvent.PeerIdentified -> system.tell(Protocol.PeerIdentified(event.peerId)).getOrThrow()
-                else -> Unit
-            }
+    val libp2p: Libp2pModule = Libp2pModule().setEventHandler { event ->
+        log.info { "Libp2pEvent: $event" }
+        when (event) {
+            is Libp2pEvent.PeerIdentified -> system.tell(Protocol.PeerIdentified(event.peerId)).getOrThrow()
+            else -> Unit
         }
     }
-    val libp2pMetrics: StateFlow<Libp2pMetricsSnapshot> = libp2p.metrics.value
+
+    val libble: LibbleModule = LibbleModule().setEventHandler { event ->
+        log.info { "LibbleEvent: $event" }
+    }
 
     fun initialize(system: ActorRef) {
         this.system = system
@@ -102,5 +102,13 @@ abstract class AbstractAppResources(
 
     suspend fun stopLibp2p() {
         libp2p.stop()
+    }
+
+    suspend fun startupLibble() {
+        libble.start()
+    }
+
+    suspend fun stopLibble() {
+        libble.stop()
     }
 }

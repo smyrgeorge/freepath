@@ -48,8 +48,9 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
     // null = not started, non-null = started (CAS from null → Unit)
     private val mdnsStarted = AtomicReference<Unit?>(null)
 
-    actual fun setEventHandler(handler: suspend (Libp2pEvent) -> Unit) {
+    actual fun setEventHandler(handler: suspend (Libp2pEvent) -> Unit): Libp2pModule {
         appHandler = handler
+        return this
     }
 
     actual suspend fun start(

@@ -24,7 +24,7 @@ class AppClient(
 ) {
     private val log: Logger = Logger.of(this::class)
     private val libp2p = resources.libp2p
-    private val libp2pMetrics = resources.libp2pMetrics
+    private val libp2pMetrics = resources.libp2p.metrics.value
 
     init {
         libp2p.scope.launch { libp2p.requests.consumeAsFlow().collect { r -> open(r) } }
