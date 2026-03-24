@@ -9,7 +9,7 @@ import io.github.smyrgeorge.freepath.client.model.success
 import io.github.smyrgeorge.freepath.client.model.toResult
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.content.ContentCodec
-import io.github.smyrgeorge.freepath.content.ContentEnvelope
+import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.state.AbstractAppState
@@ -34,7 +34,7 @@ class AppClient(
         val peerId = peerId.takeIf { libp2pMetrics.value.identifiedPeers.contains(it) }
             ?: return failure("Peer $peerId not identified yet, message not sent")
         return state.contacts.value
-            .firstOrNull { it.nodeId == peerId }?.card
+            .firstOrNull { it.peerId == peerId }?.card
             ?.let { Result.success(it) }
             ?: failure("No contact card for $peerId, cannot encrypt")
     }
@@ -45,7 +45,7 @@ class AppClient(
         return libp2p.request(message.receiverId, payload).toResult().map { }
     }
 
-    suspend fun send(envelope: ContentEnvelope, receiverId: String): Result<Unit> {
+    suspend fun send(envelope: Content, receiverId: String): Result<Unit> {
         val receiver = onlineRecieverOf(receiverId).getOrElse { return Result.failure(it) }
         val payload = seal(receiver, TYPE_CONTENT, ContentCodec.encode(envelope))
         return libp2p.request(receiverId, payload).toResult().map { }

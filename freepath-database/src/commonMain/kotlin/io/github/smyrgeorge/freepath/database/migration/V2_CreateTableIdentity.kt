@@ -8,9 +8,9 @@ CREATE TABLE IF NOT EXISTS identity
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    node_id    TEXT    NOT NULL,
-    data       TEXT    NOT NULL
+    peer_id    TEXT    NOT NULL,
+    identity   TEXT    NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS identity_node_id_uidx ON identity (node_id);
+CREATE UNIQUE INDEX IF NOT EXISTS identity_peer_id_uidx ON identity (peer_id);
 """

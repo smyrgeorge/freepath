@@ -71,10 +71,10 @@ fun NearbyScreen(
     val nearbyPeers by AppState.nearbyPeers.collectAsState()
     val contacts by AppState.contacts.collectAsState()
     val contactContents by AppState.contactContents.collectAsState()
-    val contactByNodeId = contacts.associateBy { it.nodeId }
+    val contactByPeerId = contacts.associateBy { it.peerId }
     val allPeers = nearbyPeers.keys.toList()
-    val knownPeers = allPeers.filter { it in contactByNodeId }
-    val unknownPeers = allPeers.filter { it !in contactByNodeId }
+    val knownPeers = allPeers.filter { it in contactByPeerId }
+    val unknownPeers = allPeers.filter { it !in contactByPeerId }
 
     Column(modifier = modifier.fillMaxSize()) {
         FreepathTopBar(
@@ -88,7 +88,7 @@ fun NearbyScreen(
                 .padding(top = 24.dp, bottom = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            RadarView(peers = allPeers, contactByNodeId = contactByNodeId, contactContents = contactContents)
+            RadarView(peers = allPeers, contactByPeerId = contactByPeerId, contactContents = contactContents)
         }
 
         Text(
@@ -116,8 +116,8 @@ fun NearbyScreen(
             contentPadding = PaddingValues(bottom = 80.dp),
         ) {
             if (knownPeers.isNotEmpty()) {
-                items(knownPeers, key = { it }) { nodeId ->
-                    PeerCard(nodeId, contactByNodeId[nodeId], contactContents[nodeId])
+                items(knownPeers, key = { it }) { peerId ->
+                    PeerCard(peerId, contactByPeerId[peerId], contactContents[peerId])
                 }
             }
 
@@ -125,8 +125,8 @@ fun NearbyScreen(
                 if (knownPeers.isNotEmpty()) {
                     item { Spacer(modifier = Modifier.height(4.dp)) }
                 }
-                items(unknownPeers, key = { it }) { nodeId ->
-                    PeerCard(nodeId, null, null)
+                items(unknownPeers, key = { it }) { peerId ->
+                    PeerCard(peerId, null, null)
                 }
             }
         }
@@ -168,7 +168,7 @@ private fun ScanningIndicator() {
 @Composable
 private fun RadarView(
     peers: List<String>,
-    contactByNodeId: Map<String, ContactCardEntry>,
+    contactByPeerId: Map<String, ContactCardEntry>,
     contactContents: Map<String, ContentBody.Contact>,
     modifier: Modifier = Modifier,
 ) {
@@ -222,16 +222,16 @@ private fun RadarView(
 
         // Device avatars positioned around the radar
         val deviceRadius = radarSize.value * 0.35f
-        peers.forEachIndexed { index, nodeId ->
+        peers.forEachIndexed { index, peerId ->
             val angle = (2.0 * PI * index / peers.size - PI / 2).toFloat()
             val offsetX = (deviceRadius * cos(angle)).dp
             val offsetY = (deviceRadius * sin(angle)).dp
 
-            val contact = contactByNodeId[nodeId]
+            val contact = contactByPeerId[peerId]
             val isKnown = contact != null
             val contactName = contact?.resolvedDisplayName()
-            val avatarLabel = if (isKnown) (contactName ?: nodeId).first().uppercaseChar().toString() else "?"
-            val avatar = contactContents[nodeId]?.avatar
+            val avatarLabel = if (isKnown) (contactName ?: peerId).first().uppercaseChar().toString() else "?"
+            val avatar = contactContents[peerId]?.avatar
 
             FreepathAvatar(
                 label = avatarLabel,
@@ -259,10 +259,10 @@ private fun RadarView(
 }
 
 @Composable
-private fun PeerCard(nodeId: String, contact: ContactCardEntry?, content: ContentBody.Contact?) {
+private fun PeerCard(peerId: String, contact: ContactCardEntry?, content: ContentBody.Contact?) {
     val scope = rememberCoroutineScope()
     val isKnown = contact != null
-    val displayName = if (isKnown) contact.resolvedDisplayName() ?: nodeId.abbrev() else "#${nodeId.abbrev()}"
+    val displayName = if (isKnown) contact.resolvedDisplayName() ?: peerId.abbrev() else "#${peerId.abbrev()}"
     val avatarLabel = if (isKnown) displayName.first().uppercaseChar().toString() else "?"
     val statusText =
         if (isKnown) stringResource(Res.string.nearby_status_connected)
@@ -299,7 +299,7 @@ private fun PeerCard(nodeId: String, contact: ContactCardEntry?, content: Conten
             FreepathButton(
                 onClick = {
                     scope.launch {
-                        AppResources.system.tell(Protocol.InitiateContactExchange(nodeId))
+                        AppResources.system.tell(Protocol.InitiateContactExchange(peerId))
                     }
                 },
                 variant = ButtonVariant.Outline,

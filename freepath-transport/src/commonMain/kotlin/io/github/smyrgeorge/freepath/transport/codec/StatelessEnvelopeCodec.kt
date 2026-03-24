@@ -7,6 +7,7 @@ import io.github.smyrgeorge.freepath.transport.model.StatelessEnvelope
 import io.github.smyrgeorge.freepath.util.codec.Base58
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
+import kotlin.time.Instant
 
 object StatelessEnvelopeCodec {
 
@@ -20,7 +21,7 @@ object StatelessEnvelopeCodec {
         receiverIdRaw: ByteArray,
         receiverEncKeyPublic: ByteArray,
         plaintext: ByteArray,
-        timestamp: Long,
+        timestamp: Instant,
         fragmentIndex: Int = 0,
         fragmentCount: Int = 1,
     ): StatelessEnvelope {
@@ -116,12 +117,12 @@ object StatelessEnvelopeCodec {
         return CryptoProvider.hkdfSha256(ikm = sharedSecret, salt = ByteArray(32), info = info, outputLen = 32)
     }
 
-    // AAD = schema(4BE) ∥ senderIdRaw(32) ∥ receiverIdRaw(32) ∥ timestamp(8BE) ∥ nonce(12) ∥ fragmentIndex(4BE) ∥ fragmentCount(4BE)
+    // AAD = schema(4BE) ∥ senderIdRaw(32) ∥ receiverIdRaw(32) ∥ timestamp(8BE epoch millis) ∥ nonce(12) ∥ fragmentIndex(4BE) ∥ fragmentCount(4BE)
     private fun buildAad(
         schema: Int,
         senderIdRaw: ByteArray,
         receiverIdRaw: ByteArray,
-        timestamp: Long,
+        timestamp: Instant,
         nonce: ByteArray,
         fragmentIndex: Int,
         fragmentCount: Int,
@@ -131,7 +132,7 @@ object StatelessEnvelopeCodec {
         off = BinaryCodec.writeInt32BE(buf, off, schema)
         senderIdRaw.copyInto(buf, off); off += 32
         receiverIdRaw.copyInto(buf, off); off += 32
-        off = BinaryCodec.writeInt64BE(buf, off, timestamp)
+        off = BinaryCodec.writeInt64BE(buf, off, timestamp.toEpochMilliseconds())
         nonce.copyInto(buf, off); off += 12
         off = BinaryCodec.writeInt32BE(buf, off, fragmentIndex)
         BinaryCodec.writeInt32BE(buf, off, fragmentCount)

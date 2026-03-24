@@ -11,8 +11,6 @@ import kotlin.time.Instant
 
 class ContactCardSignedCodecTest {
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private fun makeCard(sigKp: KeyPair, encKp: KeyPair, updatedAt: Instant = Clock.System.now()): ContactCard =
         ContactCard(
             schema = ContactCardCodec.SCHEMA,
@@ -20,8 +18,6 @@ class ContactCardSignedCodecTest {
             encKey = Base64.encode(encKp.publicKey),
             updatedAt = Instant.fromEpochMilliseconds(updatedAt.toEpochMilliseconds()),
         )
-
-    // ── seal / open ───────────────────────────────────────────────────────────
 
     @Test
     fun sealOpen_roundTrip() {
@@ -44,8 +40,6 @@ class ContactCardSignedCodecTest {
             ContactCardSignedCodec.open(ContactCardSigned(card, Base64.encode(wrongSig))).getOrThrow()
         }
     }
-
-    // ── encode / decode ───────────────────────────────────────────────────────
 
     @Test
     fun encodeDecodeSignedContactCard_roundTrip() {

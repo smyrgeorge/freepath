@@ -17,9 +17,9 @@ class FeedHelpersTest {
     private val NODE_C = "Qm33333333333333333333333333333333333333333333333333"
     private val NODE_X = "Qm44444444444444444444444444444444444444444444444444"
 
-    private fun fakeEntry(nodeId: String, trust: TrustLevel): ContactCardEntry =
+    private fun fakeEntry(peerId: String, trust: TrustLevel): ContactCardEntry =
         ContactCardEntry(
-            nodeId = nodeId,
+            peerId = peerId,
             card = ContactCard(
                 schema = 1,
                 sigKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",

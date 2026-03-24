@@ -14,8 +14,6 @@ import kotlin.time.Instant
 
 class ContactCardCodecTest {
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private fun makeCard(sigKp: KeyPair, encKp: KeyPair, updatedAt: Instant = Clock.System.now()): ContactCard =
         ContactCard(
             schema = ContactCardCodec.SCHEMA,
@@ -24,35 +22,31 @@ class ContactCardCodecTest {
             updatedAt = Instant.fromEpochMilliseconds(updatedAt.toEpochMilliseconds()),
         )
 
-    // ── deriveNodeId ──────────────────────────────────────────────────────────
-
     @Test
-    fun deriveNodeId_produces52CharBase58String() {
+    fun derivePeerId_produces52CharBase58String() {
         val kp = CryptoProvider.generateEd25519KeyPair()
-        val nodeId = ContactCardCodec.deriveNodeId(kp.publicKey)
-        assertEquals(52, nodeId.length)
-        assertTrue(nodeId.all { it in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" })
+        val peerId = ContactCardCodec.derivePeerId(kp.publicKey)
+        assertEquals(52, peerId.length)
+        assertTrue(peerId.all { it in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" })
     }
 
     @Test
-    fun deriveNodeId_isDeterministic() {
+    fun derivePeerId_isDeterministic() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         assertEquals(
-            ContactCardCodec.deriveNodeId(kp.publicKey),
-            ContactCardCodec.deriveNodeId(kp.publicKey),
+            ContactCardCodec.derivePeerId(kp.publicKey),
+            ContactCardCodec.derivePeerId(kp.publicKey),
         )
     }
 
     @Test
-    fun deriveNodeId_differsByKey() {
+    fun derivePeerId_differsByKey() {
         val kp1 = CryptoProvider.generateEd25519KeyPair()
         val kp2 = CryptoProvider.generateEd25519KeyPair()
-        val id1 = ContactCardCodec.deriveNodeId(kp1.publicKey)
-        val id2 = ContactCardCodec.deriveNodeId(kp2.publicKey)
+        val id1 = ContactCardCodec.derivePeerId(kp1.publicKey)
+        val id2 = ContactCardCodec.derivePeerId(kp2.publicKey)
         assertTrue(id1 != id2)
     }
-
-    // ── sign / verify ─────────────────────────────────────────────────────────
 
     @Test
     fun signVerify_roundTrip() {
@@ -90,8 +84,6 @@ class ContactCardCodecTest {
         val sig = ContactCardCodec.sign(card, kp2.privateKey)
         assertFalse(ContactCardCodec.verify(card, sig))
     }
-
-    // ── shouldUpdate ──────────────────────────────────────────────────────────
 
     @Test
     fun shouldUpdate_trueForNewerUpdatedAt() {
@@ -134,8 +126,6 @@ class ContactCardCodecTest {
         assertFalse(ContactCardCodec.shouldUpdate(stored, incoming))
     }
 
-    // ── encode / decode ───────────────────────────────────────────────────────
-
     @Test
     fun encodeDecodeContactCard_roundTripRequiredFieldsOnly() {
         val kp = CryptoProvider.generateEd25519KeyPair()
@@ -160,8 +150,6 @@ class ContactCardCodecTest {
         val cardWithName = cardWithoutName.copy(name = "Alice")
         assertTrue(ContactCardCodec.encode(cardWithoutName).size < ContactCardCodec.encode(cardWithName).size)
     }
-
-    // ── ContactCard validation ────────────────────────────────────────────────
 
     @Test
     fun contactCard_validation_acceptsValidCard() {

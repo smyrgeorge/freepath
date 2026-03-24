@@ -289,7 +289,7 @@ private fun RecipientEnterPinDrawer(
         peerCard.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
     }
     val avatarLabel = remember(peerCard) {
-        (peerName?.firstOrNull()?.uppercaseChar() ?: peerCard.nodeId.first().uppercaseChar()).toString()
+        (peerName?.firstOrNull()?.uppercaseChar() ?: peerCard.peerId.first().uppercaseChar()).toString()
     }
 
     DrawerShell(offsetProvider = offsetProvider, onHeightMeasured = onHeightMeasured) {
@@ -338,12 +338,12 @@ private fun RecipientEnterPinDrawer(
             }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = peerName ?: (peerCard.nodeId.take(12) + "…"),
+                    text = peerName ?: (peerCard.peerId.take(12) + "…"),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                FreepathFingerprint(text = peerCard.nodeId)
+                FreepathFingerprint(text = peerCard.peerId)
             }
         }
 

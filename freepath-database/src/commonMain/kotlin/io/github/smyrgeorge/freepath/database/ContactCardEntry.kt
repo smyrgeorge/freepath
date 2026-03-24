@@ -14,7 +14,6 @@ import kotlin.time.Instant
 
 @Table("contact")
 data class ContactCardEntry(
-    /** Primary key. */
     @Id
     override val id: Int = 0,
     @Converter(InstantConverter::class)
@@ -22,7 +21,7 @@ data class ContactCardEntry(
     @Converter(InstantConverter::class)
     override var updatedAt: Instant = Clock.System.now(),
     /** Unique key. Derived locally from the contact's sigKey. */
-    val nodeId: String,
+    val peerId: String,
     /** The accepted contact card. */
     @Converter(ContactCardConverter::class)
     val card: ContactCard,
@@ -45,8 +44,8 @@ data class ContactCardEntry(
 ) : Auditable<Int> {
     init {
         require(id >= 0) { "id must be non-negative" }
-        require(nodeId.matches(BASE58_REGEX)) {
-            "nodeId must be a 52-character Base58 string"
+        require(peerId.matches(BASE58_REGEX)) {
+            "peerId must be a 52-character Base58 string"
         }
         require(notes.isNullOrEmpty() || notes.isNotBlank()) { "notes cannot be blank" }
         require(notes == null || notes.length <= MAX_NOTES_LENGTH) {
@@ -70,12 +69,12 @@ data class ContactCardEntry(
      *
      * @param incoming The incoming contact entry with an updated card.
      * @return A new [ContactCardEntry] with the incoming card and all local-only fields preserved.
-     * @throws IllegalArgumentException if `incoming.nodeId` does not match this entry's [nodeId].
+     * @throws IllegalArgumentException if `incoming.peerId` does not match this entry's [peerId].
      * @throws IllegalArgumentException if `incoming.card` is not newer than the current card.
      */
     fun merge(incoming: ContactCardEntry): ContactCardEntry {
-        require(incoming.nodeId == nodeId) {
-            "Cannot merge entries with different Node IDs: ${incoming.nodeId} != $nodeId"
+        require(incoming.peerId == peerId) {
+            "Cannot merge entries with different peer IDs: ${incoming.peerId} != $peerId"
         }
         require(incoming.card.updatedAt > card.updatedAt) {
             "Incoming card is not newer than stored card (${incoming.card.updatedAt} <= ${card.updatedAt})"

@@ -1,8 +1,10 @@
 package io.github.smyrgeorge.freepath.transport.model
 
+import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
+import kotlin.time.Instant
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
@@ -14,7 +16,7 @@ data class StatelessEnvelope(
     /** Base58-encoded Node ID of the intended recipient. */
     @ProtoNumber(3) val receiverId: String,
     /** Unix epoch milliseconds. Used for replay protection. */
-    @ProtoNumber(4) val timestamp: Long,
+    @ProtoNumber(4) @Serializable(with = InstantSerializer::class) val timestamp: Instant,
     /** Random 12-byte nonce unique per envelope. */
     @ProtoNumber(5) val nonce: ByteArray,
     /** Zero-based index of this fragment within a multi-envelope message. 0 if not fragmented. */

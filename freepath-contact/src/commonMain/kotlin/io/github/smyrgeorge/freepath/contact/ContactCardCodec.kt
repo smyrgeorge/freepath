@@ -27,7 +27,7 @@ object ContactCardCodec {
      * Always produces a 52-character Base58 string starting with "1".
      * Compatible with libp2p Peer IDs for Ed25519 keys.
      */
-    fun deriveNodeId(ed25519PubKey: ByteArray): String {
+    fun derivePeerId(ed25519PubKey: ByteArray): String {
         require(ed25519PubKey.size == 32) { "Ed25519 public key must be 32 bytes" }
         // protobuf encode PublicKey
         val protobuf = ByteArray(2 + 2 + 32)

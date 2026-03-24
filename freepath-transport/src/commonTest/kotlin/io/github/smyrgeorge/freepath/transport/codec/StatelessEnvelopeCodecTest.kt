@@ -8,14 +8,15 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.time.Instant
 
 class StatelessEnvelopeCodecTest {
 
     private fun makeIdentity(): Identity {
         val sigKp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val nodeIdRaw = CryptoProvider.randomBytes(32)
-        return Identity(nodeIdRaw, sigKp.publicKey, sigKp.privateKey, encKp.publicKey, encKp.privateKey)
+        val peerIdRaw = CryptoProvider.randomBytes(32)
+        return Identity(peerIdRaw, sigKp.publicKey, sigKp.privateKey, encKp.publicKey, encKp.privateKey)
     }
 
     private fun contactLookupFor(vararg identities: Identity): (ByteArray) -> ContactInfo? = { nodeIdRaw ->
@@ -31,7 +32,7 @@ class StatelessEnvelopeCodecTest {
         val bob = makeIdentity()
         val plaintext = "hello freepath".encodeToByteArray()
 
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, plaintext, timestamp = 1_000_000L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, plaintext, timestamp = Instant.fromEpochMilliseconds(1_000_000L))
         val recovered = StatelessEnvelopeCodec.open(envelope, bob, contactLookupFor(alice))
 
         assertContentEquals(plaintext, recovered)
@@ -42,7 +43,7 @@ class StatelessEnvelopeCodecTest {
         val alice = makeIdentity()
         val bob = makeIdentity()
 
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, ByteArray(0), timestamp = 1L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, ByteArray(0), timestamp = Instant.fromEpochMilliseconds(1L))
         val recovered = StatelessEnvelopeCodec.open(envelope, bob, contactLookupFor(alice))
 
         assertContentEquals(ByteArray(0), recovered)
@@ -53,12 +54,13 @@ class StatelessEnvelopeCodecTest {
         val alice = makeIdentity()
         val bob = makeIdentity()
 
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "test".encodeToByteArray(), timestamp = 42_000L)
+        val ts = Instant.fromEpochMilliseconds(42_000L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "test".encodeToByteArray(), timestamp = ts)
 
         assertEquals(StatelessEnvelopeCodec.SCHEMA, envelope.schema)
         assertEquals(Base58.encode(alice.nodeIdRaw), envelope.senderId)
         assertEquals(Base58.encode(bob.nodeIdRaw), envelope.receiverId)
-        assertEquals(42_000L, envelope.timestamp)
+        assertEquals(ts, envelope.timestamp)
         assertEquals(0, envelope.fragmentIndex)
         assertEquals(1, envelope.fragmentCount)
         assertEquals(12, envelope.nonce.size)
@@ -72,7 +74,7 @@ class StatelessEnvelopeCodecTest {
         val chunks = listOf("part-0".encodeToByteArray(), "part-1".encodeToByteArray(), "part-2".encodeToByteArray())
 
         val envelopes = chunks.mapIndexed { idx, chunk ->
-            StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, chunk, timestamp = 1L, fragmentIndex = idx, fragmentCount = 3)
+            StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, chunk, timestamp = Instant.fromEpochMilliseconds(1L), fragmentIndex = idx, fragmentCount = 3)
         }
 
         val recovered = envelopes.map { StatelessEnvelopeCodec.open(it, bob, contactLookupFor(alice)) }
@@ -87,7 +89,7 @@ class StatelessEnvelopeCodecTest {
     fun `open fails for unknown sender`() {
         val alice = makeIdentity()
         val bob = makeIdentity()
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = 1L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = Instant.fromEpochMilliseconds(1L))
 
         assertFailsWith<StatelessEnvelopeCodec.EnvelopeException> {
             StatelessEnvelopeCodec.open(envelope, bob) { null }  // unknown sender
@@ -99,7 +101,7 @@ class StatelessEnvelopeCodecTest {
         val alice = makeIdentity()
         val bob = makeIdentity()
         val carol = makeIdentity()
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = 1L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = Instant.fromEpochMilliseconds(1L))
 
         assertFailsWith<StatelessEnvelopeCodec.EnvelopeException> {
             StatelessEnvelopeCodec.open(envelope, carol, contactLookupFor(alice))  // carol is not the receiver
@@ -110,7 +112,7 @@ class StatelessEnvelopeCodecTest {
     fun `open fails when signature is tampered`() {
         val alice = makeIdentity()
         val bob = makeIdentity()
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = 1L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = Instant.fromEpochMilliseconds(1L))
 
         val tamperedSig = envelope.signature.copyOf().also { it[0] = it[0].inc() }
         val tampered = envelope.copy(signature = tamperedSig)
@@ -124,7 +126,7 @@ class StatelessEnvelopeCodecTest {
     fun `open fails when payload ciphertext is tampered`() {
         val alice = makeIdentity()
         val bob = makeIdentity()
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = 1L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = Instant.fromEpochMilliseconds(1L))
 
         val tamperedCt = envelope.payload.copyOf().also { it[0] = it[0].inc() }
         val tampered = envelope.copy(payload = tamperedCt)
@@ -138,9 +140,9 @@ class StatelessEnvelopeCodecTest {
     fun `open fails when timestamp is modified after signing`() {
         val alice = makeIdentity()
         val bob = makeIdentity()
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = 1_000L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = Instant.fromEpochMilliseconds(1_000L))
 
-        val tampered = envelope.copy(timestamp = 9_999L)
+        val tampered = envelope.copy(timestamp = Instant.fromEpochMilliseconds(9_999L))
 
         assertFailsWith<StatelessEnvelopeCodec.EnvelopeException> {
             StatelessEnvelopeCodec.open(tampered, bob, contactLookupFor(alice))
@@ -152,7 +154,7 @@ class StatelessEnvelopeCodecTest {
         val alice = makeIdentity()
         val bob = makeIdentity()
         val wrongKey = makeIdentity()
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = 1L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = Instant.fromEpochMilliseconds(1L))
 
         // Signature verifies (sigKey is correct), but AEAD fails because encKey is wrong.
         assertFailsWith<StatelessEnvelopeCodec.EnvelopeException> {
@@ -168,7 +170,7 @@ class StatelessEnvelopeCodecTest {
     fun `open fails for unsupported schema`() {
         val alice = makeIdentity()
         val bob = makeIdentity()
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = 1L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = Instant.fromEpochMilliseconds(1L))
 
         val tampered = envelope.copy(schema = 99)
 
@@ -181,7 +183,7 @@ class StatelessEnvelopeCodecTest {
     fun `open fails for invalid fragmentCount`() {
         val alice = makeIdentity()
         val bob = makeIdentity()
-        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = 1L)
+        val envelope = StatelessEnvelopeCodec.seal(alice, bob.nodeIdRaw, bob.encKeyPublic, "x".encodeToByteArray(), timestamp = Instant.fromEpochMilliseconds(1L))
 
         assertFailsWith<StatelessEnvelopeCodec.EnvelopeException> {
             StatelessEnvelopeCodec.open(envelope.copy(fragmentCount = 0), bob, contactLookupFor(alice))

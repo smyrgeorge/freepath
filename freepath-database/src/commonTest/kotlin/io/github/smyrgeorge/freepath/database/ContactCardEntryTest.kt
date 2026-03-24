@@ -39,7 +39,7 @@ class ContactCardEntryTest {
     ): ContactCardEntry {
         val actualCard = card ?: makeCard()
         return ContactCardEntry(
-            nodeId = actualCard.nodeId,
+            peerId = actualCard.peerId,
             card = actualCard,
             trustLevel = trustLevel,
             name = name,
@@ -160,7 +160,7 @@ class ContactCardEntryTest {
     }
 
     @Test
-    fun merge_throwsForDifferentNodeId() {
+    fun merge_throwsForDifferentPeerId() {
         val now = Clock.System.now()
         val card1 = makeCard(updatedAt = now)
         val card2 = makeCard(updatedAt = now + 1000.milliseconds)

@@ -31,9 +31,8 @@ kotlin {
             dependencies {
                 implementation(project(":freepath-crypto"))
                 implementation(project(":freepath-util"))
-                implementation(libs.kotlinx.serialization.json)
-                implementation(libs.kotlinx.serialization.protobuf)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.protobuf)
             }
         }
         commonTest {

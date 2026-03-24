@@ -29,7 +29,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
     }
 
     actual suspend fun start(
-        nodeId: String,
+        peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
     ) {
@@ -38,9 +38,9 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         val ctx = requireNotNull(AndroidContextHolder.applicationContext) {
             "LibP2pModule.applicationContext must be set before start() on Android"
         }
-        mdns = MdnsPeerDiscovery(nodeId, ctx)
+        mdns = MdnsPeerDiscovery(peerId, ctx)
         eventHandlers[handlerId] = ::dispatch
-        val handle = Libp2pJni.start(nodeId, sigKeyPrivate, listenAddrs, handlerId)
+        val handle = Libp2pJni.start(peerId, sigKeyPrivate, listenAddrs, handlerId)
         if (handle == 0L) {
             nodeHandle.set(0L)
             eventHandlers.remove(handlerId)
@@ -115,13 +115,13 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         scope.launch {
             m.start(
                 port = port,
-                onPeerDiscovered = { nodeId, address ->
+                onPeerDiscovered = { peerId, address ->
                     val multiaddr = lanAddressToMultiaddr(address) ?: return@start
                     scope.launch { dial(multiaddr) }
-                    dispatch(Libp2pEvent.MdnsPeerDiscovered(nodeId, address))
+                    dispatch(Libp2pEvent.MdnsPeerDiscovered(peerId, address))
                 },
-                onPeerRemoved = { nodeId ->
-                    dispatch(Libp2pEvent.MdnsPeerExpired(nodeId))
+                onPeerRemoved = { peerId ->
+                    dispatch(Libp2pEvent.MdnsPeerExpired(peerId))
                 },
             )
         }

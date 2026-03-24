@@ -1,16 +1,16 @@
 package io.github.smyrgeorge.freepath.state
 
 import io.github.smyrgeorge.freepath.content.ContentBody
-import io.github.smyrgeorge.freepath.content.ContentEnvelope
+import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.content.ContentType
 import io.github.smyrgeorge.freepath.content.ImageFormat
-import io.github.smyrgeorge.freepath.content.Visibility
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.util.generateCheckerboardPng
 import kotlin.io.encoding.Base64
 import kotlin.random.Random
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 object RandomContentGenerator {
     fun generateRandomContent(contacts: List<ContactCardEntry>): List<ContentEntry> {
@@ -21,27 +21,21 @@ object RandomContentGenerator {
                 ContentType.IMAGE to randomImageBody(),
             ).mapIndexed { i, (type, body) ->
                 val createdAt = now - ((i + 1) * 3_600_000L + Random.nextLong(0, 86_400_000L))
-                val contentId = "dev-${contact.nodeId.takeLast(6)}-$createdAt"
-                val envelope = ContentEnvelope(
+                val contentId = "dev-${contact.peerId.takeLast(6)}-$createdAt"
+                val envelope = Content(
                     id = contentId,
                     type = type,
-                    authorId = contact.nodeId,
-                    createdAt = createdAt,
-                    commentsEnabled = true,
+                    authorId = contact.peerId,
+                    createdAt = Instant.fromEpochMilliseconds(createdAt),
                     signature = "dev",
                     body = body,
                 )
                 ContentEntry(
                     contentId = contentId,
-                    rootId = contentId,
                     type = type,
-                    authorId = contact.nodeId,
+                    authorId = contact.peerId,
                     version = 1,
-                    contentCreatedAt = createdAt,
-                    commentsEnabled = true,
-                    visibility = Visibility.PUBLIC,
-                    hops = (1..5).random(),
-                    envelope = envelope,
+                    content = envelope,
                 )
             }
         }

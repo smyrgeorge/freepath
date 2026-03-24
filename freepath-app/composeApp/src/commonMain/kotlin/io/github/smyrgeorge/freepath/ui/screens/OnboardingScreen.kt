@@ -74,8 +74,8 @@ fun OnboardingScreen(
     onContinue: () -> Unit,
 ) {
     var showProfile by remember { mutableStateOf(false) }
-    val nodeId = AppState.identityEntry.nodeId
-    val profile = remember(nodeId) { RandomProfileGenerator.profileFor(nodeId) }
+    val peerId = AppState.identityEntry.peerId
+    val profile = remember(peerId) { RandomProfileGenerator.profileFor(peerId) }
     var avatar by remember { mutableStateOf<String?>(null) }
     var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var isLoading by remember { mutableStateOf(false) }
@@ -166,7 +166,7 @@ fun OnboardingScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
-                            FreepathFingerprint(text = AppState.identityEntry.nodeId)
+                            FreepathFingerprint(text = AppState.identityEntry.peerId)
                             Text(
                                 text = stringResource(Res.string.identity_description),
                                 style = MaterialTheme.typography.bodySmall,

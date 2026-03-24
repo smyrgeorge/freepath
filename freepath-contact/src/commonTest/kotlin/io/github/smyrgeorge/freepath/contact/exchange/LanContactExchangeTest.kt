@@ -14,8 +14,6 @@ import kotlin.time.Instant
 
 class LanContactExchangeTest {
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private fun makeCard(
         sigKp: KeyPair,
         encKp: KeyPair,
@@ -30,8 +28,6 @@ class LanContactExchangeTest {
             name = name,
         )
 
-    // ── method ────────────────────────────────────────────────────────────────
-
     @Test
     fun method_isLan() {
         assertEquals(ContactExchangeMethod.LAN, LanContactExchange.method)
@@ -41,8 +37,6 @@ class LanContactExchangeTest {
     fun method_isBidirectional() {
         assertTrue(LanContactExchange.method.isBidirectional)
     }
-
-    // ── encode then decode round-trip ─────────────────────────────────────────
 
     @Test
     fun encode_then_decode_roundTripsCorrectly() {
@@ -80,8 +74,6 @@ class LanContactExchangeTest {
         val signed = ContactCardSignedCodec.decode(encoded)
         assertEquals(card, signed.card)
     }
-
-    // ── decode rejects tampered card ──────────────────────────────────────────
 
     @Test
     fun decode_rejectsTamperedCard() {
@@ -128,14 +120,13 @@ class LanContactExchangeTest {
     @Test
     fun decode_rejectsWrongSchema() {
         val kp = CryptoProvider.generateEd25519KeyPair()
-        val kp2 = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
         val card = makeCard(kp, encKp)
 
         // Build a signed card with an unsupported schema value, re-signed to pass sig check
         // Note: ContactCard constructor validates schema, so we use a known-good card and
-        // manipulate the JSON directly — instead, sign a card with wrong nodeId derived
-        // from a second keypair to trigger the nodeId check. For schema, we encode raw JSON.
+        // manipulate the JSON directly — instead, sign a card with wrong peerId derived
+        // from a second keypair to trigger the peerId check. For schema, we encode raw JSON.
         val validEncoded = LanContactExchange.encode(card, kp.privateKey)
         val jsonStr = validEncoded.decodeToString()
         val tamperedJson = jsonStr.replace("\"schema\":1", "\"schema\":99")

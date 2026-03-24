@@ -23,10 +23,7 @@ data class ContactCard(
     /** Human-readable display name chosen by the owner. Max 64 chars. */
     @ProtoNumber(5) val name: String? = null,
 ) {
-    /** Base58-encoded Node ID derived locally from [sigKey]: Base58(SHA-256(sigKey)). Never transmitted. */
-    val nodeId: String by lazy {
-        ContactCardCodec.deriveNodeId(Base64.decode(sigKey))
-    }
+    val peerId: String by lazy { ContactCardCodec.derivePeerId(Base64.decode(sigKey)) }
 
     init {
         require(schema == SCHEMA) { "Unsupported schema version: $schema (expected $SCHEMA)" }
@@ -46,7 +43,7 @@ data class ContactCard(
     }
 
     override fun toString(): String {
-        return "ContactCard(name=$name, updatedAt=$updatedAt, nodeId='$nodeId', schema=$schema)"
+        return "ContactCard(name=$name, updatedAt=$updatedAt, peerId='$peerId', schema=$schema)"
     }
 
     companion object {

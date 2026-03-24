@@ -1,97 +1,47 @@
 package io.github.smyrgeorge.freepath.content
 
-import io.github.smyrgeorge.freepath.content.ContentCodec.verify
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.util.codec.Base58
-import io.github.smyrgeorge.freepath.util.codec.JsonCodec
+import io.github.smyrgeorge.freepath.util.codec.ProtobufCodec
+import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.io.encoding.Base64
-import kotlin.time.Clock
+import kotlin.time.Instant
 
+@OptIn(ExperimentalSerializationApi::class)
 object ContentCodec {
 
     const val SCHEMA = 1
 
-    // ── Canonical signable envelope (excludes hops and signature) ─────────────
-
-    // Fields excluded from signing: `hops` (incremented by carriers) and `signature` (the signature itself).
-    @Serializable
-    private data class Signable(
-        val id: String,
-        val schema: Int,
-        val type: ContentType,
-        val authorId: String,
-        val version: Int,
-        val prevId: String?,
-        val createdAt: Long,
-        val expiresAt: Long?,
-        val commentsEnabled: Boolean,
-        val visibility: Visibility,
-        val body: ContentBody,
-    )
-
-    private fun toSignable(envelope: ContentEnvelope): Signable = Signable(
-        id = envelope.id,
-        schema = envelope.schema,
-        type = envelope.type,
-        authorId = envelope.authorId,
-        version = envelope.version,
-        prevId = envelope.prevId,
-        createdAt = envelope.createdAt,
-        expiresAt = envelope.expiresAt,
-        commentsEnabled = envelope.commentsEnabled,
-        visibility = envelope.visibility,
-        body = envelope.body,
-    )
-
-    // ── ID derivation ─────────────────────────────────────────────────────────
-
-    /** Returns Base58( SHA-256( canonical body JSON ) ). Deterministic across devices. */
-    fun deriveId(body: ContentBody): String {
-        val bytes = JsonCodec.json.encodeToString(body).encodeToByteArray()
-        return Base58.encode(CryptoProvider.sha256(bytes))
-    }
-
-    // ── Signing ───────────────────────────────────────────────────────────────
-
-    /** Returns a 64-byte Ed25519 signature over the canonical envelope (hops and signature excluded). */
-    fun sign(envelope: ContentEnvelope, sigKeyPrivate: ByteArray): ByteArray {
-        val bytes = JsonCodec.json.encodeToString(toSignable(envelope)).encodeToByteArray()
+    fun sign(envelope: Content, sigKeyPrivate: ByteArray): ByteArray {
+        val bytes = ProtobufCodec.protobuf.encodeToByteArray(toSignable(envelope))
         return CryptoProvider.ed25519Sign(sigKeyPrivate, bytes)
     }
 
-    /** Returns true if the envelope signature is valid for the given public key. */
-    fun verify(envelope: ContentEnvelope, sigKeyPublic: ByteArray): Boolean {
+    fun verify(envelope: Content, sigKeyPublic: ByteArray): Boolean {
         val signatureBytes = Base64.decode(envelope.signature)
-        val bytes = JsonCodec.json.encodeToString(toSignable(envelope)).encodeToByteArray()
+        val bytes = ProtobufCodec.protobuf.encodeToByteArray(toSignable(envelope))
         return CryptoProvider.ed25519Verify(sigKeyPublic, bytes, signatureBytes)
     }
-
-    // ── seal / edit ───────────────────────────────────────────────────────────
 
     fun seal(
         body: ContentBody,
         authorId: String,
         sigKeyPrivate: ByteArray,
-        commentsEnabled: Boolean,
-        visibility: Visibility = Visibility.PUBLIC,
-        expiresAt: Long? = null,
-    ): ContentEnvelope {
+        expiresAt: Instant? = null,
+    ): Content {
         val type = typeOf(body)
-        val id = deriveId(body)
-        val createdAt = Clock.System.now().toEpochMilliseconds()
-        val placeholder = ContentEnvelope(
+        val id = ContentBodyCodec.deriveId(body)
+        val placeholder = Content(
             id = id,
             schema = SCHEMA,
             type = type,
             authorId = authorId,
             version = 1,
-            prevId = null,
-            createdAt = createdAt,
             expiresAt = expiresAt,
-            commentsEnabled = commentsEnabled,
-            visibility = visibility,
-            hops = 0,
             signature = "",
             body = body,
         )
@@ -101,31 +51,25 @@ object ContentCodec {
 
     /**
      * Creates a new, signed version of [original] with [newBody].
-     * Increments [ContentEnvelope.version], sets [ContentEnvelope.prevId], preserves [ContentEnvelope.createdAt].
-     * [commentsEnabled] must be passed explicitly — it may change between versions.
+     * Increments [Content.version], preserves [Content.createdAt].
      * [expiresAt] defaults to carrying forward the original value.
      */
     fun edit(
-        original: ContentEnvelope,
+        original: Content,
         newBody: ContentBody,
         sigKeyPrivate: ByteArray,
-        commentsEnabled: Boolean,
-        expiresAt: Long? = original.expiresAt,
-    ): ContentEnvelope {
+        expiresAt: Instant? = original.expiresAt,
+    ): Content {
         val type = typeOf(newBody)
-        val id = deriveId(newBody)
-        val placeholder = ContentEnvelope(
+        val id = ContentBodyCodec.deriveId(newBody)
+        val placeholder = Content(
             id = id,
             schema = original.schema,
             type = type,
             authorId = original.authorId,
             version = original.version + 1,
-            prevId = original.id,
             createdAt = original.createdAt,
             expiresAt = expiresAt,
-            commentsEnabled = commentsEnabled,
-            visibility = original.visibility,
-            hops = 0,
             signature = "",
             body = newBody,
         )
@@ -133,26 +77,37 @@ object ContentCodec {
         return placeholder.copy(signature = signature)
     }
 
-    // ── JSON encode/decode ────────────────────────────────────────────────────
-
-    /** Encodes [envelope] to UTF-8 JSON bytes. */
-    fun encode(envelope: ContentEnvelope): ByteArray =
-        JsonCodec.json.encodeToString(envelope).encodeToByteArray()
-
-    /**
-     * Decodes a [ContentEnvelope] from UTF-8 JSON bytes.
-     * Returns [Result.failure] on parse error.
-     * Signature verification is NOT performed here — call [verify] separately with the author's public key.
-     */
-    fun decode(data: ByteArray): Result<ContentEnvelope> = runCatching {
-        JsonCodec.json.decodeFromString<ContentEnvelope>(data.decodeToString())
+    fun encode(envelope: Content): ByteArray = ProtobufCodec.protobuf.encodeToByteArray(envelope)
+    fun decode(data: ByteArray): Result<Content> = runCatching {
+        ProtobufCodec.protobuf.decodeFromByteArray<Content>(data)
     }
-
-    // ── helpers ───────────────────────────────────────────────────────────────
 
     private fun typeOf(body: ContentBody): ContentType = when (body) {
         is ContentBody.Article -> ContentType.ARTICLE
         is ContentBody.Image -> ContentType.IMAGE
         is ContentBody.Contact -> ContentType.CONTACT
     }
+
+    private fun toSignable(envelope: Content): Signable = Signable(
+        id = envelope.id,
+        schema = envelope.schema,
+        type = envelope.type,
+        authorId = envelope.authorId,
+        version = envelope.version,
+        createdAt = envelope.createdAt,
+        expiresAt = envelope.expiresAt,
+        body = envelope.body,
+    )
+
+    @Serializable
+    private data class Signable(
+        @ProtoNumber(1) val id: String,
+        @ProtoNumber(2) val schema: Int,
+        @ProtoNumber(3) val type: ContentType,
+        @ProtoNumber(4) val authorId: String,
+        @ProtoNumber(5) val version: Int,
+        @ProtoNumber(6) @Serializable(with = InstantSerializer::class) val createdAt: Instant,
+        @ProtoNumber(7) @Serializable(with = InstantSerializer::class) val expiresAt: Instant?,
+        @ProtoNumber(8) val body: ContentBody,
+    )
 }

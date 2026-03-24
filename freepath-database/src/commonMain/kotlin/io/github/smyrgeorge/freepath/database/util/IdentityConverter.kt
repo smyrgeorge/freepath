@@ -8,7 +8,7 @@ import kotlin.io.encoding.Base64
 object IdentityConverter : ValueEncoder<Identity> {
     override fun encode(value: Identity): String {
         return listOf(
-            Base64.encode(value.nodeIdRaw),
+            Base64.encode(value.peerIdRaw),
             Base64.encode(value.sigKeyPublic),
             Base64.encode(value.sigKeyPrivate),
             Base64.encode(value.encKeyPublic),
@@ -21,7 +21,7 @@ object IdentityConverter : ValueEncoder<Identity> {
         require(parts.size == 5) { "Invalid Identity format: expected 5 parts, got ${parts.size}" }
 
         return Identity(
-            nodeIdRaw = Base64.decode(parts[0]),
+            peerIdRaw = Base64.decode(parts[0]),
             sigKeyPublic = Base64.decode(parts[1]),
             sigKeyPrivate = Base64.decode(parts[2]),
             encKeyPublic = Base64.decode(parts[3]),

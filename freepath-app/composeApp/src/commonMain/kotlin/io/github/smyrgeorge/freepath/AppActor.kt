@@ -37,7 +37,7 @@ class AppActor(
             state.initialize()
             resources.initializeAppClient(state = state)
             resources.startLibp2p(
-                nodeId = state.contactCard.nodeId,
+                peerId = state.contactCard.peerId,
                 sigKeyPrivate = state.identity.sigKeyPrivate,
                 identityEntry = state.identityEntry,
                 contactLookup = { state.contactLookup(it) },
@@ -101,7 +101,7 @@ class AppActor(
                 }
 
                 is Protocol.SendChatMessage -> {
-                    val message = ChatMessage(state.identityEntry.nodeId, m.peerId, m.text)
+                    val message = ChatMessage(state.identityEntry.peerId, m.peerId, m.text)
                     resources.client.send(message)
                         .onSuccess { state.appendMessage(message) }
                         .onFailure { log.error("Failed to send chat message: ${it.message}") }

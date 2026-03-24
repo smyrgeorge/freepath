@@ -14,8 +14,6 @@ import kotlin.time.Instant
 
 class QrCodeContactExchangeTest {
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private fun makeCard(
         sigKp: KeyPair,
         encKp: KeyPair,
@@ -34,8 +32,6 @@ class QrCodeContactExchangeTest {
         card: ContactCard,
         sigKeyPrivate: ByteArray,
     ): String = QrCodeContactExchange.encode(card, sigKeyPrivate).decodeToString()
-
-    // ── encode ─────────────────────────────────────────────────────────────────
 
     @Test
     fun encode_producesValidPrefix() {
@@ -87,8 +83,6 @@ class QrCodeContactExchangeTest {
         assertEquals(card.name, decodedCard.name)
     }
 
-    // ── decode success ────────────────────────────────────────────────────────
-
     @Test
     fun decode_roundTrip() {
         val kp = CryptoProvider.generateEd25519KeyPair()
@@ -111,8 +105,6 @@ class QrCodeContactExchangeTest {
         val decodedCard = QrCodeContactExchange.decode(qrCode).getOrThrow()
         assertEquals("Bob", decodedCard.name)
     }
-
-    // ── decode failure: invalid format ────────────────────────────────────────
 
     @Test
     fun decode_failsForWrongPrefix() {
@@ -155,8 +147,6 @@ class QrCodeContactExchangeTest {
         assertEquals(result.exceptionOrNull()?.message?.contains("Failed to parse"), true)
     }
 
-    // ── decode failure: signature verification ────────────────────────────────
-
     @Test
     fun decode_failsForInvalidSignature() {
         val kp = CryptoProvider.generateEd25519KeyPair()
@@ -197,8 +187,6 @@ class QrCodeContactExchangeTest {
         assertEquals(result.exceptionOrNull()?.message?.contains("Invalid card signature"), true)
     }
 
-    // ── decodeRaw ─────────────────────────────────────────────────────────────
-
     @Test
     fun decodeRaw_returnsNullForInvalidPrefix() {
         val result = QrCodeContactExchange.decodeRaw("invalid://contact/v1/abc")
@@ -222,8 +210,6 @@ class QrCodeContactExchangeTest {
 
         assertEquals(card, result?.card)
     }
-
-    // ── estimateQrCodeLength ──────────────────────────────────────────────────
 
     @Test
     fun estimateQrCodeLength_returnsPositiveValue() {

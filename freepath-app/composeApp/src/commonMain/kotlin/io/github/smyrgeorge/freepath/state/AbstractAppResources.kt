@@ -89,15 +89,15 @@ abstract class AbstractAppResources(
     }
 
     suspend fun startLibp2p(
-        nodeId: String,
+        peerId: String,
         sigKeyPrivate: ByteArray,
         identityEntry: IdentityEntry,
         contactLookup: (ByteArray) -> ContactInfo?,
     ) {
-        this.identity = identityEntry.data
+        this.identity = identityEntry.identity
         this.identityEntry = identityEntry
         this.contactLookup = contactLookup
-        libp2p.start(nodeId = nodeId, sigKeyPrivate = sigKeyPrivate)
+        libp2p.start(peerId = peerId, sigKeyPrivate = sigKeyPrivate)
     }
 
     suspend fun stopLibp2p() {

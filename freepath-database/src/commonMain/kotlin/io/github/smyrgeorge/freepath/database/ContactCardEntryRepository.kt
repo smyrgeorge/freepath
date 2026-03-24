@@ -10,8 +10,8 @@ interface ContactCardEntryRepository : AuditableRepository<ContactCardEntry> {
     @Query("SELECT * FROM contact")
     suspend fun findAll(context: QueryExecutor): Result<List<ContactCardEntry>>
 
-    @Query("SELECT * FROM contact WHERE node_id = :nodeId")
-    suspend fun findOneByNodeId(context: QueryExecutor, nodeId: String): Result<ContactCardEntry?>
+    @Query("SELECT * FROM contact WHERE peer_id = :peerId")
+    suspend fun findOneByPeerId(context: QueryExecutor, peerId: String): Result<ContactCardEntry?>
 
     @Query("DELETE FROM contact")
     suspend fun deleteAll(context: QueryExecutor): Result<Long>

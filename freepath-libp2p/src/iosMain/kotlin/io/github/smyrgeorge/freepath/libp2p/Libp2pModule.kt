@@ -54,18 +54,18 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
     }
 
     actual suspend fun start(
-        nodeId: String,
+        peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
     ) {
         mutex.withLock {
             if (nodePtr != null) return
-            mdns = MdnsPeerDiscovery(nodeId)
+            mdns = MdnsPeerDiscovery(peerId)
             dispatcherRef.value = ::dispatch
             val ref = StableRef.create(dispatcherRef)
             val ptr = sigKeyPrivate.usePinned { pinned ->
                 libp2p_start(
-                    node_id = nodeId,
+                    node_id = peerId,
                     sig_key_private = pinned.addressOf(0).reinterpret(),
                     sig_key_len = sigKeyPrivate.size.convert(),
                     listen_addr = listenAddrs,
@@ -167,13 +167,13 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         scope.launch {
             m.start(
                 port = port,
-                onPeerDiscovered = { nodeId, address ->
+                onPeerDiscovered = { peerId, address ->
                     val multiaddr = lanAddressToMultiaddr(address) ?: return@start
                     scope.launch { dial(multiaddr) }
-                    dispatch(Libp2pEvent.MdnsPeerDiscovered(nodeId, address))
+                    dispatch(Libp2pEvent.MdnsPeerDiscovered(peerId, address))
                 },
-                onPeerRemoved = { nodeId ->
-                    dispatch(Libp2pEvent.MdnsPeerExpired(nodeId))
+                onPeerRemoved = { peerId ->
+                    dispatch(Libp2pEvent.MdnsPeerExpired(peerId))
                 },
             )
         }

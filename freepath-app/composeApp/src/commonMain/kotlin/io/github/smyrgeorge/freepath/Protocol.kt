@@ -4,7 +4,7 @@ import io.github.smyrgeorge.actor4k.actor.ActorProtocol
 import io.github.smyrgeorge.freepath.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.TrustLevel
-import io.github.smyrgeorge.freepath.content.ContentEnvelope
+import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
 
 sealed interface Protocol : ActorProtocol {
@@ -48,7 +48,7 @@ sealed interface Protocol : ActorProtocol {
     ) : Message<Ok>()
 
     // Content
-    data class ContentReceived(val envelope: ContentEnvelope) : Message<Ok>()
+    data class ContentReceived(val envelope: Content) : Message<Ok>()
 
     // Network events
     data class PeerIdentified(val peerId: String) : Message<Ok>()

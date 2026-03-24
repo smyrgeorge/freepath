@@ -13,10 +13,10 @@ interface ContentEntryRepository : AuditableRepository<ContentEntry> {
     suspend fun findOneByContentId(context: QueryExecutor, contentId: String): Result<ContentEntry?>
 
     /**
-     * Main feed: top-level content (excludes COMMENT, REACTION, and CONTACT), latest versions only, most recent first.
+     * Main feed: top-level content (excludes COMMENT, REACTION, and CONTACT), most recent first.
      * Visibility filtering (e.g. hiding PRIVATE items from other authors) is the caller's responsibility.
      */
-    @Query("SELECT * FROM content WHERE type NOT IN ('COMMENT','REACTION','CONTACT') AND is_latest = 1 ORDER BY content_created_at DESC LIMIT :limit OFFSET :offset")
+    @Query("SELECT * FROM content WHERE type NOT IN ('COMMENT','REACTION','CONTACT') ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     suspend fun findAllByTopLevel(context: QueryExecutor, limit: Int, offset: Int): Result<List<ContentEntry>>
 
     /** Hard-delete all content entries. */

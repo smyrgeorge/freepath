@@ -97,19 +97,19 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun MeScreen(modifier: Modifier = Modifier) {
     val card = AppState.contactCard
-    val nodeId = card.nodeId
+    val peerId = card.peerId
 
     val displayName = remember(card) {
         card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") } ?: "you"
     }
     val avatarLabel = remember(card) {
         val name = card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
-        (name?.firstOrNull()?.uppercaseChar() ?: nodeId.first().uppercaseChar()).toString()
+        (name?.firstOrNull()?.uppercaseChar() ?: peerId.first().uppercaseChar()).toString()
     }
     var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var isRefreshingAvatar by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(nodeId) {
+    LaunchedEffect(peerId) {
         val stored = AppState.contactCardContent.avatar
         if (stored != null) {
             avatarBitmap = runCatching { Base64.decode(stored).toImageBitmap() }.getOrNull()
@@ -157,7 +157,7 @@ fun MeScreen(modifier: Modifier = Modifier) {
                     isRefreshingAvatar = isRefreshingAvatar,
                     onRefreshAvatar = onRefreshAvatar,
                     displayName = displayName,
-                    nodeId = nodeId,
+                    peerId = peerId,
                     qrData = qrData,
                 )
             }
@@ -173,7 +173,7 @@ private fun DeveloperSection() {
     val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(text = stringResource(Res.string.dev_section_title))
-        Libp2pMetricsPanel(metrics = libp2pMetrics, selfNodeId = AppState.contactCard.nodeId)
+        Libp2pMetricsPanel(metrics = libp2pMetrics, selfPeerId = AppState.contactCard.peerId)
         LibbleMetricsPanel(metrics = libbleMetrics)
         FreepathButton(
             onClick = { scope.launch { AppState.generateRandomContent() } },
@@ -280,7 +280,7 @@ private fun LibbleMetricsPanel(metrics: LibbleMetricsSnapshot) {
 }
 
 @Composable
-private fun Libp2pMetricsPanel(metrics: Libp2pMetricsSnapshot, selfNodeId: String) {
+private fun Libp2pMetricsPanel(metrics: Libp2pMetricsSnapshot, selfPeerId: String) {
     val none = stringResource(Res.string.dev_libp2p_none)
     Column(
         modifier = Modifier
@@ -316,9 +316,9 @@ private fun Libp2pMetricsPanel(metrics: Libp2pMetricsSnapshot, selfNodeId: Strin
         MetricRow(
             label = stringResource(Res.string.dev_libp2p_mdns_peers),
             value = metrics.mdnsPeers.takeIf { it.isNotEmpty() }
-                ?.entries?.joinToString("\n") { (nodeId, addr) ->
-                    val suffix = if (nodeId == selfNodeId) " (self)" else ""
-                    "${nodeId.abbrev()} @ $addr$suffix"
+                ?.entries?.joinToString("\n") { (peerId, addr) ->
+                    val suffix = if (peerId == selfPeerId) " (self)" else ""
+                    "${peerId.abbrev()} @ $addr$suffix"
                 } ?: none,
         )
     }
@@ -349,7 +349,7 @@ private fun IdentityCard(
     isRefreshingAvatar: Boolean,
     onRefreshAvatar: () -> Unit,
     displayName: String,
-    nodeId: String,
+    peerId: String,
     qrData: String,
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -419,7 +419,7 @@ private fun IdentityCard(
             color = MaterialTheme.colorScheme.onSurface,
         )
 
-        FreepathFingerprint(text = nodeId)
+        FreepathFingerprint(text = peerId)
 
         Spacer(modifier = Modifier.height(4.dp))
 

@@ -48,7 +48,7 @@ import kotlin.io.encoding.Base64
 // ── Pure helpers (testable without Compose) ───────────────────────────────────
 
 fun trustLabel(contacts: List<ContactCardEntry>, authorId: String): String =
-    when (contacts.firstOrNull { it.nodeId == authorId }?.trustLevel) {
+    when (contacts.firstOrNull { it.peerId == authorId }?.trustLevel) {
         TrustLevel.TRUSTED -> "Trusted"
         TrustLevel.KNOWN -> "Known"
         TrustLevel.BLOCKED -> "Blocked"
@@ -139,7 +139,7 @@ private fun FeedPostCard(
     contactContents: Map<String, ContentBody.Contact>,
     onClick: () -> Unit,
 ) {
-    val contact = contacts.firstOrNull { it.nodeId == entry.authorId }
+    val contact = contacts.firstOrNull { it.peerId == entry.authorId }
     val displayName = contact?.let { c ->
         c.name?.takeIf { it.isNotBlank() }
             ?: c.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
@@ -169,7 +169,7 @@ private fun FeedPostCard(
         ) {
             FreepathAvatar(
                 label = avatarLabel,
-                avatar = contactContents[contact?.nodeId]?.avatar,
+                avatar = contactContents[contact?.peerId]?.avatar,
                 size = AvatarSize.Small,
             )
             Column {
@@ -180,7 +180,7 @@ private fun FeedPostCard(
                     color = onSurface,
                 )
                 Text(
-                    text = formatRelativeTime(entry.contentCreatedAt),
+                    text = formatRelativeTime(entry.content.createdAt.toEpochMilliseconds()),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -188,7 +188,7 @@ private fun FeedPostCard(
         }
 
         // Content preview
-        val body = entry.envelope.body
+        val body = entry.content.body
         if (body is ContentBody.Image) {
             FeedImagePreview(body)
         } else {

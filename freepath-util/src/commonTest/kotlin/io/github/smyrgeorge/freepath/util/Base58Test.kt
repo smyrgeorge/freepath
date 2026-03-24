@@ -113,12 +113,12 @@ class Base58Test {
 
     @Test
     fun `round-trip 16-byte node ID`() {
-        val nodeId = byteArrayOf(
+        val peerId = byteArrayOf(
             0x12, 0x34, 0x56, 0x78, 0x9A.toByte(), 0xBC.toByte(),
             0xDE.toByte(), 0xF0.toByte(), 0x11, 0x22, 0x33, 0x44,
             0x55, 0x66, 0x77, 0x88.toByte()
         )
-        assertContentEquals(nodeId, Base58.decode(Base58.encode(nodeId)))
+        assertContentEquals(peerId, Base58.decode(Base58.encode(peerId)))
     }
 
     @Test

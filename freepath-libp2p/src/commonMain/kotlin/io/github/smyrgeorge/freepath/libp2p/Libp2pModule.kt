@@ -23,14 +23,14 @@ expect class Libp2pModule() : AbstractLibp2pModule {
 
     /**
      * Start the libp2p node. Idempotent — subsequent calls are no-ops.
-     * @param nodeId freepath nodeId (Base58 string) — from `AbstractAppState.contactCard.nodeId`.
+     * @param peerId freepath nodeId (Base58 string) — from `AbstractAppState.contactCard.nodeId`.
      * @param sigKeyPrivate 32-byte Ed25519 private key seed — from `AbstractAppState.identity.sigKeyPrivate`.
      * @param listenAddrs Newline-separated Multiaddr strings; each address is passed to listen_on.
      *   Defaults to TCP on any available port for both IPv4 and IPv6.
      * @throws Libp2pException if startup fails.
      */
     suspend fun start(
-        nodeId: String,
+        peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String = defaultListenAddrs,
     )

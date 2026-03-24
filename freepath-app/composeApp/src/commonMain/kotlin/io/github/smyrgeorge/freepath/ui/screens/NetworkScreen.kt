@@ -145,10 +145,10 @@ fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactCardEn
                         "${stringResource(Res.string.network_section_trusted)} (${trusted.size})"
                     )
                 }
-                items(trusted, key = { it.nodeId }) { entry ->
+                items(trusted, key = { it.peerId }) { entry ->
                     ContactRow(
                         entry,
-                        contactContents[entry.nodeId],
+                        contactContents[entry.peerId],
                         onContactClick = onContactClick
                     )
                 }
@@ -161,10 +161,10 @@ fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactCardEn
                         "${stringResource(Res.string.network_section_known)} (${known.size})"
                     )
                 }
-                items(known, key = { it.nodeId }) { entry ->
+                items(known, key = { it.peerId }) { entry ->
                     ContactRow(
                         entry,
-                        contactContents[entry.nodeId],
+                        contactContents[entry.peerId],
                         onContactClick = onContactClick
                     )
                 }
@@ -177,10 +177,10 @@ fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactCardEn
                         "${stringResource(Res.string.network_section_blocked)} (${blocked.size})"
                     )
                 }
-                items(blocked, key = { it.nodeId }) { entry ->
+                items(blocked, key = { it.peerId }) { entry ->
                     ContactRow(
                         entry,
-                        contactContents[entry.nodeId],
+                        contactContents[entry.peerId],
                         grayed = true
                     )
                 }
@@ -263,7 +263,7 @@ private fun ContactRow(
 
     val localName = entry.name?.takeIf { it.isNotBlank() }
     val cardName = entry.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
-    val displayName = localName ?: cardName ?: entry.nodeId.take(12)
+    val displayName = localName ?: cardName ?: entry.peerId.take(12)
     val avatarLabel = if (grayed) "✕" else displayName.first().uppercaseChar().toString()
 
     Row(
@@ -725,7 +725,7 @@ private fun ContactDrawer(
     val onSurface = MaterialTheme.colorScheme.onSurface
 
     val displayName = card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
-        ?: card.nodeId.take(8)
+        ?: card.peerId.take(8)
     val avatarLabel = displayName.first().uppercaseChar().toString()
 
     Column(
@@ -797,7 +797,7 @@ private fun ContactDrawer(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(4.dp))
-        FreepathFingerprint(text = card.nodeId)
+        FreepathFingerprint(text = card.peerId)
 
 
         Spacer(modifier = Modifier.height(24.dp))

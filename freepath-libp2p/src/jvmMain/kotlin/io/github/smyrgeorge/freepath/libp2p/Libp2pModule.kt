@@ -29,15 +29,15 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
     }
 
     actual suspend fun start(
-        nodeId: String,
+        peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
     ) {
         if (!nodeHandle.compareAndSet(0L, STARTING)) return
         ensureNativeLoaded()
-        mdns = MdnsPeerDiscovery(nodeId)
+        mdns = MdnsPeerDiscovery(peerId)
         eventHandlers[handlerId] = ::dispatch
-        val handle = Libp2pJni.start(nodeId, sigKeyPrivate, listenAddrs, handlerId)
+        val handle = Libp2pJni.start(peerId, sigKeyPrivate, listenAddrs, handlerId)
         if (handle == 0L) {
             nodeHandle.set(0L)
             eventHandlers.remove(handlerId)

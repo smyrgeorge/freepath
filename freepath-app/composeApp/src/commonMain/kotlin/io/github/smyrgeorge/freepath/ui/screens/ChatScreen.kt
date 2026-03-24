@@ -67,15 +67,15 @@ fun ChatScreen(
     val focusManager = LocalFocusManager.current
     val nearbyPeers by AppState.connectedKnownPeers.collectAsState()
     val chats by AppState.chats.collectAsState()
-    val messages = chats[contact.nodeId] ?: emptyList()
+    val messages = chats[contact.peerId] ?: emptyList()
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
 
     val localName = contact.name?.takeIf { it.isNotBlank() }
     val cardName = contact.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
-    val displayName = localName ?: cardName ?: contact.nodeId.take(12)
+    val displayName = localName ?: cardName ?: contact.peerId.take(12)
 
-    val isOnline = contact.nodeId in nearbyPeers
+    val isOnline = contact.peerId in nearbyPeers
 
     // Scroll to bottom whenever messages change
     LaunchedEffect(messages.size) {
@@ -87,7 +87,7 @@ fun ChatScreen(
         if (text.isBlank()) return
         inputText = ""
         scope.launch {
-            AppResources.system.tell(Protocol.SendChatMessage(contact.nodeId, text))
+            AppResources.system.tell(Protocol.SendChatMessage(contact.peerId, text))
         }
     }
 
@@ -118,7 +118,7 @@ fun ChatScreen(
             },
             content = {
                 Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    FreepathFingerprint(text = contact.nodeId)
+                    FreepathFingerprint(text = contact.peerId)
                 }
             },
         )
@@ -139,7 +139,7 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(messages) { msg ->
-                    ChatBubble(text = msg.text, fromMe = msg.senderId == AppState.contactCard.nodeId)
+                    ChatBubble(text = msg.text, fromMe = msg.senderId == AppState.contactCard.peerId)
                 }
             }
         }

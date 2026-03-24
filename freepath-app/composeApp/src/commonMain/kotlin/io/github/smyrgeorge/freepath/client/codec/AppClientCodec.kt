@@ -27,7 +27,7 @@ object AppClientCodec {
             receiverIdRaw = receiverIdRaw,
             receiverEncKeyPublic = receiverEncKeyPublic,
             plaintext = plaintext,
-            timestamp = Clock.System.now().toEpochMilliseconds(),
+            timestamp = Clock.System.now(),
         )
         val envelopeBytes = StatelessEnvelopeCodec.encode(envelope)
         return byteArrayOf(VERSION, type, 0, 0) + envelopeBytes

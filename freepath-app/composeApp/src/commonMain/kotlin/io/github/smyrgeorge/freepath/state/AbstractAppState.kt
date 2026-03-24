@@ -6,10 +6,9 @@ import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.contact.TrustLevel
+import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.content.ContentBody
-import io.github.smyrgeorge.freepath.content.ContentEnvelope
 import io.github.smyrgeorge.freepath.content.ContentType
-import io.github.smyrgeorge.freepath.content.Visibility
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
@@ -55,14 +54,14 @@ abstract class AbstractAppState(
     val nearbyPeers: StateFlow<Map<String, ConnectionSource>> =
         resources.libp2p.metrics.value.map {
             it.mdnsPeers
-                .filterKeys { peerId -> peerId != identityEntry.nodeId }
+                .filterKeys { peerId -> peerId != identityEntry.peerId }
                 .mapValues { ConnectionSource.LAN }
         }.stateIn(emptyMap())
 
     val connectedKnownPeers: StateFlow<Map<String, ConnectionSource>> =
         resources.libp2p.metrics.value.map {
             it.identifiedPeers
-                .filter { peerId -> peerId != identityEntry.nodeId }
+                .filter { peerId -> peerId != identityEntry.peerId }
                 .associateWith { ConnectionSource.LAN }
         }.stateIn(emptyMap())
 
@@ -71,7 +70,7 @@ abstract class AbstractAppState(
     lateinit var contactCard: ContactCard
     lateinit var contactCardEntry: ContactCardEntry
     lateinit var contactCardContent: ContentBody.Contact
-    lateinit var contactCardContentEnvelope: ContentEnvelope
+    lateinit var contactCardContentEnvelope: Content
     lateinit var contactCardContentEntry: ContentEntry
 
     // Contact exchange state — only valid during an active exchange
@@ -87,12 +86,12 @@ abstract class AbstractAppState(
     }
 
     suspend fun acceptContact(card: ContactCard) {
-        val existing = contactCardRepository.findOneByNodeId(db, card.nodeId).getOrThrow()
+        val existing = contactCardRepository.findOneByPeerId(db, card.peerId).getOrThrow()
         if (existing == null) {
-            val entry = ContactCardEntry(nodeId = card.nodeId, card = card)
+            val entry = ContactCardEntry(peerId = card.peerId, card = card)
             contactCardRepository.insert(db, entry).getOrThrow()
         } else {
-            val entry = existing.merge(ContactCardEntry(nodeId = card.nodeId, card = card))
+            val entry = existing.merge(ContactCardEntry(peerId = card.peerId, card = card))
             contactCardRepository.update(db, entry).getOrThrow()
         }
         loadContacts()
@@ -105,13 +104,13 @@ abstract class AbstractAppState(
     }
 
     suspend fun loadContacts() {
-        val ownNodeId = contactCardEntry.nodeId
-        val list = contactCardRepository.findAll(db).getOrThrow().filter { it.nodeId != ownNodeId }
+        val ownPeerId = contactCardEntry.peerId
+        val list = contactCardRepository.findAll(db).getOrThrow().filter { it.peerId != ownPeerId }
         _contacts.value = list
         _contactContents.value = list.mapNotNull { entry ->
-            val body = contentEntryRepository.findOneByContentId(db, entry.nodeId).getOrNull()
-                ?.envelope?.body as? ContentBody.Contact ?: return@mapNotNull null
-            entry.nodeId to body
+            val body = contentEntryRepository.findOneByContentId(db, entry.peerId).getOrNull()
+                ?.content?.body as? ContentBody.Contact ?: return@mapNotNull null
+            entry.peerId to body
         }.toMap()
     }
 
@@ -152,33 +151,26 @@ abstract class AbstractAppState(
         contactCardEntry = contactCardRepository.update(db, updatedEntry).getOrThrow()
         contactCard = contactCardEntry.card
 
-        val nodeId = identityEntry.nodeId
-        val now = Clock.System.now().toEpochMilliseconds()
+        val peerId = identityEntry.peerId
         val body = ContentBody.Contact(
             bio = bio?.takeIf { it.isNotBlank() },
             avatar = avatar?.takeIf { it.length <= ContentBody.Contact.MAX_AVATAR_SIZE },
             location = location?.takeIf { it.isNotBlank() },
         )
-        val envelope = ContentEnvelope(
-            id = nodeId,
+        val envelope = Content(
+            id = peerId,
             type = ContentType.CONTACT,
-            authorId = nodeId,
-            createdAt = now,
-            commentsEnabled = false,
-            visibility = Visibility.PUBLIC,
+            authorId = peerId,
+            createdAt = Clock.System.now(),
             signature = "self",
             body = body,
         )
         val entry = ContentEntry(
-            contentId = nodeId,
-            rootId = nodeId,
+            contentId = peerId,
             type = ContentType.CONTACT,
-            authorId = nodeId,
+            authorId = peerId,
             version = 1,
-            contentCreatedAt = now,
-            commentsEnabled = false,
-            visibility = Visibility.PUBLIC,
-            envelope = envelope,
+            content = envelope,
         )
         contactCardContentEntry = contentEntryRepository.insert(db, entry).getOrThrow()
         contactCardContentEnvelope = envelope
@@ -187,9 +179,9 @@ abstract class AbstractAppState(
 
     fun appendMessage(message: ChatMessage) {
         // The chat map is keyed by the remote peer's node ID so the UI can look up
-        // messages with chats[contact.nodeId]. Use whichever side is not us.
+        // messages with chats[contact.peerId]. Use whichever side is not us.
         val conversationKey =
-            if (message.senderId == contactCard.nodeId) message.receiverId
+            if (message.senderId == contactCard.peerId) message.receiverId
             else message.senderId
         _chats.update { current ->
             current + (conversationKey to (current[conversationKey] ?: emptyList()) + message)
@@ -249,21 +241,21 @@ abstract class AbstractAppState(
         val existing = identityRepository.findAll(db).getOrThrow()
         require(existing.size <= 1) { "Expected at most one identity entry, got $existing" }
         val entry = existing.firstOrNull() ?: createAndSaveIdentity()
-        identity = entry.data
+        identity = entry.identity
         identityEntry = entry
     }
 
     suspend fun updateAvatar(avatar: String?) {
         val updatedBody = contactCardContent.copy(avatar = avatar)
-        val updatedEnvelope = contactCardContentEntry.envelope.copy(body = updatedBody)
-        val updatedEntry = contactCardContentEntry.copy(envelope = updatedEnvelope)
+        val updatedEnvelope = contactCardContentEntry.content.copy(body = updatedBody)
+        val updatedEntry = contactCardContentEntry.copy(content = updatedEnvelope)
         contactCardContentEntry = contentEntryRepository.update(db, updatedEntry).getOrThrow()
         contactCardContentEnvelope = updatedEnvelope
         contactCardContent = updatedBody
     }
 
-    suspend fun receiveContent(envelope: ContentEnvelope) {
-        // Contact content is keyed by authorId (nodeId) in the DB, all other content by envelope.id.
+    suspend fun receiveContent(envelope: Content) {
+        // Contact content is keyed by authorId (peerId) in the DB, all other content by envelope.id.
         val isContact = envelope.type == ContentType.CONTACT
         val contentId = if (isContact) envelope.authorId else envelope.id
 
@@ -275,18 +267,10 @@ abstract class AbstractAppState(
         ContentEntry(
             id = existing?.id ?: 0,
             contentId = contentId,
-            rootId = contentId,
-            prevId = envelope.prevId,
             type = envelope.type,
             authorId = envelope.authorId,
             version = envelope.version,
-            isLatest = true,
-            contentCreatedAt = envelope.createdAt,
-            expiresAt = envelope.expiresAt,
-            commentsEnabled = envelope.commentsEnabled,
-            visibility = envelope.visibility,
-            hops = envelope.hops,
-            envelope = envelope,
+            content = envelope,
         ).also {
             contentEntryRepository.save(db, it).getOrThrow()
         }
@@ -295,16 +279,16 @@ abstract class AbstractAppState(
     }
 
     private suspend fun loadOwnContactContent() {
-        val entry = contentEntryRepository.findOneByContentId(db, identityEntry.nodeId).getOrThrow() ?: return
-        val body = entry.envelope.body as? ContentBody.Contact ?: return
+        val entry = contentEntryRepository.findOneByContentId(db, identityEntry.peerId).getOrThrow() ?: return
+        val body = entry.content.body as? ContentBody.Contact ?: return
         contactCardContent = body
-        contactCardContentEnvelope = entry.envelope
+        contactCardContentEnvelope = entry.content
         contactCardContentEntry = entry
     }
 
     private suspend fun loadOwnContactCard() {
-        val nodeId = identityEntry.nodeId
-        val existing = contactCardRepository.findOneByNodeId(db, nodeId).getOrThrow()
+        val peerId = identityEntry.peerId
+        val existing = contactCardRepository.findOneByPeerId(db, peerId).getOrThrow()
         if (existing != null) {
             contactCard = existing.card
             contactCardEntry = existing
@@ -315,12 +299,12 @@ abstract class AbstractAppState(
             schema = ContactCard.SCHEMA,
             sigKey = Base64.encode(identity.sigKeyPublic),
             encKey = Base64.encode(identity.encKeyPublic),
-            name = "#$nodeId",
+            name = "#$peerId",
         )
 
         contactCard = card
         val entry = ContactCardEntry(
-            nodeId = nodeId,
+            peerId = peerId,
             card = card,
             tags = listOf(ContactCardEntry.TAG_ONBOARDING)
         )
@@ -330,18 +314,18 @@ abstract class AbstractAppState(
     private suspend fun createAndSaveIdentity(): IdentityEntry {
         val sigKeyPair: KeyPair = CryptoProvider.generateEd25519KeyPair()
         val encKeyPair: KeyPair = CryptoProvider.generateX25519KeyPair()
-        val nodeIdRaw = CryptoProvider.sha256(sigKeyPair.publicKey)
-        val nodeId = ContactCardCodec.deriveNodeId(sigKeyPair.publicKey)
+        val peerIdRaw = CryptoProvider.sha256(sigKeyPair.publicKey)
+        val peerId = ContactCardCodec.derivePeerId(sigKeyPair.publicKey)
 
         val identity = Identity(
-            nodeIdRaw = nodeIdRaw,
+            peerIdRaw = peerIdRaw,
             sigKeyPublic = sigKeyPair.publicKey,
             sigKeyPrivate = sigKeyPair.privateKey,
             encKeyPublic = encKeyPair.publicKey,
             encKeyPrivate = encKeyPair.privateKey,
         )
 
-        val entry = IdentityEntry(nodeId = nodeId, data = identity)
+        val entry = IdentityEntry(peerId = peerId, identity = identity)
         return identityRepository.insert(db, entry).getOrThrow()
     }
 }

@@ -49,7 +49,7 @@ fun PostDetailScreen(
     onBack: () -> Unit,
 ) {
     val contacts by AppState.contacts.collectAsState()
-    val contact = contacts.firstOrNull { it.nodeId == entry.authorId }
+    val contact = contacts.firstOrNull { it.peerId == entry.authorId }
     val displayName = contact?.let { c ->
         c.name?.takeIf { it.isNotBlank() }
             ?: c.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
@@ -125,7 +125,7 @@ fun PostDetailScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Content body
-            val body = entry.envelope.body
+            val body = entry.content.body
             if (body is ContentBody.Image) {
                 DetailImage(body)
             } else {
@@ -151,7 +151,7 @@ fun PostDetailScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Created ${formatRelativeTime(entry.contentCreatedAt)}",
+                text = "Created ${formatRelativeTime(entry.content.createdAt.toEpochMilliseconds())}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
