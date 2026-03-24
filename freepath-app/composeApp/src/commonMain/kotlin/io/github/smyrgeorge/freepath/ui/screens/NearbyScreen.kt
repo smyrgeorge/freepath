@@ -51,6 +51,7 @@ import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.state.abbrev
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonSize
@@ -71,6 +72,8 @@ fun NearbyScreen(
     val nearbyPeers by AppState.nearbyPeers.collectAsState()
     val contacts by AppState.contacts.collectAsState()
     val contactContents by AppState.contactContents.collectAsState()
+    val metrics by AppResources.libble.metrics.value.collectAsState()
+    val discoveredBlePeripherals = metrics.discoveredPeripherals
     val contactByPeerId = contacts.associateBy { it.peerId }
     val allPeers = nearbyPeers.keys.toList()
     val knownPeers = allPeers.filter { it in contactByPeerId }
@@ -127,6 +130,30 @@ fun NearbyScreen(
                 }
                 items(unknownPeers, key = { it }) { peerId ->
                     PeerCard(peerId, null, null)
+                }
+            }
+        }
+
+        if (discoveredBlePeripherals.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Nearby via Bluetooth",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 80.dp),
+            ) {
+                items(discoveredBlePeripherals.values.toList(), key = { it.peripheralId }) { peer ->
+                    BlePeerCard(peer)
                 }
             }
         }
@@ -312,6 +339,69 @@ private fun PeerCard(peerId: String, contact: ContactCardEntry?, content: Conten
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun BlePeerCard(peer: LibbleEvent.PeripheralDiscovered) {
+    val scope = rememberCoroutineScope()
+    val displayName = peer.peripheralName ?: peer.name ?: peer.peripheralId.take(8) + "…"
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                RoundedCornerShape(12.dp),
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "BT",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "RSSI ${peer.rssi} dBm",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        FreepathButton(
+            onClick = {
+                scope.launch {
+                    AppResources.system.tell(Protocol.InitiateBluetoothExchange(peer.peripheralId))
+                }
+            },
+            variant = ButtonVariant.Outline,
+            size = ButtonSize.Small,
+        ) {
+            Text(
+                text = "Add",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }

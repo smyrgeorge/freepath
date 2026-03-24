@@ -1,18 +1,16 @@
 package io.github.smyrgeorge.freepath.libble
 
-import io.github.smyrgeorge.freepath.libble.LibbleModule.Companion.FREEPATH_SERVICE_UUID
+import io.github.smyrgeorge.freepath.libble.BleConstants.FREEPATH_SERVICE_UUID
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 import platform.CoreBluetooth.CBAdvertisementDataServiceUUIDsKey
 import platform.CoreBluetooth.CBPeripheralManager
-import platform.CoreBluetooth.CBPeripheralManagerDelegateProtocol
 import platform.CoreBluetooth.CBPeripheralManagerStatePoweredOn
 import platform.CoreBluetooth.CBUUID
 import platform.Foundation.NSArray
 import platform.Foundation.arrayWithObject
-import platform.darwin.NSObject
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.uuid.ExperimentalUuidApi
@@ -22,24 +20,23 @@ actual class LibbleAdvertiser actual constructor() {
 
     private val log = Logger.of(this::class)
     private val advertising = AtomicBoolean(false)
+    private val manager get() = PeripheralManagerHolder.manager.manager
 
-    private val delegate = object : NSObject(), CBPeripheralManagerDelegateProtocol {
-        override fun peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {
-            if (peripheral.state == CBPeripheralManagerStatePoweredOn && advertising.load()) {
-                doAdvertise(peripheral)
-            }
+    private val stateListener: (CBPeripheralManager) -> Unit = { peripheral ->
+        if (peripheral.state == CBPeripheralManagerStatePoweredOn && advertising.load()) {
+            doAdvertise(peripheral)
         }
     }
 
-    private val manager = CBPeripheralManager(delegate, null)
+    init {
+        PeripheralManagerHolder.manager.addStateListener(stateListener)
+    }
 
     actual suspend fun start() {
         if (!advertising.compareAndSet(expectedValue = false, newValue = true)) return
         withContext(Dispatchers.IO) {
             log.info("BleAdvertiser starting")
-            if (manager.state == CBPeripheralManagerStatePoweredOn) {
-                doAdvertise(manager)
-            }
+            if (manager.state == CBPeripheralManagerStatePoweredOn) doAdvertise(manager)
         }
     }
 
@@ -47,6 +44,7 @@ actual class LibbleAdvertiser actual constructor() {
         if (!advertising.compareAndSet(expectedValue = true, newValue = false)) return
         withContext(Dispatchers.IO) {
             manager.stopAdvertising()
+            PeripheralManagerHolder.manager.removeStateListener(stateListener)
             log.info("BleAdvertiser stopped")
         }
     }

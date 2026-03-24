@@ -90,10 +90,11 @@ abstract class AbstractAppState(
         if (existing == null) {
             val entry = ContactCardEntry(peerId = card.peerId, card = card)
             contactCardRepository.insert(db, entry).getOrThrow()
-        } else {
+        } else if (card.updatedAt > existing.card.updatedAt) {
             val entry = existing.merge(ContactCardEntry(peerId = card.peerId, card = card))
             contactCardRepository.update(db, entry).getOrThrow()
         }
+        // else: stored card is already up to date — no-op
         loadContacts()
     }
 

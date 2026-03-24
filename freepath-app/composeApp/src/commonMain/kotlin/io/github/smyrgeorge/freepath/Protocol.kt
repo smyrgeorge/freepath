@@ -28,6 +28,7 @@ sealed interface Protocol : ActorProtocol {
 
     // Contact exchange — drawer-based flow
     data class InitiateContactExchange(val peerId: String) : Message<Ok>()
+    data class InitiateBluetoothExchange(val peripheralId: String) : Message<Ok>()
     data class ContactExchangePinSubmitted(val enteredPin: String) : Message<Ok>()
     data object ContactExchangeCancelled : Message<Ok>()
     data class IncomingContactExchange(

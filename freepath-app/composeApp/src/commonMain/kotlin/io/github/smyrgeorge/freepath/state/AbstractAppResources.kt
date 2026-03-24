@@ -4,7 +4,9 @@ import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.client.AppClient
 import io.github.smyrgeorge.freepath.client.model.ContactInfo
+import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.Identity
+import io.github.smyrgeorge.freepath.libble.exchange.BleContactExchange
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
@@ -14,6 +16,7 @@ import io.github.smyrgeorge.freepath.database.generated.ContentEntryRepositoryIm
 import io.github.smyrgeorge.freepath.database.generated.IdentityEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
+import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.LibbleModule
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
@@ -45,13 +48,26 @@ abstract class AbstractAppResources(
     val libp2p: Libp2pModule = Libp2pModule().setEventHandler { event ->
         log.info { "Libp2pEvent: $event" }
         when (event) {
-            is Libp2pEvent.PeerIdentified -> system.tell(Protocol.PeerIdentified(event.peerId)).getOrThrow()
+            is Libp2pEvent.PeerIdentified -> {
+                val cmd = Protocol.PeerIdentified(event.peerId)
+                system.tell(cmd).getOrThrow()
+            }
+
             else -> Unit
         }
     }
 
     val libble: LibbleModule = LibbleModule().setEventHandler { event ->
         log.info { "LibbleEvent: $event" }
+        when (event) {
+            is LibbleEvent.ContactCardReceived -> {
+                val (pin, card) = BleContactExchange.decodeWithPin(event.cardBytes).getOrThrow()
+                val cmd = Protocol.IncomingContactExchange(card.peerId, pin, card)
+                system.tell(cmd).getOrThrow()
+            }
+
+            else -> Unit
+        }
     }
 
     fun initialize(system: ActorRef) {
@@ -104,8 +120,9 @@ abstract class AbstractAppResources(
         libp2p.stop()
     }
 
-    suspend fun startupLibble() {
+    suspend fun startupLibble(localCard: ContactCard, sigKeyPrivate: ByteArray) {
         libble.start()
+        libble.startGattServer(BleContactExchange.encode(localCard, sigKeyPrivate))
     }
 
     suspend fun stopLibble() {

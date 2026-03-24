@@ -24,7 +24,7 @@ import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.state.model.StartupRoute
 import io.github.smyrgeorge.freepath.ui.components.DeleteContentDrawer
 import io.github.smyrgeorge.freepath.ui.components.FreepathTabBar
-import io.github.smyrgeorge.freepath.ui.components.LanExchangeDrawer
+import io.github.smyrgeorge.freepath.ui.components.ContactExchangeDrawer
 import io.github.smyrgeorge.freepath.ui.components.ResetDataDrawer
 import io.github.smyrgeorge.freepath.ui.components.ResetDataOverlay
 import io.github.smyrgeorge.freepath.ui.components.TabItem
@@ -155,7 +155,7 @@ fun App() {
                 // Drawers — outside the safe-area box so they cover the full screen
                 ContactDrawerOverlay()
                 AddContactDrawerOverlay()
-                LanExchangeDrawer()
+                ContactExchangeDrawer()
                 DeleteContentDrawer()
                 ResetDataDrawer()
                 ResetDataOverlay()

@@ -65,11 +65,11 @@ import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Full-screen overlay for the LAN contact exchange flow (both requestor and recipient sides).
+ * Full-screen overlay for the contact exchange flow (LAN and BLE) (both requestor and recipient sides).
  * Rendered at the App level so it appears above the tab bar.
  */
 @Composable
-fun LanExchangeDrawer() {
+fun ContactExchangeDrawer() {
     val drawerState by AppViewState.exchangeDrawer.collectAsState()
     val scope = rememberCoroutineScope()
 

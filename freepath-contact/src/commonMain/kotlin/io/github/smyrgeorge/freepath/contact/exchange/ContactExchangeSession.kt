@@ -7,11 +7,6 @@ import io.github.smyrgeorge.freepath.contact.ContactCard
  *
  * Covers both unidirectional (QR code) and bidirectional (NFC, Bluetooth LE) flows
  * with a uniform `send` / `receive` / `close` API.
- *
- * - **Unidirectional** — see [StatelessContactExchangeSession]: `send` encodes
- *   the local card; `receive` suspends until the caller delivers the peer's scanned bytes.
- * - **Bidirectional** — NFC/BLE implementations in transport modules: both `send` and
- *   `receive` operate over the underlying transport connection.
  */
 interface ContactExchangeSession {
 
@@ -29,10 +24,6 @@ interface ContactExchangeSession {
 
     /**
      * Receives and verifies the peer's contact card.
-     *
-     * Suspends until the peer's card arrives — either delivered externally
-     * (unidirectional, via [StatelessContactExchangeSession.deliver]) or
-     * received over the transport (bidirectional).
      *
      * Performs spec-3 verification (schema, Node ID, signature) before returning.
      *

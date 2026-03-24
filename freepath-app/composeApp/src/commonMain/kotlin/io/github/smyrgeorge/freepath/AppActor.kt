@@ -42,7 +42,10 @@ class AppActor(
                 identityEntry = state.identityEntry,
                 contactLookup = { state.contactLookup(it) },
             )
-            resources.startupLibble()
+            resources.startupLibble(
+                localCard = state.contactCard,
+                sigKeyPrivate = state.identity.sigKeyPrivate,
+            )
         }
 
         log.info("[onActivate] Identity: ${state.identityEntry}")
@@ -90,6 +93,27 @@ class AppActor(
                 is Protocol.InitiateContactExchange -> {
                     state.initiateContactExchange(m.peerId)
                     ctx.become(exchange)
+                }
+
+                is Protocol.InitiateBluetoothExchange -> {
+                    val pin = state.initiateContactExchange(m.peripheralId)
+                    ctx.become(exchange)
+                    launch {
+                        val result = runCatching {
+                            val session = resources.libble.initSession(m.peripheralId, pin)
+                            session.send(state.contactCard, state.identity.sigKeyPrivate)
+                            val peerCard = session.receive().getOrThrow()
+                            session.close()
+                            peerCard
+                        }
+                        result.onSuccess { peerCard ->
+                            resources.system.tell(Protocol.ContactExchangeSucceeded(peerCard)).getOrThrow()
+                        }.onFailure { e ->
+                            resources.system.tell(
+                                Protocol.ContactExchangeFailed(e.message ?: "BLE exchange failed")
+                            ).getOrThrow()
+                        }
+                    }
                 }
 
                 is Protocol.IncomingContactExchange -> {

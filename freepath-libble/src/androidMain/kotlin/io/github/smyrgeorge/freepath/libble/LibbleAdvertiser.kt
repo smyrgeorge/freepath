@@ -8,7 +8,7 @@ import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.os.ParcelUuid
-import io.github.smyrgeorge.freepath.libble.LibbleModule.Companion.FREEPATH_SERVICE_UUID
+import io.github.smyrgeorge.freepath.libble.BleConstants.FREEPATH_SERVICE_UUID
 import io.github.smyrgeorge.freepath.util.AndroidContextHolder
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.Dispatchers
@@ -55,7 +55,7 @@ actual class LibbleAdvertiser actual constructor() {
 
             val settings = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-                .setConnectable(false)
+                .setConnectable(true)
                 .build()
 
             val serviceUuid = ParcelUuid(UUID.fromString(FREEPATH_SERVICE_UUID.toString()))
