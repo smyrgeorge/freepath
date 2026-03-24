@@ -2,14 +2,16 @@ package io.github.smyrgeorge.freepath.contact
 
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.codec.Base58
-import io.github.smyrgeorge.freepath.util.codec.JsonCodec
+import io.github.smyrgeorge.freepath.util.codec.ProtobufCodec
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
 import kotlin.io.encoding.Base64
 
+@OptIn(ExperimentalSerializationApi::class)
 object ContactCardCodec {
 
     const val SCHEMA = 1
-
-    // ── Node ID ───────────────────────────────────────────────────────────────
 
     /**
      * Derives the Node ID from a raw Ed25519 public key following the modern libp2p Peer ID spec.
@@ -44,9 +46,7 @@ object ContactCardCodec {
         return Base58.encode(multihash)
     }
 
-    // ── Signing ───────────────────────────────────────────────────────────────
-
-    /** Signs the JSON-encoded card bytes with [sigKeyPrivate]; returns the raw 64-byte Ed25519 signature. */
+    /** Signs the protobuf-encoded card bytes with [sigKeyPrivate]; returns the raw 64-byte Ed25519 signature. */
     fun sign(card: ContactCard, sigKeyPrivate: ByteArray): ByteArray =
         CryptoProvider.ed25519Sign(sigKeyPrivate, encode(card))
 
@@ -58,25 +58,6 @@ object ContactCardCodec {
         val sigKeyBytes = Base64.decode(card.sigKey)
         return CryptoProvider.ed25519Verify(sigKeyBytes, encode(card), signatureBytes)
     }
-
-    /** Creates a [ContactCardSigned] by signing [card] with [sigKeyPrivate]. */
-    fun seal(card: ContactCard, sigKeyPrivate: ByteArray): ContactCardSigned =
-        ContactCardSigned(card, Base64.encode(sign(card, sigKeyPrivate)))
-
-    /**
-     * Fully verifies a [ContactCardSigned] per spec-3:
-     * (1) schema check, (2) signature verification.
-     * Node ID is always correct by construction (derived lazily from sigKey).
-     */
-    fun open(signed: ContactCardSigned): Result<ContactCard> = runCatching {
-        val card = signed.card
-        require(card.schema == ContactCard.SCHEMA) { "Unsupported card schema: ${card.schema}" }
-        val signatureBytes = Base64.decode(signed.signature)
-        require(verify(card, signatureBytes)) { "Invalid card signature" }
-        card
-    }
-
-    // ── Card update rules (spec 1 Card updates) ──────────────────────────────
 
     /**
      * Returns `true` if [incoming] should replace [stored] in the local contact list.
@@ -92,23 +73,6 @@ object ContactCardCodec {
         return incoming.updatedAt > stored.updatedAt
     }
 
-    // ── JSON encode/decode ────────────────────────────────────────────────────
-
-    /** Encodes [card] to UTF-8 JSON bytes. */
-    fun encode(card: ContactCard): ByteArray = JsonCodec.json.encodeToString(card).encodeToByteArray()
-
-    /** Encodes [card] to UTF-8 JSON string. */
-    fun encodeToString(card: ContactCard): String = JsonCodec.json.encodeToString(card)
-
-    /** Decodes a [ContactCard] from UTF-8 JSON [bytes]. */
-    fun decode(bytes: ByteArray): ContactCard = JsonCodec.json.decodeFromString(bytes.decodeToString())
-
-    /** Decodes a [ContactCard] from UTF-8 JSON [str]. */
-    fun decode(str: String): ContactCard = JsonCodec.json.decodeFromString(str)
-
-    /** Encodes [signed] to UTF-8 JSON bytes. */
-    fun encode(signed: ContactCardSigned): ByteArray = JsonCodec.json.encodeToString(signed).encodeToByteArray()
-
-    /** Decodes a [ContactCardSigned] from UTF-8 JSON [bytes]. */
-    fun decodeSigned(bytes: ByteArray): ContactCardSigned = JsonCodec.json.decodeFromString(bytes.decodeToString())
+    fun encode(card: ContactCard): ByteArray = ProtobufCodec.protobuf.encodeToByteArray(card)
+    fun decode(bytes: ByteArray): ContactCard = ProtobufCodec.protobuf.decodeFromByteArray(bytes)
 }

@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.contact.exchange
 
 import io.github.smyrgeorge.freepath.contact.ContactCard
-import io.github.smyrgeorge.freepath.contact.ContactCardCodec
+import io.github.smyrgeorge.freepath.contact.ContactCardSignedCodec
 
 /**
  * Handles LAN-based contact exchange (bidirectional mode).
@@ -27,8 +27,8 @@ object LanContactExchange : ContactExchange {
      * @return Raw UTF-8 JSON bytes of the signed card, ready for transmission over LAN.
      */
     override fun encode(card: ContactCard, sigKeyPrivate: ByteArray): ByteArray {
-        val signed = ContactCardCodec.seal(card, sigKeyPrivate)
-        return ContactCardCodec.encode(signed)
+        val signed = ContactCardSignedCodec.seal(card, sigKeyPrivate)
+        return ContactCardSignedCodec.encode(signed)
     }
 
     /**
@@ -44,8 +44,8 @@ object LanContactExchange : ContactExchange {
      */
     override fun decode(data: ByteArray): Result<ContactCard> {
         return runCatching {
-            val signed = ContactCardCodec.decodeSigned(data)
-            ContactCardCodec.open(signed).getOrThrow()
+            val signed = ContactCardSignedCodec.decode(data)
+            ContactCardSignedCodec.open(signed).getOrThrow()
         }
     }
 }

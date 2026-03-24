@@ -1,8 +1,8 @@
 package io.github.smyrgeorge.freepath.contact.exchange
 
 import io.github.smyrgeorge.freepath.contact.ContactCard
-import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.ContactCardSigned
+import io.github.smyrgeorge.freepath.contact.ContactCardSignedCodec
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
 import kotlin.io.encoding.Base64
@@ -26,7 +26,7 @@ class QrCodeContactExchangeTest {
             schema = ContactCard.SCHEMA,
             sigKey = Base64.encode(sigKp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
-            updatedAt = updatedAt,
+            updatedAt = Instant.fromEpochMilliseconds(updatedAt.toEpochMilliseconds()),
             name = name,
         )
 
@@ -165,8 +165,8 @@ class QrCodeContactExchangeTest {
         val card = makeCard(kp, encKp)
 
         // Sign with wrong key
-        val signed = ContactCardCodec.seal(card, kp2.privateKey)
-        val base64Url = Base64.encode(ContactCardCodec.encode(signed))
+        val signed = ContactCardSignedCodec.seal(card, kp2.privateKey)
+        val base64Url = Base64.encode(ContactCardSignedCodec.encode(signed))
         val qrCode = "freepath://contact/v1/$base64Url"
 
         val result = QrCodeContactExchange.decode(qrCode)
@@ -188,7 +188,7 @@ class QrCodeContactExchangeTest {
         val raw = QrCodeContactExchange.decodeRaw(qrCode)!!
         val tamperedCard = raw.card.copy(name = "Tampered")
         val tamperedSigned = ContactCardSigned(tamperedCard, raw.signature)
-        val tamperedBase64 = Base64.encode(ContactCardCodec.encode(tamperedSigned))
+        val tamperedBase64 = Base64.encode(ContactCardSignedCodec.encode(tamperedSigned))
         val tamperedQrCode = "freepath://contact/v1/$tamperedBase64"
 
         val result = QrCodeContactExchange.decode(tamperedQrCode)

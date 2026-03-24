@@ -75,7 +75,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.me_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.contact.ContactCardCodec
+import io.github.smyrgeorge.freepath.contact.ContactCardSignedCodec
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetricsSnapshot
 import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetricsSnapshot
@@ -138,7 +138,7 @@ fun MeScreen(modifier: Modifier = Modifier) {
         }
     }
     val qrData = remember(card) {
-        val signed = ContactCardCodec.seal(card, AppState.identity.sigKeyPrivate)
+        val signed = ContactCardSignedCodec.seal(card, AppState.identity.sigKeyPrivate)
         QrCodeContactExchange.encode(signed)
     }
 

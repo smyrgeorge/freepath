@@ -5,16 +5,17 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 @OptIn(ExperimentalSerializationApi::class)
 data class ChatMessage(
     val senderId: String,
     val receiverId: String,
     val text: String,
-    val timestamp: Long = Clock.System.now().toEpochMilliseconds(),
+    val timestamp: Instant = Clock.System.now(),
 ) {
     fun encodeToByteArray(): ByteArray =
-        ProtoBuf.encodeToByteArray(Dto.serializer(), Dto(text, timestamp))
+        ProtoBuf.encodeToByteArray(Dto.serializer(), Dto(text, timestamp.toEpochMilliseconds()))
 
     @Serializable
     private data class Dto(
@@ -29,7 +30,7 @@ data class ChatMessage(
                 senderId = senderId,
                 receiverId = receiverId,
                 text = wire.text,
-                timestamp = wire.timestamp
+                timestamp = Instant.fromEpochMilliseconds(wire.timestamp),
             )
         }
     }

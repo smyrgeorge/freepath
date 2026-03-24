@@ -3,6 +3,7 @@ package io.github.smyrgeorge.freepath.contact.exchange
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.ContactCardSigned
+import io.github.smyrgeorge.freepath.contact.ContactCardSignedCodec
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange.decode
 import kotlin.io.encoding.Base64
 
@@ -34,7 +35,7 @@ object QrCodeContactExchange : ContactExchange {
      * @return A QR code string ready for display.
      */
     override fun encode(card: ContactCard, sigKeyPrivate: ByteArray): ByteArray {
-        val signed = ContactCardCodec.seal(card, sigKeyPrivate)
+        val signed = ContactCardSignedCodec.seal(card, sigKeyPrivate)
         return encode(signed).encodeToByteArray()
     }
 
@@ -45,7 +46,7 @@ object QrCodeContactExchange : ContactExchange {
      * @return A QR code string ready for display.
      */
     fun encode(signed: ContactCardSigned): String {
-        val jsonBytes = ContactCardCodec.encode(signed)
+        val jsonBytes = ContactCardSignedCodec.encode(signed)
         val base64Url = Base64.encode(jsonBytes)
         return "$PREFIX$base64Url"
     }
@@ -106,7 +107,7 @@ object QrCodeContactExchange : ContactExchange {
         // Parse signed card
         val signed: ContactCardSigned
         try {
-            signed = ContactCardCodec.decodeSigned(jsonBytes)
+            signed = ContactCardSignedCodec.decode(jsonBytes)
         } catch (e: Exception) {
             return Result.failure(
                 IllegalArgumentException("Failed to parse contact card JSON", e)
@@ -143,7 +144,7 @@ object QrCodeContactExchange : ContactExchange {
         return try {
             val paddedBase64 = addBase64Padding(base64Payload)
             val jsonBytes = Base64.decode(paddedBase64)
-            ContactCardCodec.decodeSigned(jsonBytes)
+            ContactCardSignedCodec.decode(jsonBytes)
         } catch (_: Exception) {
             null
         }
@@ -164,7 +165,7 @@ object QrCodeContactExchange : ContactExchange {
      */
     fun estimateQrCodeLength(card: ContactCard): Int {
         val signed = ContactCardSigned(card, Base64.encode(ByteArray(64))) // 64-byte signature
-        val jsonLength = ContactCardCodec.encode(signed).size
+        val jsonLength = ContactCardSignedCodec.encode(signed).size
         val base64Length = ((jsonLength + 2) / 3) * 4 // Base64 encoding overhead
         return PREFIX.length + base64Length
     }

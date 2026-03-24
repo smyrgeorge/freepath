@@ -1,8 +1,8 @@
 package io.github.smyrgeorge.freepath.contact.exchange
 
 import io.github.smyrgeorge.freepath.contact.ContactCard
-import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.ContactCardSigned
+import io.github.smyrgeorge.freepath.contact.ContactCardSignedCodec
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
 import kotlin.io.encoding.Base64
@@ -26,7 +26,7 @@ class LanContactExchangeTest {
             schema = ContactCard.SCHEMA,
             sigKey = Base64.encode(sigKp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
-            updatedAt = updatedAt,
+            updatedAt = Instant.fromEpochMilliseconds(updatedAt.toEpochMilliseconds()),
             name = name,
         )
 
@@ -77,7 +77,7 @@ class LanContactExchangeTest {
         val encoded = LanContactExchange.encode(card, kp.privateKey)
 
         // Should be parseable as a ContactCardSigned
-        val signed = ContactCardCodec.decodeSigned(encoded)
+        val signed = ContactCardSignedCodec.decode(encoded)
         assertEquals(card, signed.card)
     }
 
@@ -92,10 +92,10 @@ class LanContactExchangeTest {
         val encoded = LanContactExchange.encode(card, kp.privateKey)
 
         // Decode the signed card, tamper with the name, re-encode without re-signing
-        val signed = ContactCardCodec.decodeSigned(encoded)
+        val signed = ContactCardSignedCodec.decode(encoded)
         val tamperedCard = signed.card.copy(name = "Tampered")
         val tamperedSigned = ContactCardSigned(tamperedCard, signed.signature)
-        val tamperedEncoded = ContactCardCodec.encode(tamperedSigned)
+        val tamperedEncoded = ContactCardSignedCodec.encode(tamperedSigned)
 
         val result = LanContactExchange.decode(tamperedEncoded)
 
@@ -110,8 +110,8 @@ class LanContactExchangeTest {
         val card = makeCard(kp, encKp)
 
         // Sign with wrong key
-        val signed = ContactCardCodec.seal(card, kp2.privateKey)
-        val encoded = ContactCardCodec.encode(signed)
+        val signed = ContactCardSignedCodec.seal(card, kp2.privateKey)
+        val encoded = ContactCardSignedCodec.encode(signed)
 
         val result = LanContactExchange.decode(encoded)
 

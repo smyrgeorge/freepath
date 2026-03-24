@@ -117,17 +117,16 @@ class ContactCardEntryTest {
     @Test
     fun merge_returnsNewEntryWithIncomingCard() {
         val now = Clock.System.now()
-        val storedCard = makeCard(updatedAt = now).copy(name = "Old Name", bio = "Old bio")
+        val storedCard = makeCard(updatedAt = now).copy(name = "Old Name")
         val stored = makeEntry(card = storedCard, name = "Local Name", notes = "My notes")
 
-        val incomingCard = storedCard.copy(updatedAt = now + 1000.milliseconds, name = "New Name", bio = "New bio")
+        val incomingCard = storedCard.copy(updatedAt = now + 1000.milliseconds, name = "New Name")
         val incoming = makeEntry(card = incomingCard, name = "Other Local Name")
 
         val merged = stored.merge(incoming)
 
         assertEquals(incomingCard, merged.card)
         assertEquals("New Name", merged.card.name)
-        assertEquals("New bio", merged.card.bio)
     }
 
     @Test

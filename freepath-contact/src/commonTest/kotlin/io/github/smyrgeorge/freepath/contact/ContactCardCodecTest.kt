@@ -21,7 +21,7 @@ class ContactCardCodecTest {
             schema = ContactCardCodec.SCHEMA,
             sigKey = Base64.encode(sigKp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
-            updatedAt = updatedAt,
+            updatedAt = Instant.fromEpochMilliseconds(updatedAt.toEpochMilliseconds()),
         )
 
     // ── deriveNodeId ──────────────────────────────────────────────────────────
@@ -47,7 +47,6 @@ class ContactCardCodecTest {
     fun deriveNodeId_differsByKey() {
         val kp1 = CryptoProvider.generateEd25519KeyPair()
         val kp2 = CryptoProvider.generateEd25519KeyPair()
-        // Two distinct keys should (with overwhelming probability) produce different Node IDs.
         val id1 = ContactCardCodec.deriveNodeId(kp1.publicKey)
         val id2 = ContactCardCodec.deriveNodeId(kp2.publicKey)
         assertTrue(id1 != id2)
@@ -92,28 +91,6 @@ class ContactCardCodecTest {
         assertFalse(ContactCardCodec.verify(card, sig))
     }
 
-    // ── seal / open ───────────────────────────────────────────────────────────
-
-    @Test
-    fun sealOpen_roundTrip() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val signed = ContactCardCodec.seal(card, kp.privateKey)
-        val opened = ContactCardCodec.open(signed).getOrThrow()
-        assertEquals(card, opened)
-    }
-
-    @Test
-    fun open_throwsForInvalidSignature() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val kp2 = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val wrongSig = ContactCardCodec.sign(card, kp2.privateKey)
-        assertFails { ContactCardCodec.open(ContactCardSigned(card, Base64.encode(wrongSig))).getOrThrow() }
-    }
-
     // ── shouldUpdate ──────────────────────────────────────────────────────────
 
     @Test
@@ -153,12 +130,11 @@ class ContactCardCodecTest {
         val encKp = CryptoProvider.generateX25519KeyPair()
         val now = Clock.System.now()
         val stored = makeCard(kp, encKp, updatedAt = now)
-        // incoming has a different sigKey (and therefore a different nodeId too)
         val incoming = makeCard(kp2, encKp, updatedAt = now + 1000.milliseconds)
         assertFalse(ContactCardCodec.shouldUpdate(stored, incoming))
     }
 
-    // ── JSON encode/decode ────────────────────────────────────────────────────
+    // ── encode / decode ───────────────────────────────────────────────────────
 
     @Test
     fun encodeDecodeContactCard_roundTripRequiredFieldsOnly() {
@@ -177,21 +153,12 @@ class ContactCardCodecTest {
     }
 
     @Test
-    fun encodeDecodeContactCard_nullFieldsOmittedFromJson() {
+    fun encodeContactCard_nullOptionalFieldsNotEncoded() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val jsonStr = ContactCardCodec.encode(card).decodeToString()
-        assertFalse(jsonStr.contains("name"))
-    }
-
-    @Test
-    fun encodeDecodeSignedContactCard_roundTrip() {
-        val kp = CryptoProvider.generateEd25519KeyPair()
-        val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val signed = ContactCardCodec.seal(card, kp.privateKey)
-        assertEquals(signed, ContactCardCodec.decodeSigned(ContactCardCodec.encode(signed)))
+        val cardWithoutName = makeCard(kp, encKp)
+        val cardWithName = cardWithoutName.copy(name = "Alice")
+        assertTrue(ContactCardCodec.encode(cardWithoutName).size < ContactCardCodec.encode(cardWithName).size)
     }
 
     // ── ContactCard validation ────────────────────────────────────────────────

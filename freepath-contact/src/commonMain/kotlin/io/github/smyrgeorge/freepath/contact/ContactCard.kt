@@ -1,23 +1,27 @@
 package io.github.smyrgeorge.freepath.contact
 
 import io.github.smyrgeorge.freepath.contact.ContactCard.Companion.SCHEMA
+import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Instant
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class ContactCard(
     /** Schema version. Always [SCHEMA] for cards produced by this implementation. */
-    val schema: Int,
+    @ProtoNumber(1) val schema: Int,
     /** Base64-encoded Ed25519 public key. Used to verify the card signature and all attributed content. */
-    val sigKey: String,
+    @ProtoNumber(2) val sigKey: String,
     /** Base64-encoded X25519 public key. Used to derive shared secrets for end-to-end encryption. */
-    val encKey: String,
+    @ProtoNumber(3) val encKey: String,
     /** Unix epoch milliseconds of the last change to this card. */
-    val updatedAt: Instant = Clock.System.now(),
+    @ProtoNumber(4) @Serializable(with = InstantSerializer::class) val updatedAt: Instant = Clock.System.now(),
     /** Human-readable display name chosen by the owner. Max 64 chars. */
-    val name: String? = null,
+    @ProtoNumber(5) val name: String? = null,
 ) {
     /** Base58-encoded Node ID derived locally from [sigKey]: Base58(SHA-256(sigKey)). Never transmitted. */
     val nodeId: String by lazy {
