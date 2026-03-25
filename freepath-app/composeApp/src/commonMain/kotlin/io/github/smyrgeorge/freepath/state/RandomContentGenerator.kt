@@ -30,13 +30,7 @@ object RandomContentGenerator {
                     signature = "dev",
                     body = body,
                 )
-                ContentEntry(
-                    contentId = contentId,
-                    type = type,
-                    authorId = contact.peerId,
-                    version = 1,
-                    content = envelope,
-                )
+                ContentEntry.from(envelope)
             }
         }
     }

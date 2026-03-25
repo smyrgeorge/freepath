@@ -116,7 +116,7 @@ abstract class AbstractAppState(
 
     suspend fun loadFeed(limit: Int = 50) {
         contentEntryRepository
-            .findAllByTopLevel(db, limit, 0)
+            .findAllByLimitAndOffset(db, limit, 0)
             .onSuccess { _feedEntries.value = it }
     }
 
@@ -165,13 +165,7 @@ abstract class AbstractAppState(
             signature = "self",
             body = body,
         )
-        val entry = ContentEntry(
-            contentId = peerId,
-            type = ContentType.CONTACT,
-            authorId = peerId,
-            version = 1,
-            content = envelope,
-        )
+        val entry = ContentEntry.from(envelope)
         contactCardContentEntry = contentEntryRepository.insert(db, entry).getOrThrow()
         contactCardContentEnvelope = envelope
         contactCardContent = body
@@ -255,14 +249,7 @@ abstract class AbstractAppState(
         // For contact content, always accept — the peer is the authoritative source for their own profile.
         if (!isContact && existing != null && existing.version >= envelope.version) return
 
-        ContentEntry(
-            id = existing?.id ?: 0,
-            contentId = contentId,
-            type = envelope.type,
-            authorId = envelope.authorId,
-            version = envelope.version,
-            content = envelope,
-        ).also {
+        ContentEntry.from(envelope, existing?.id ?: 0).also {
             contentEntryRepository.save(db, it).getOrThrow()
         }
 

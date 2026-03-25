@@ -18,9 +18,7 @@ data class IdentityEntry(
     override var createdAt: Instant = Clock.System.now(),
     @Converter(InstantConverter::class)
     override var updatedAt: Instant = Clock.System.now(),
-    /** Unique key. Derived locally from the contact's sigKey. */
     val peerId: String,
-    /** Complete identity: peerIdRaw, sigKey pair (public + private), encKey pair (public + private). */
     @Converter(IdentityConverter::class)
     val identity: Identity,
 ) : Auditable<Int> {

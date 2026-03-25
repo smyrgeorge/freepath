@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS contact
     created_at   INTEGER NOT NULL,
     updated_at   INTEGER NOT NULL,
     peer_id      TEXT    NOT NULL,
-    card         TEXT    NOT NULL,
+    card         JSON    NOT NULL,
     trust_level  TEXT    NOT NULL,
     name         TEXT,
     last_seen_at INTEGER,
