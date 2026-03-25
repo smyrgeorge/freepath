@@ -1,5 +1,6 @@
 package io.github.smyrgeorge.freepath.libp2p
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.nsd.DiscoveryRequest
 import android.net.nsd.NsdManager
@@ -35,6 +36,7 @@ internal class MdnsPeerDiscovery(val nodeId: String, context: Context) {
 
     private val resolvedPeers = ConcurrentHashMap<String, String>()
 
+    @SuppressLint("NewApi")
     fun start(
         port: Int,
         onPeerDiscovered: suspend (peerId: String, address: String) -> Unit,
@@ -102,7 +104,7 @@ internal class MdnsPeerDiscovery(val nodeId: String, context: Context) {
 
             override fun onServiceLost(serviceInfo: NsdServiceInfo) {
                 val peerNodeId = resolvedPeers.remove(serviceInfo.serviceName) ?: return
-                log.warn { "mDNS service lost: ${serviceInfo.serviceName} (nodeId=$peerNodeId)" }
+                log.debug { "mDNS service lost: ${serviceInfo.serviceName} (nodeId=$peerNodeId)" }
                 scope.launch { onPeerRemoved(peerNodeId) }
             }
         }
@@ -136,7 +138,7 @@ internal class MdnsPeerDiscovery(val nodeId: String, context: Context) {
                     if (version != SUPPORTED_VERSION) return
                     val peerNodeId = info.attributes["nodeId"]?.decodeToString() ?: return
                     val host = info.hostAddresses.firstOrNull { it is Inet4Address }?.hostAddress
-                        ?: info.hostAddresses.firstOrNull()?.hostAddress
+                        ?: info.hostAddresses.firstOrNull { !it.isLinkLocalAddress }?.hostAddress
                         ?: return
                     resolvedPeers[info.serviceName] = peerNodeId
                     scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddressCodec.encode(host, info.port)) }
@@ -162,7 +164,7 @@ internal class MdnsPeerDiscovery(val nodeId: String, context: Context) {
                     val version = serviceInfo.attributes["v"]?.decodeToString() ?: return
                     if (version != SUPPORTED_VERSION) return
                     val peerNodeId = serviceInfo.attributes["nodeId"]?.decodeToString() ?: return
-                    val host = serviceInfo.host?.hostAddress ?: return
+                    val host = serviceInfo.host?.takeIf { !it.isLinkLocalAddress }?.hostAddress ?: return
                     resolvedPeers[serviceInfo.serviceName] = peerNodeId
                     scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddressCodec.encode(host, serviceInfo.port)) }
                 }

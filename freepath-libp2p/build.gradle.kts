@@ -5,7 +5,6 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android)
     id("io.github.smyrgeorge.freepath.rust.interop")
-    id("io.github.smyrgeorge.freepath.swift.interop")
 }
 
 rustInterop {
@@ -15,11 +14,6 @@ rustInterop {
     // if_watch (network interface monitoring) requires SystemConfiguration;
     // ring (crypto) requires Security for SecRandomCopyBytes on Darwin.
     linkerOpts = "-framework SystemConfiguration -framework Security"
-}
-
-swiftInterop {
-    packageName = "MdnsBridge"
-    // Foundation (NetService/NetServiceBrowser) is auto-linked on iOS — no extra frameworks needed.
 }
 
 kotlin {

@@ -68,7 +68,7 @@ internal class MdnsPeerDiscovery(val nodeId: String) {
                 if (version != SUPPORTED_VERSION) return
                 val peerNodeId = resolved.getPropertyString("nodeId") ?: return
                 val host = resolved.inet4Addresses.firstOrNull()?.hostAddress
-                    ?: resolved.inet6Addresses.firstOrNull()?.hostAddress
+                    ?: resolved.inet6Addresses.firstOrNull { !it.isLinkLocalAddress }?.hostAddress
                     ?: return
                 resolvedPeers[event.name] = peerNodeId
                 scope.launch { onPeerDiscovered(peerNodeId, LanPeerAddressCodec.encode(host, resolved.port)) }
