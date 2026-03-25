@@ -10,7 +10,7 @@ class BleContactExchangeSession(
     private val pin: String,
 ) : ContactExchangeSession {
 
-    override val method: ContactExchangeMethod = ContactExchangeMethod.BLUETOOTH
+    override val method: ContactExchangeMethod = ContactExchangeMethod.BLE
 
     init {
         require(pin.isNotBlank()) { "PIN must not be blank" }

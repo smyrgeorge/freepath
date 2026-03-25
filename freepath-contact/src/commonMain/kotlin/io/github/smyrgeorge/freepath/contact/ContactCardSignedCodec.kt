@@ -8,7 +8,6 @@ import kotlin.io.encoding.Base64
 
 @OptIn(ExperimentalSerializationApi::class)
 object ContactCardSignedCodec {
-
     /** Creates a [ContactCardSigned] by signing [card] with [sigKeyPrivate]. */
     fun seal(card: ContactCard, sigKeyPrivate: ByteArray): ContactCardSigned =
         ContactCardSigned(card, Base64.encode(ContactCardCodec.sign(card, sigKeyPrivate)))

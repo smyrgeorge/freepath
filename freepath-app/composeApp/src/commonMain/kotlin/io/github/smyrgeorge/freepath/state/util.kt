@@ -7,10 +7,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlin.coroutines.EmptyCoroutineContext
 
-/**
- * Abbreviates a string to `first 2 chars + … + last 6 chars`.
- * Falls back to the original string if it is 10 characters or shorter.
- */
 fun String.abbrev(): String = takeLast(10)
 
 fun <T> Flow<T>.stateIn(initialValue: T): StateFlow<T> =

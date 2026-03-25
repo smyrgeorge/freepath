@@ -28,6 +28,7 @@ class BleContactExchangeSessionTest {
         val writtenBytes: MutableList<ByteArray> = mutableListOf(),
     ) : BleConnectionPort {
         override suspend fun connect() {}
+        override suspend fun ping() {}
         override suspend fun readCard(): ByteArray = peerCardBytes
         override suspend fun writeCard(bytes: ByteArray) {
             writtenBytes += bytes

@@ -8,7 +8,6 @@ import kotlin.io.encoding.Base64
 import kotlin.random.Random
 
 object RandomAvatarGenerator {
-
     private val httpClient = HttpClient()
 
     suspend fun randomAvatar(name: String): String? = runCatching {

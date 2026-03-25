@@ -10,7 +10,6 @@ import kotlin.io.encoding.Base64
 
 @OptIn(ExperimentalSerializationApi::class)
 object ContactCardCodec {
-
     const val SCHEMA = 1
 
     /**

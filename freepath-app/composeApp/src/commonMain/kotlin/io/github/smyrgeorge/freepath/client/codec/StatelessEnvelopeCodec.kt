@@ -10,7 +10,6 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import kotlin.time.Instant
 
 object StatelessEnvelopeCodec {
-
     const val SCHEMA = 1
     private val HKDF_INFO_PREFIX = "freepath-stateless-v1".encodeToByteArray()
 

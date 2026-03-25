@@ -4,12 +4,13 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import androidx.core.graphics.createBitmap
 import java.io.ByteArrayOutputStream
 
 actual fun generateCheckerboardPng(): ByteArray {
     val size = 512
     val squareSize = 64
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val bitmap = createBitmap(size, size)
     val canvas = Canvas(bitmap)
     val paint = Paint()
     for (y in 0 until size step squareSize) {

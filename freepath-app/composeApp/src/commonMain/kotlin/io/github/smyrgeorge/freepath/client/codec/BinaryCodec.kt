@@ -1,7 +1,6 @@
 package io.github.smyrgeorge.freepath.client.codec
 
 internal object BinaryCodec {
-
     fun writeInt32BE(buf: ByteArray, off: Int, value: Int): Int {
         buf[off] = ((value shr 24) and 0xFF).toByte()
         buf[off + 1] = ((value shr 16) and 0xFF).toByte()

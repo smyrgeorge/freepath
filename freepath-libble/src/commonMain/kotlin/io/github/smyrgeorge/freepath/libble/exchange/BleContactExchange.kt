@@ -10,7 +10,7 @@ import io.github.smyrgeorge.freepath.contact.exchange.ContactExchangeMethod
  */
 object BleContactExchange : ContactExchange {
 
-    override val method: ContactExchangeMethod = ContactExchangeMethod.BLUETOOTH
+    override val method: ContactExchangeMethod = ContactExchangeMethod.BLE
 
     /**
      * Encodes a [card] by signing it with [sigKeyPrivate] and returns the raw JSON bytes

@@ -43,7 +43,7 @@ class BleContactExchangeTest {
 
     @Test
     fun method_isBluetooth() {
-        assertEquals(ContactExchangeMethod.BLUETOOTH, BleContactExchange.method)
+        assertEquals(ContactExchangeMethod.BLE, BleContactExchange.method)
     }
 
     @Test

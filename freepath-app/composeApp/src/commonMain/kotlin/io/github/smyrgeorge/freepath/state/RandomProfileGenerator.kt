@@ -1,8 +1,11 @@
 package io.github.smyrgeorge.freepath.state
 
 object RandomProfileGenerator {
-
-    data class DefaultProfile(val name: String, val bio: String, val location: String)
+    data class DefaultProfile(
+        val name: String,
+        val bio: String,
+        val location: String
+    )
 
     private val profiles = listOf(
         DefaultProfile("Agile Axolotl", "Moves through shadows unseen", "Ashenvale"),
