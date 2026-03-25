@@ -6,7 +6,6 @@ import io.github.smyrgeorge.freepath.client.AppClient
 import io.github.smyrgeorge.freepath.client.model.ContactInfo
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.Identity
-import io.github.smyrgeorge.freepath.libble.exchange.BleContactExchange
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
@@ -18,6 +17,7 @@ import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.LibbleModule
+import io.github.smyrgeorge.freepath.libble.exchange.BleContactExchange
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
 import io.github.smyrgeorge.freepath.util.exitApplication
@@ -58,9 +58,9 @@ abstract class AbstractAppResources(
     }
 
     val libble: LibbleModule = LibbleModule().setEventHandler { event ->
-        log.info { "LibbleEvent: $event" }
         when (event) {
             is LibbleEvent.ContactCardReceived -> {
+                log.info { "LibbleEvent: $event" }
                 val (pin, card) = BleContactExchange.decodeWithPin(event.cardBytes).getOrThrow()
                 val cmd = Protocol.IncomingContactExchange(card.peerId, pin, card)
                 system.tell(cmd).getOrThrow()
@@ -120,7 +120,10 @@ abstract class AbstractAppResources(
         libp2p.stop()
     }
 
-    suspend fun startupLibble(localCard: ContactCard, sigKeyPrivate: ByteArray) {
+    suspend fun startupLibble(
+        localCard: ContactCard,
+        sigKeyPrivate: ByteArray
+    ) {
         libble.start()
         libble.startGattServer(BleContactExchange.encode(localCard, sigKeyPrivate))
     }

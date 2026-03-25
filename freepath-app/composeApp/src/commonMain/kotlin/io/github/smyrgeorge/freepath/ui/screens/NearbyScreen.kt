@@ -69,7 +69,7 @@ import kotlin.math.sin
 fun NearbyScreen(
     modifier: Modifier = Modifier,
 ) {
-    val nearbyPeers by AppState.nearbyPeers.collectAsState()
+    val nearbyPeers by AppState.nearbyLanPeers.collectAsState()
     val contacts by AppState.contacts.collectAsState()
     val contactContents by AppState.contactContents.collectAsState()
     val metrics by AppResources.libble.metrics.value.collectAsState()

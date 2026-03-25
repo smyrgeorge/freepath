@@ -51,14 +51,14 @@ abstract class AbstractAppState(
     private val _feedEntries = MutableStateFlow<List<ContentEntry>>(emptyList())
     val feedEntries: StateFlow<List<ContentEntry>> = _feedEntries.asStateFlow()
 
-    val nearbyPeers: StateFlow<Map<String, ConnectionSource>> =
+    val nearbyLanPeers: StateFlow<Map<String, ConnectionSource>> =
         resources.libp2p.metrics.value.map {
-            it.mdnsPeers
-                .filterKeys { peerId -> peerId != identityEntry.peerId }
-                .mapValues { ConnectionSource.LAN }
+            it.connectedPeers
+                .filter { peerId -> peerId != identityEntry.peerId }
+                .associateWith { ConnectionSource.LAN }
         }.stateIn(emptyMap())
 
-    val connectedKnownPeers: StateFlow<Map<String, ConnectionSource>> =
+    val identifiedLanPeers: StateFlow<Map<String, ConnectionSource>> =
         resources.libp2p.metrics.value.map {
             it.identifiedPeers
                 .filter { peerId -> peerId != identityEntry.peerId }
