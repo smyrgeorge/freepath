@@ -53,6 +53,7 @@ class LibbleModule {
     internal val gattServer: BleGattServer = BleGattServer()
 
     private val expiryJob: Job
+    private lateinit var pingJob: Job
     private val pingSemaphore = Semaphore(64)
 
     private val peripherals = mutableMapOf<String, PeripheralEntry>()
@@ -101,7 +102,7 @@ class LibbleModule {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
         log.info("LibbleModule starting")
         advertiser.start()
-        scope.launch { runPingLoop() }
+        pingJob = scope.launch { pingLoop() }
         scope.launch {
             val scanner = Scanner {
                 filters {
@@ -173,6 +174,7 @@ class LibbleModule {
     suspend fun stop() {
         if (!started.compareAndSet(expectedValue = true, newValue = false)) return
         log.info("LibbleModule stopping")
+        pingJob.cancel()
         stopGattServer()
         metrics.close()
         advertiser.stop()
@@ -180,7 +182,7 @@ class LibbleModule {
         scope.cancel()
     }
 
-    private suspend fun runPingLoop() {
+    private suspend fun pingLoop() {
         while (true) {
             peripheralsMutex.withLock { peripherals.keys.toList() }.forEach { id ->
                 scope.launch {
