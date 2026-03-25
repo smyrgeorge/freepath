@@ -6,16 +6,15 @@ import com.juul.kable.characteristicOf
 import io.github.smyrgeorge.freepath.libble.BleConstants
 import kotlin.uuid.ExperimentalUuidApi
 
-/**
- * Wraps a Kable [com.juul.kable.Peripheral] as a GATT central for contact card exchange.
- *
- * Lifecycle: [connect] → [readCard] / [writeCard] → [disconnect].
- * Created via [io.github.smyrgeorge.freepath.libble.LibbleModule.connect].
- */
 @OptIn(ExperimentalUuidApi::class)
 class BleConnection internal constructor(
     private val peripheral: Peripheral,
 ) : BleConnectionPort {
+
+    private val pingChar = characteristicOf(
+        service = BleConstants.FREEPATH_SERVICE_UUID,
+        characteristic = BleConstants.PING_UUID,
+    )
 
     private val cardReadChar = characteristicOf(
         service = BleConstants.FREEPATH_SERVICE_UUID,
@@ -31,13 +30,12 @@ class BleConnection internal constructor(
         peripheral.connect()
     }
 
-    override suspend fun readCard(): ByteArray = peripheral.read(cardReadChar)
-
-    override suspend fun writeCard(bytes: ByteArray) =
-        peripheral.write(cardWriteChar, bytes, WriteType.WithResponse)
-
     override suspend fun disconnect() {
-        peripheral.disconnect()
+        runCatching { peripheral.disconnect() }
         peripheral.close()
     }
+
+    override suspend fun ping(): Unit = peripheral.write(pingChar, byteArrayOf(), WriteType.WithResponse)
+    override suspend fun readCard(): ByteArray = peripheral.read(cardReadChar)
+    override suspend fun writeCard(bytes: ByteArray) = peripheral.write(cardWriteChar, bytes, WriteType.WithResponse)
 }

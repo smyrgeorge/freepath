@@ -45,6 +45,13 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     private var localCardBytes: ByteArray = byteArrayOf()
     private val manager: CBPeripheralManager get() = PeripheralManagerHolder.manager.manager
 
+    private val pingChar = CBMutableCharacteristic(
+        type = CBUUID.UUIDWithString(BleConstants.PING_UUID.toString()),
+        properties = CBCharacteristicPropertyWrite,
+        value = null,
+        permissions = CBAttributePermissionsWriteable,
+    )
+
     private val cardReadChar = CBMutableCharacteristic(
         type = CBUUID.UUIDWithString(BleConstants.CARD_READ_UUID.toString()),
         properties = CBCharacteristicPropertyRead,
@@ -75,14 +82,21 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     private val writeHandler: (List<CBATTRequest>) -> Unit = writeHandler@{ requests ->
         if (!started.load()) return@writeHandler
         requests.forEach { req ->
-            if (req.characteristic.UUID == cardWriteChar.UUID) {
-                req.value?.let { nsData ->
-                    val bytes = nsData.bytes?.readBytes(nsData.length.toInt()) ?: byteArrayOf()
-                    _receivedCards.tryEmit(bytes)
+            when (req.characteristic.UUID) {
+                pingChar.UUID -> {
+                    // PING: ACK immediately, no data processing.
+                    manager.respondToRequest(req, CBATTErrorSuccess)
                 }
-                manager.respondToRequest(req, CBATTErrorSuccess)
-            } else {
-                manager.respondToRequest(req, CBATTErrorRequestNotSupported)
+
+                cardWriteChar.UUID -> {
+                    req.value?.let { nsData ->
+                        val bytes = nsData.bytes?.readBytes(nsData.length.toInt()) ?: byteArrayOf()
+                        _receivedCards.tryEmit(bytes)
+                    }
+                    manager.respondToRequest(req, CBATTErrorSuccess)
+                }
+
+                else -> manager.respondToRequest(req, CBATTErrorRequestNotSupported)
             }
         }
     }
@@ -124,7 +138,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             type = CBUUID.UUIDWithString(BleConstants.FREEPATH_SERVICE_UUID.toString()),
             primary = true,
         )
-        service.setCharacteristics(listOf(cardReadChar, cardWriteChar))
+        service.setCharacteristics(listOf(pingChar, cardReadChar, cardWriteChar))
         manager.addService(service)
     }
 }

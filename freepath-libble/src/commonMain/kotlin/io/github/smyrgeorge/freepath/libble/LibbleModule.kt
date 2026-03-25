@@ -12,16 +12,25 @@ import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.log4k.impl.extensions.doEvery
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalUuidApi::class)
@@ -32,22 +41,19 @@ class LibbleModule {
     val metrics: LibbleMetrics = LibbleMetrics()
 
     private val started = AtomicBoolean(false)
-    private val gattServerStarted = AtomicBoolean(false)
-    private var gattServerCollector: kotlinx.coroutines.Job? = null
-    private val advertiser: LibbleAdvertiser = LibbleAdvertiser()
-    internal val gattServer: BleGattServer = BleGattServer()
 
     @Volatile
     private var handler: (suspend (LibbleEvent) -> Unit)? = null
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // Job returned by doEvery (runs on its own EmptyScope); cancelled explicitly in stop().
-    private val expiryJob: kotlinx.coroutines.Job
+    private val advertiser: LibbleAdvertiser = LibbleAdvertiser()
 
-    private data class PeripheralEntry(
-        val event: LibbleEvent.PeripheralDiscovered,
-        val advertisement: Advertisement,
-    )
+    private val gattServerStarted = AtomicBoolean(false)
+    private var gattServerCollector: Job? = null
+    internal val gattServer: BleGattServer = BleGattServer()
+
+    private val expiryJob: Job
+    private val pingSemaphore = Semaphore(64)
 
     private val peripherals = mutableMapOf<String, PeripheralEntry>()
     private val peripheralsMutex = Mutex()
@@ -56,14 +62,28 @@ class LibbleModule {
         expiryJob = doEvery(1.seconds) {
             val now = Clock.System.now()
             val expired = mutableListOf<String>()
+            val disconnected = mutableListOf<String>()
+
             peripheralsMutex.withLock {
                 peripherals
-                    .filter { (_, e) -> now - e.event.discoveredAt > 5.seconds }
-                    .keys
-                    .forEach { id ->
+                    .filter { (_, e) -> now - e.event.discoveredAt > ADVERTISMENT_EXPIRE_THRESHOLD }
+                    .forEach { (id, entry) ->
                         peripherals.remove(id)
                         expired += id
+                        disconnected += id
                     }
+
+                peripherals
+                    .filter { (_, e) -> now - e.pingedAt > PING_DISCONNECT_THRESHOLD }
+                    .forEach { (id, entry) ->
+                        peripherals[id] = entry.copy(connected = false)
+                        disconnected += id
+                    }
+            }
+
+            disconnected.forEach { id ->
+                sendEvent(LibbleEvent.PeripheralDisconnected(id))
+                log.debug("Peripheral disconnected (ping timeout): $id")
             }
             expired.forEach { id ->
                 sendEvent(LibbleEvent.PeripheralExpired(id))
@@ -81,6 +101,7 @@ class LibbleModule {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
         log.info("LibbleModule starting")
         advertiser.start()
+        scope.launch { runPingLoop() }
         scope.launch {
             val scanner = Scanner {
                 filters {
@@ -100,19 +121,20 @@ class LibbleModule {
                     txPower = advertisement.txPower,
                     isConnectable = advertisement.isConnectable,
                 )
-                peripheralsMutex.withLock {
-                    peripherals[event.peripheralId] = PeripheralEntry(event, advertisement)
-                }
                 sendEvent(event)
+                peripheralsMutex.withLock {
+                    val prev = peripherals[event.peripheralId]
+                    peripherals[event.peripheralId] = PeripheralEntry(
+                        event = event,
+                        advertisement = advertisement,
+                        pingedAt = prev?.pingedAt ?: Instant.DISTANT_PAST,
+                        connected = prev?.connected ?: false,
+                    )
+                }
             }
         }
     }
 
-    /**
-     * Starts the GATT server hosting [localCardBytes] on the CARD_READ characteristic.
-     * Each received peer card is forwarded as a [LibbleEvent.ContactCardReceived] event.
-     * Idempotent: calling more than once is a no-op until [stopGattServer] is called.
-     */
     suspend fun startGattServer(localCardBytes: ByteArray) {
         if (!gattServerStarted.compareAndSet(expectedValue = false, newValue = true)) return
         gattServer.start(localCardBytes)
@@ -123,7 +145,6 @@ class LibbleModule {
         }
     }
 
-    /** Stops the GATT server. Call when the exchange screen is closed. */
     suspend fun stopGattServer() {
         if (!gattServerStarted.compareAndSet(expectedValue = true, newValue = false)) return
         gattServerCollector?.cancel()
@@ -131,23 +152,23 @@ class LibbleModule {
         gattServer.stop()
     }
 
-    /**
-     * Returns a [io.github.smyrgeorge.freepath.libble.gatt.BleConnection] to [peripheralId], ready to [io.github.smyrgeorge.freepath.libble.gatt.BleConnection.connect].
-     * The peripheral must be present in the current discovery cache.
-     */
-    suspend fun connect(peripheralId: String): BleConnection {
+    suspend fun connection(peripheralId: String): BleConnection {
         val entry = peripheralsMutex.withLock { peripherals[peripheralId] }
             ?: error("Unknown peripheralId: $peripheralId — not in discovery cache")
         return BleConnection(Peripheral(entry.advertisement))
     }
 
-    /**
-     * Creates an initiator session that will connect to [peripheralId].
-     * Call [io.github.smyrgeorge.freepath.libble.exchange.BleContactExchangeSession.send] first to connect and push your card,
-     * then [io.github.smyrgeorge.freepath.libble.exchange.BleContactExchangeSession.receive] to read the peer's card.
-     */
-    suspend fun initSession(peripheralId: String, pin: String): BleContactExchangeSession =
-        BleContactExchangeSession(connect(peripheralId), pin)
+    suspend fun initSession(peripheralId: String, pin: String): BleContactExchangeSession {
+        val session = BleContactExchangeSession(connection(peripheralId), pin)
+        peripheralsMutex.withLock {
+            val entry = peripherals[peripheralId] ?: return@withLock
+            peripherals[peripheralId] = entry.copy(
+                pingedAt = Clock.System.now(),
+                connected = true,
+            )
+        }
+        return session
+    }
 
     suspend fun stop() {
         if (!started.compareAndSet(expectedValue = true, newValue = false)) return
@@ -159,8 +180,65 @@ class LibbleModule {
         scope.cancel()
     }
 
+    private suspend fun runPingLoop() {
+        while (true) {
+            peripheralsMutex.withLock { peripherals.keys.toList() }.forEach { id ->
+                scope.launch {
+                    pingSemaphore.withPermit {
+                        val success = ping(id)
+                        if (success) {
+                            var wasConnected = false
+                            peripheralsMutex.withLock {
+                                val entry = peripherals[id] ?: return@withLock
+                                wasConnected = entry.connected
+                                peripherals[id] = entry.copy(
+                                    pingedAt = Clock.System.now(),
+                                    connected = true,
+                                )
+                            }
+                            if (!wasConnected) {
+                                sendEvent(LibbleEvent.PeripheralConnected(id))
+                                log.debug("Peripheral connected (ping OK): $id")
+                            }
+                        }
+                    }
+                }
+            }
+            delay(PING_INTERVAL)
+        }
+    }
+
+    private suspend fun ping(peripheralId: String): Boolean = runCatching {
+        withTimeoutOrNull(PING_TIMEOUT) {
+            val conn = connection(peripheralId)
+            try {
+                conn.connect()
+                conn.ping()
+                true
+            } finally {
+                withContext(NonCancellable) { conn.disconnect() }
+            }
+        } ?: false
+    }.onFailure {
+        log.debug("Ping failed for $peripheralId: $it")
+    }.getOrDefault(false)
+
     private suspend fun sendEvent(event: LibbleEvent) {
         metrics.onEvent(event)
         handler?.let { h -> runCatching { h(event) } }
+    }
+
+    private data class PeripheralEntry(
+        val event: LibbleEvent.PeripheralDiscovered,
+        val advertisement: Advertisement,
+        val pingedAt: Instant = Instant.DISTANT_PAST,
+        val connected: Boolean = false,
+    )
+
+    companion object {
+        private val ADVERTISMENT_EXPIRE_THRESHOLD = 3.seconds
+        private val PING_DISCONNECT_THRESHOLD = 3.seconds
+        private val PING_INTERVAL = 1.seconds
+        private val PING_TIMEOUT = 3.seconds
     }
 }

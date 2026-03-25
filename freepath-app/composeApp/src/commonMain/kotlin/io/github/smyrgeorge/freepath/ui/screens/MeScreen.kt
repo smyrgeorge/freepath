@@ -55,6 +55,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.dev_delete_content_su
 import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_content
 import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_content_subtitle
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_connectable
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_connected_peripherals
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_discovered_peripherals
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_metrics_title
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_none
@@ -270,10 +271,19 @@ private fun LibbleMetricsPanel(metrics: LibbleMetricsSnapshot) {
             label = stringResource(Res.string.dev_libble_discovered_peripherals),
             value = metrics.discoveredPeripherals.takeIf { it.isNotEmpty() }
                 ?.values?.joinToString("\n") { p ->
-                    val label = p.peripheralName ?: p.name ?: p.peripheralId
+                    val label = p.peripheralName ?: p.name ?: p.peripheralId.abbrev()
                     val tx = p.txPower?.let { " | $txPowerLabel: ${it}dBm" } ?: ""
                     val connectable = p.isConnectable?.let { " | $connectableLabel: $it" } ?: ""
-                    "$label (rssi: ${p.rssi}dBm$tx$connectable)"
+                    "$label ${p.peripheralId.abbrev()} (rssi: ${p.rssi}dBm$tx$connectable)"
+                } ?: none,
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libble_connected_peripherals),
+            value = metrics.connectedPeripherals.takeIf { it.isNotEmpty() }
+                ?.joinToString("\n") { id ->
+                    val p = metrics.discoveredPeripherals[id]
+                    val label = p?.peripheralName ?: p?.name ?: id.abbrev()
+                    "$label ${id.abbrev()}"
                 } ?: none,
         )
     }

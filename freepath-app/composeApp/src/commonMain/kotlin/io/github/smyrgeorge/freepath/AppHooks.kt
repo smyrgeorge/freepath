@@ -44,10 +44,10 @@ object AppHooks {
     }
 
     fun onStart() {
-        launch { AppResources.system.tell(Protocol.AppForegrounded) }
+        launch { ActorSystem.get(AppActor::class, AppActor.DEFAULT_KEY).tell(Protocol.AppForegrounded) }
     }
 
     fun onStop() {
-        launch { AppResources.system.tell(Protocol.AppBackgrounded) }
+        launch { ActorSystem.get(AppActor::class, AppActor.DEFAULT_KEY).tell(Protocol.AppBackgrounded) }
     }
 }

@@ -14,5 +14,7 @@ sealed class LibbleEvent {
     ) : LibbleEvent()
 
     data class PeripheralExpired(val peripheralId: String) : LibbleEvent()
+    data class PeripheralConnected(val peripheralId: String) : LibbleEvent()
+    data class PeripheralDisconnected(val peripheralId: String) : LibbleEvent()
     class ContactCardReceived(val cardBytes: ByteArray) : LibbleEvent()
 }

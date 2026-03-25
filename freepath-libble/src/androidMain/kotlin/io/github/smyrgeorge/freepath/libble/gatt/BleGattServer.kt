@@ -59,6 +59,10 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             characteristic: BluetoothGattCharacteristic,
             preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?,
         ) {
+            if (characteristic.uuid == PING_JVM_UUID) {
+                if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+                return
+            }
             if (characteristic.uuid != CARD_WRITE_JVM_UUID) {
                 if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null)
                 return
@@ -110,6 +114,13 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             )
             service.addCharacteristic(
                 BluetoothGattCharacteristic(
+                    PING_JVM_UUID,
+                    BluetoothGattCharacteristic.PROPERTY_WRITE,
+                    BluetoothGattCharacteristic.PERMISSION_WRITE,
+                )
+            )
+            service.addCharacteristic(
+                BluetoothGattCharacteristic(
                     CARD_READ_JVM_UUID,
                     BluetoothGattCharacteristic.PROPERTY_READ,
                     BluetoothGattCharacteristic.PERMISSION_READ,
@@ -141,13 +152,9 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     }
 
     companion object {
-        @OptIn(ExperimentalUuidApi::class)
-        private val CARD_READ_JVM_UUID = UUID.fromString(BleConstants.CARD_READ_UUID.toString())
-
-        @OptIn(ExperimentalUuidApi::class)
-        private val CARD_WRITE_JVM_UUID = UUID.fromString(BleConstants.CARD_WRITE_UUID.toString())
-
-        @OptIn(ExperimentalUuidApi::class)
         private val SERVICE_JVM_UUID = UUID.fromString(BleConstants.FREEPATH_SERVICE_UUID.toString())
+        private val PING_JVM_UUID = UUID.fromString(BleConstants.PING_UUID.toString())
+        private val CARD_READ_JVM_UUID = UUID.fromString(BleConstants.CARD_READ_UUID.toString())
+        private val CARD_WRITE_JVM_UUID = UUID.fromString(BleConstants.CARD_WRITE_UUID.toString())
     }
 }
