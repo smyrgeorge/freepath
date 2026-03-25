@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.client.codec
 
-import io.github.smyrgeorge.freepath.client.model.ContactInfo
 import io.github.smyrgeorge.freepath.client.model.StatelessEnvelope
+import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.codec.Base58
@@ -55,7 +55,7 @@ object StatelessEnvelopeCodec {
     fun open(
         envelope: StatelessEnvelope,
         receiver: Identity,
-        contactLookup: (peerIdRaw: ByteArray) -> ContactInfo?,
+        contactLookup: (peerId: String) -> ContactCard?,
     ): ByteArray {
         if (envelope.schema != SCHEMA)
             throw EnvelopeException("Unsupported schema: ${envelope.schema}")
@@ -69,10 +69,10 @@ object StatelessEnvelopeCodec {
         if (!receiverIdRaw.contentEquals(receiver.peerIdRaw))
             throw EnvelopeException("Envelope receiverId does not match local peerId")
 
+        val contact = contactLookup(envelope.senderId)
+            ?: throw EnvelopeException("Unknown sender peerId")
         val senderIdRaw = runCatching { Base58.decode(envelope.senderId) }
             .getOrElse { throw EnvelopeException("Invalid senderId encoding") }
-        val contact = contactLookup(senderIdRaw)
-            ?: throw EnvelopeException("Unknown sender peerId")
 
         val nonce = envelope.nonce
         if (nonce.size != 12) throw EnvelopeException("Nonce must be 12 bytes, got ${nonce.size}")

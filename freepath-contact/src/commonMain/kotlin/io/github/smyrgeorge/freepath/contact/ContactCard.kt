@@ -24,6 +24,8 @@ data class ContactCard(
     @ProtoNumber(5) val name: String? = null,
 ) {
     val peerId: String by lazy { ContactCardCodec.derivePeerId(Base64.decode(sigKey)) }
+    val sigKeyPublic: ByteArray by lazy { Base64.decode(sigKey) }
+    val encKeyPublic: ByteArray by lazy { Base64.decode(encKey) }
 
     init {
         require(schema == SCHEMA) { "Unsupported schema version: $schema (expected $SCHEMA)" }

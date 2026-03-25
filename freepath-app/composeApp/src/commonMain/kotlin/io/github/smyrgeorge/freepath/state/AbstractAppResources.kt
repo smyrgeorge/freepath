@@ -3,7 +3,6 @@ package io.github.smyrgeorge.freepath.state
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.client.AppClient
-import io.github.smyrgeorge.freepath.client.model.ContactInfo
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
@@ -39,7 +38,7 @@ abstract class AbstractAppResources(
 
     lateinit var identity: Identity
     lateinit var identityEntry: IdentityEntry
-    lateinit var contactLookup: (ByteArray) -> ContactInfo?
+    lateinit var contactLookup: (String) -> ContactCard?
 
     val identityRepository: IdentityEntryRepository = IdentityEntryRepositoryImpl
     val contactCardRepository: ContactCardEntryRepository = ContactCardEntryRepositoryImpl
@@ -108,7 +107,7 @@ abstract class AbstractAppResources(
         peerId: String,
         sigKeyPrivate: ByteArray,
         identityEntry: IdentityEntry,
-        contactLookup: (ByteArray) -> ContactInfo?,
+        contactLookup: (String) -> ContactCard?,
     ) {
         this.identity = identityEntry.identity
         this.identityEntry = identityEntry

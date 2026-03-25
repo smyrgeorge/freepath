@@ -1,7 +1,6 @@
 package io.github.smyrgeorge.freepath.state
 
 import io.github.smyrgeorge.freepath.client.model.ChatMessage
-import io.github.smyrgeorge.freepath.client.model.ContactInfo
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.Identity
@@ -189,17 +188,8 @@ abstract class AbstractAppState(
         }
     }
 
-    fun contactLookup(peerIdRaw: ByteArray): ContactInfo? {
-        return contacts.value.firstOrNull {
-            val peerId = CryptoProvider.sha256(Base64.decode(it.card.sigKey))
-            peerId.contentEquals(peerIdRaw)
-        }?.let { entry ->
-            ContactInfo(
-                sigKeyPublic = Base64.decode(entry.card.sigKey),
-                encKeyPublic = Base64.decode(entry.card.encKey),
-            )
-        }
-    }
+    fun contactLookup(peerId: String): ContactCard? =
+        contacts.value.firstOrNull { it.peerId == peerId }?.card
 
     suspend fun resetData(): Boolean {
         viewState.showResetClearing()
