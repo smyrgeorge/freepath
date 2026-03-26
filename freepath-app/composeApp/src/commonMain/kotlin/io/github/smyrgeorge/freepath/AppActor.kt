@@ -107,11 +107,9 @@ class AppActor(
                             peerCard
                         }
                         result.onSuccess { peerCard ->
-                            resources.system.tell(Protocol.ContactExchangeSucceeded(peerCard)).getOrThrow()
+                            ctx.tell(Protocol.ContactExchangeSucceeded(peerCard)).getOrThrow()
                         }.onFailure { e ->
-                            resources.system.tell(
-                                Protocol.ContactExchangeFailed(e.message ?: "BLE exchange failed")
-                            ).getOrThrow()
+                            ctx.tell(Protocol.ContactExchangeFailed(e.message ?: "BLE exchange failed")).getOrThrow()
                         }
                     }
                 }

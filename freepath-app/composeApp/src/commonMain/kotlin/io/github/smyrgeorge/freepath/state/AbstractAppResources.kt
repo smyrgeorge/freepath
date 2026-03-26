@@ -55,7 +55,7 @@ abstract class AbstractAppResources(
 
             else -> Unit.success()
         }.onFailure {
-            log.error(it) { "Error while processing Libp2pEvent: $event" }
+            log.error { "Error while processing Libp2pEvent: $event" }
         }
     }
 
@@ -70,7 +70,7 @@ abstract class AbstractAppResources(
 
             else -> Unit.success()
         }.onFailure {
-            log.error(it) { "Error while processing LibbleEvent: $event" }
+            log.error { "Error while processing LibbleEvent: $event" }
         }
     }
 
