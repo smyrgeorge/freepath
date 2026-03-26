@@ -3,6 +3,7 @@ package io.github.smyrgeorge.freepath.state
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.client.AppClient
+import io.github.smyrgeorge.freepath.client.model.success
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
@@ -49,10 +50,12 @@ abstract class AbstractAppResources(
         when (event) {
             is Libp2pEvent.PeerIdentified -> {
                 val cmd = Protocol.PeerIdentified(event.peerId)
-                system.tell(cmd).getOrThrow()
+                system.tell(cmd)
             }
 
-            else -> Unit
+            else -> Unit.success()
+        }.onFailure {
+            log.error(it) { "Error while processing Libp2pEvent: $event" }
         }
     }
 
@@ -62,10 +65,12 @@ abstract class AbstractAppResources(
                 log.info { "LibbleEvent: $event" }
                 val (pin, card) = BleContactExchange.decodeWithPin(event.cardBytes).getOrThrow()
                 val cmd = Protocol.IncomingContactExchange(card.peerId, pin, card)
-                system.tell(cmd).getOrThrow()
+                system.tell(cmd)
             }
 
-            else -> Unit
+            else -> Unit.success()
+        }.onFailure {
+            log.error(it) { "Error while processing LibbleEvent: $event" }
         }
     }
 
