@@ -14,7 +14,7 @@ actor4k = "1.4.10"
 # https://github.com/Kotlin/kotlinx.serialization
 kotlinx-serialization = "1.10.0"
 # https://github.com/ktorio/ktor
-ktor = "3.4.1"
+ktor = "3.4.2"
 # https://www.bouncycastle.org
 bouncycastle = "1.83"
 # https://github.com/ionspin/kotlin-multiplatform-bignum
