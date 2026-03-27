@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -56,7 +55,6 @@ import androidx.compose.ui.unit.sp
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppViewState
 import io.github.smyrgeorge.freepath.Protocol
-import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.state.model.ExchangeDrawerState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -110,17 +108,18 @@ fun ContactExchangeDrawer() {
     val activeState = if (isVisible) drawerState else currentState
 
     if (activeState !is ExchangeDrawerState.Hidden) {
-        // Scrim — not tappable for RequestorWaiting (prevents accidental dismiss while waiting)
+        // Scrim — not tappable for ResponderWaiting (prevents accidental dismiss while exchange runs)
+        val isWaitingState = activeState is ExchangeDrawerState.ResponderWaiting
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.5f))
                 .then(
-                    if (activeState !is ExchangeDrawerState.RequestorWaiting) {
+                    if (!isWaitingState) {
                         Modifier.clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = { scope.launch { AppResources.system.tell(Protocol.ContactExchangeCancelled) } },
+                            onClick = { scope.launch { AppResources.system.tell(Protocol.BleContactExchangeCancelled) } },
                         )
                     } else {
                         Modifier
@@ -130,26 +129,25 @@ fun ContactExchangeDrawer() {
 
         Box(modifier = Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.BottomCenter) {
             when (activeState) {
-                is ExchangeDrawerState.RequestorWaiting -> {
-                    RequestorWaitingDrawer(
-                        state = activeState,
-                        offsetProvider = { offsetAnim.value.roundToInt() },
-                        onHeightMeasured = { drawerHeightPx = it },
-                        onCancel = { scope.launch { AppResources.system.tell(Protocol.ContactExchangeCancelled) } },
-                    )
-                }
-
-                is ExchangeDrawerState.RecipientEnterPin -> {
-                    RecipientEnterPinDrawer(
-                        peerCard = activeState.peerCard,
+                is ExchangeDrawerState.RequestorEnterPin -> {
+                    RequestorEnterPinDrawer(
                         offsetProvider = { offsetAnim.value.roundToInt() },
                         onHeightMeasured = { drawerHeightPx = it },
                         onSubmit = { pin ->
                             scope.launch {
-                                AppResources.system.tell(Protocol.ContactExchangePinSubmitted(pin))
+                                AppResources.system.tell(Protocol.BleBeginInitiatorContactExchange(activeState.peripheralId, pin))
                             }
                         },
-                        onCancel = { scope.launch { AppResources.system.tell(Protocol.ContactExchangeCancelled) } },
+                        onCancel = { scope.launch { AppResources.system.tell(Protocol.BleContactExchangeCancelled) } },
+                    )
+                }
+
+                is ExchangeDrawerState.ResponderWaiting -> {
+                    ResponderWaitingDrawer(
+                        state = activeState,
+                        offsetProvider = { offsetAnim.value.roundToInt() },
+                        onHeightMeasured = { drawerHeightPx = it },
+                        onCancel = { scope.launch { AppResources.system.tell(Protocol.BleContactExchangeCancelled) } },
                     )
                 }
 
@@ -158,7 +156,7 @@ fun ContactExchangeDrawer() {
                         state = activeState,
                         offsetProvider = { offsetAnim.value.roundToInt() },
                         onHeightMeasured = { drawerHeightPx = it },
-                        onDismiss = { scope.launch { AppResources.system.tell(Protocol.ContactExchangeCancelled) } },
+                        onDismiss = { scope.launch { AppResources.system.tell(Protocol.BleContactExchangeCancelled) } },
                     )
                 }
 
@@ -204,80 +202,7 @@ private fun DrawerShell(
 }
 
 @Composable
-private fun RequestorWaitingDrawer(
-    state: ExchangeDrawerState.RequestorWaiting,
-    offsetProvider: () -> Int,
-    onHeightMeasured: (Float) -> Unit,
-    onCancel: () -> Unit,
-) {
-    DrawerShell(offsetProvider = offsetProvider, onHeightMeasured = onHeightMeasured) {
-        Text(
-            text = "Your PIN",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "Share this with the person you want to connect with.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // PIN display — spaced digits
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            state.pin.forEach { digit ->
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant,
-                            RoundedCornerShape(10.dp),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = digit.toString(),
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-        Text(
-            text = "Waiting for peer to confirm…",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        FreepathButton(
-            onClick = onCancel,
-            modifier = Modifier.fillMaxWidth(),
-            variant = ButtonVariant.Outline,
-        ) {
-            Text(
-                text = "Cancel",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-    }
-}
-
-@Composable
-private fun RecipientEnterPinDrawer(
-    peerCard: ContactCard,
+private fun RequestorEnterPinDrawer(
     offsetProvider: () -> Int,
     onHeightMeasured: (Float) -> Unit,
     onSubmit: (String) -> Unit,
@@ -285,16 +210,9 @@ private fun RecipientEnterPinDrawer(
 ) {
     var enteredPin by remember { mutableStateOf("") }
 
-    val peerName = remember(peerCard) {
-        peerCard.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
-    }
-    val avatarLabel = remember(peerCard) {
-        (peerName?.firstOrNull()?.uppercaseChar() ?: peerCard.peerId.first().uppercaseChar()).toString()
-    }
-
     DrawerShell(offsetProvider = offsetProvider, onHeightMeasured = onHeightMeasured) {
         Text(
-            text = "Contact request",
+            text = "Add via Bluetooth",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -302,59 +220,12 @@ private fun RecipientEnterPinDrawer(
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "This person wants to exchange contact cards with you.",
+            text = "Enter the 4-digit PIN shown on the other device.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(16.dp))
-
-        // Peer identity card
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    RoundedCornerShape(12.dp),
-                )
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            val onSurface = MaterialTheme.colorScheme.onSurface
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
-                    .border(1.5.dp, onSurface, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = avatarLabel,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = onSurface,
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = peerName ?: (peerCard.peerId.take(12) + "…"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                FreepathFingerprint(text = peerCard.peerId)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Enter the 4-digit PIN shown on their device to confirm.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedTextField(
             value = enteredPin,
@@ -406,11 +277,82 @@ private fun RecipientEnterPinDrawer(
                 enabled = enteredPin.length == 4,
             ) {
                 Text(
-                    text = "Confirm",
+                    text = "Connect",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ResponderWaitingDrawer(
+    state: ExchangeDrawerState.ResponderWaiting,
+    offsetProvider: () -> Int,
+    onHeightMeasured: (Float) -> Unit,
+    onCancel: () -> Unit,
+) {
+    DrawerShell(offsetProvider = offsetProvider, onHeightMeasured = onHeightMeasured) {
+        Text(
+            text = "Waiting for peer",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "The other device should now tap \"Add\" to connect.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            state.pin.forEach { digit ->
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(10.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = digit.toString(),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            text = "Waiting for initiator to connect…",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        FreepathButton(
+            onClick = onCancel,
+            modifier = Modifier.fillMaxWidth(),
+            variant = ButtonVariant.Outline,
+        ) {
+            Text(
+                text = "Cancel",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }

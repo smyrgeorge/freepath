@@ -17,7 +17,6 @@ import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.LibbleModule
-import io.github.smyrgeorge.freepath.libble.exchange.BleContactExchange
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
 import io.github.smyrgeorge.freepath.util.exitApplication
@@ -61,17 +60,11 @@ abstract class AbstractAppResources(
 
     val libble: LibbleModule = LibbleModule().setEventHandler { event ->
         when (event) {
-            is LibbleEvent.ContactCardReceived -> {
-                log.info { "LibbleEvent: $event" }
-                val (pin, card) = BleContactExchange.decodeWithPin(event.cardBytes).getOrThrow()
-                val cmd = Protocol.IncomingContactExchange(card.peerId, pin, card)
-                system.tell(cmd)
-            }
-
-            else -> Unit.success()
-        }.onFailure {
-            log.error { "Error while processing LibbleEvent: $event" }
+            is LibbleEvent.ContactExchange.Failed -> log.warn { "LibbleEvent: exchange failed: ${event.reason}" }
+            is LibbleEvent.ContactExchange -> log.info { "LibbleEvent: $event" }
+            else -> Unit
         }
+        Unit.success()
     }
 
     fun initialize(system: ActorRef) {
@@ -124,12 +117,8 @@ abstract class AbstractAppResources(
         libp2p.stop()
     }
 
-    suspend fun startupLibble(
-        localCard: ContactCard,
-        sigKeyPrivate: ByteArray
-    ) {
+    suspend fun startupLibble() {
         libble.start()
-        libble.startGattServer(BleContactExchange.encode(localCard, sigKeyPrivate))
     }
 
     suspend fun stopLibble() {

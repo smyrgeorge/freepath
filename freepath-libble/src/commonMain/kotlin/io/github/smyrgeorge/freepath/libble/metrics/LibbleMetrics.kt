@@ -44,6 +44,6 @@ class LibbleMetrics {
 
             is LibbleEvent.PeripheralConnected -> s.copy(connectedPeripherals = s.connectedPeripherals + event.peripheralId)
             is LibbleEvent.PeripheralDisconnected -> s.copy(connectedPeripherals = s.connectedPeripherals - event.peripheralId)
-            is LibbleEvent.ContactCardReceived -> s
+            is LibbleEvent.ContactExchange -> s
         }
 }

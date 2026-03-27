@@ -7,7 +7,6 @@ import io.github.smyrgeorge.freepath.contact.ContactCard
  * discrete byte payloads (e.g. QR code, alphanumeric string).
  *
  * Exchange modes supported: **unidirectional** (one party sends their card only).
- * For session-based bidirectional exchange (NFC, Bluetooth LE) see [ContactExchangeSession].
  */
 interface ContactExchange {
 

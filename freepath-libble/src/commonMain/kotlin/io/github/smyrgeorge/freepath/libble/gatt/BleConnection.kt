@@ -15,15 +15,17 @@ class BleConnection internal constructor(
         service = BleConstants.FREEPATH_SERVICE_UUID,
         characteristic = BleConstants.PING_UUID,
     )
-
-    private val cardReadChar = characteristicOf(
+    private val ephemeralChar = characteristicOf(
         service = BleConstants.FREEPATH_SERVICE_UUID,
-        characteristic = BleConstants.CARD_READ_UUID,
+        characteristic = BleConstants.EPHEMERAL_UUID,
     )
-
-    private val cardWriteChar = characteristicOf(
+    private val cardChar = characteristicOf(
         service = BleConstants.FREEPATH_SERVICE_UUID,
-        characteristic = BleConstants.CARD_WRITE_UUID,
+        characteristic = BleConstants.CARD_UUID,
+    )
+    private val statusChar = characteristicOf(
+        service = BleConstants.FREEPATH_SERVICE_UUID,
+        characteristic = BleConstants.STATUS_UUID,
     )
 
     override suspend fun connect() {
@@ -35,7 +37,21 @@ class BleConnection internal constructor(
         peripheral.close()
     }
 
-    override suspend fun ping(): Unit = peripheral.write(pingChar, byteArrayOf(), WriteType.WithResponse)
-    override suspend fun readCard(): ByteArray = peripheral.read(cardReadChar)
-    override suspend fun writeCard(bytes: ByteArray) = peripheral.write(cardWriteChar, bytes, WriteType.WithResponse)
+    override suspend fun ping(): Unit =
+        peripheral.write(pingChar, byteArrayOf(), WriteType.WithResponse)
+
+    override suspend fun writeEphemeral(bytes: ByteArray): Unit =
+        peripheral.write(ephemeralChar, bytes, WriteType.WithResponse)
+
+    override suspend fun readEphemeral(): ByteArray =
+        peripheral.read(ephemeralChar)
+
+    override suspend fun writeCard(bytes: ByteArray): Unit =
+        peripheral.write(cardChar, bytes, WriteType.WithResponse)
+
+    override suspend fun readCard(): ByteArray =
+        peripheral.read(cardChar)
+
+    override suspend fun writeStatus(status: Byte): Unit =
+        peripheral.write(statusChar, byteArrayOf(status), WriteType.WithResponse)
 }

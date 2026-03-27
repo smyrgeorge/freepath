@@ -22,12 +22,17 @@ class AppActor(
     private val viewState: AbstractViewState,
     private val resources: AbstractAppResources,
 ) : BehaviorActor<Protocol, Protocol.Response>(key) {
+    /** Tracks the currently running exchange coroutine so it can be cancelled on dismiss. */
+    private var exchangeJob: Job? = null
+
     private val timer: Job = doEvery(5.seconds) {
-        tell(Protocol.Ping).getOrThrow() // Keep the actor alive.
+        // Keep the actor alive.
+        tell(Protocol.Ping).getOrElse { log.error("Failed to ping: ${it.message}") }
     }
 
     override suspend fun onBeforeActivate() {
-        tell(Protocol.Ping).getOrThrow() // Trigger activation.
+        // Trigger activation.
+        tell(Protocol.Ping).getOrElse { log.error("Failed to ping: ${it.message}") }
     }
 
     override suspend fun onActivate(m: Protocol) {
@@ -42,10 +47,7 @@ class AppActor(
                 identityEntry = state.identityEntry,
                 contactLookup = { state.contactLookup(it) },
             )
-            resources.startupLibble(
-                localCard = state.contactCard,
-                sigKeyPrivate = state.identity.sigKeyPrivate,
-            )
+            resources.startupLibble()
         }
 
         log.info("[onActivate] Identity: ${state.identityEntry}")
@@ -71,7 +73,6 @@ class AppActor(
     override suspend fun onShutdown() {
         log.info("[onShutdown] Shutting down...")
         timer.cancel()
-        state.resetContactExchange()
         resources.stopLibp2p()
         resources.stopLibble()
         resources.closeDatabase()
@@ -90,36 +91,27 @@ class AppActor(
                 is Protocol.Ping -> return@normal Behavior.Reply(Protocol.Pong)
                 is Protocol.AcceptContact -> state.acceptContact(m.card)
                 is Protocol.SetTrustLevel -> state.setTrustLevel(m.entry, m.level)
-                is Protocol.InitiateContactExchange -> {
-                    state.initiateContactExchange(m.peerId)
+                is Protocol.BleInitiateContactExchange -> {
+                    viewState.showRequestorEnterPin(m.peripheralId)
                     ctx.become(exchange)
                 }
 
-                is Protocol.InitiateBluetoothExchange -> {
-                    val pin = state.initiateContactExchange(m.peripheralId)
+                is Protocol.BleInitiateResponderContactExchange -> {
+                    val pin = (0 until 4).map { ('0'..'9').random() }.joinToString("")
+                    viewState.showResponderWaiting(pin)
                     ctx.become(exchange)
-                    launch {
-                        val result = runCatching {
-                            val session = resources.libble.initSession(m.peripheralId, pin)
-                            session.send(state.contactCard, state.identity.sigKeyPrivate)
-                            val peerCard = session.receive().getOrThrow()
-                            session.close()
-                            peerCard
-                        }
+                    ctx.exchangeJob = launch {
+                        val result = resources.libble.beginResponderExchange(
+                            pin = pin,
+                            localCard = state.contactCard,
+                            sigKeyPrivate = state.identity.sigKeyPrivate,
+                        )
                         result.onSuccess { peerCard ->
-                            ctx.tell(Protocol.ContactExchangeSucceeded(peerCard)).getOrThrow()
+                            ctx.tell(Protocol.BleContactExchangeSucceeded(peerCard)).getOrThrow()
                         }.onFailure { e ->
-                            ctx.tell(Protocol.ContactExchangeFailed(e.message ?: "BLE exchange failed")).getOrThrow()
+                            ctx.tell(Protocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed")).getOrThrow()
                         }
                     }
-                }
-
-                is Protocol.IncomingContactExchange -> {
-                    state.contactExchangeIncomingPin = m.pin
-                    state.contactExchangeIncomingPeerId = m.peerId
-                    state.contactExchangeIncomingPeerCard = m.peerCard
-                    viewState.showRecipientDrawer(m.peerCard)
-                    ctx.become(exchange)
                 }
 
                 is Protocol.SendChatMessage -> {
@@ -129,7 +121,7 @@ class AppActor(
                         .onFailure { log.error("Failed to send chat message: ${it.message}") }
                 }
 
-                is Protocol.ChatMessageReceived -> state.appendMessage(m.message)
+                is Protocol.ChatMessageReceived -> state.appendMessage(m.msg)
                 is Protocol.ContentReceived -> state.receiveContent(m.envelope)
                 is Protocol.PeerIdentified -> {
                     resources.client.send(state.contactCardContentEnvelope, m.peerId)
@@ -146,57 +138,69 @@ class AppActor(
                     }
                 }
 
-                is Protocol.ContactExchangeCancelled -> {
-                    state.cancelContactExchange()
-                    ctx.become(normal)
-                }
-
                 else -> log.warn("[normal] (ignored $m)")
             }
             Behavior.Reply(Protocol.Ok)
         }
 
+        //
+        // Exchange state machine:
+        //
+        //   normal   ──► BleInitiateContactExchange          ──► exchange  (shows RequestorEnterPin drawer)
+        //   normal   ──► BleInitiateResponderContactExchange ──► exchange  (shows ResponderWaiting drawer, launches exchange)
+        //   exchange ──► BleBeginInitiatorContactExchange    ──► exchange  (launches initiator exchange with entered PIN)
+        //   exchange ──► BleContactExchangeSucceeded         ──► normal    (accepts card, hides drawer)
+        //   exchange ──► BleContactExchangeFailed            ──► exchange  (shows Failed drawer)
+        //   exchange ──► BleContactExchangeCancelled         ──► normal    (hides drawer — also handles Dismiss)
+        //
         private val exchange: suspend (AppActor, Protocol) -> Behavior<Protocol.Response> = exchange@{ ctx, m ->
             val log = ctx.log
             val state = ctx.state
             val viewState = ctx.viewState
+            val resources = ctx.resources
             when (m) {
                 is Protocol.Ping -> return@exchange Behavior.Reply(Protocol.Pong)
                 is Protocol.AcceptContact -> state.acceptContact(m.card)
-                is Protocol.ContactExchangePinSubmitted -> {
-                    val pin = state.contactExchangeIncomingPin
-                    val peerId = state.contactExchangeIncomingPeerId
-                    val peerCard = state.contactExchangeIncomingPeerCard
-                    state.resetContactExchange()
-                    if (m.enteredPin == pin && peerId != null && peerCard != null) {
-                        state.acceptContact(peerCard)
-                        viewState.hideExchangeDrawer()
-                    } else {
-                        val reason = if (m.enteredPin != pin) "Invalid PIN" else "Exchange error"
-                        state.handleContactExchangeFailure(reason)
+
+                is Protocol.BleBeginInitiatorContactExchange -> {
+                    viewState.hideExchangeDrawer()
+                    ctx.exchangeJob = launch {
+                        val result = resources.libble.beginInitiatorExchange(
+                            peripheralId = m.peripheralId,
+                            pin = m.pin,
+                            localCard = state.contactCard,
+                            sigKeyPrivate = state.identity.sigKeyPrivate,
+                        )
+                        result.onSuccess { peerCard ->
+                            ctx.tell(Protocol.BleContactExchangeSucceeded(peerCard)).getOrThrow()
+                        }.onFailure { e ->
+                            ctx.tell(Protocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed")).getOrThrow()
+                        }
                     }
-                    ctx.become(normal)
                 }
 
-                is Protocol.ContactExchangeCancelled -> {
+                is Protocol.BleContactExchangeCancelled -> {
+                    ctx.exchangeJob?.cancel()
+                    ctx.exchangeJob = null
                     state.cancelContactExchange()
                     ctx.become(normal)
                 }
 
-                is Protocol.ContactExchangeSucceeded -> {
-                    state.resetContactExchange()
-                    state.acceptContact(m.peerCard) // requestor auto-accepts — they initiated
-                    state.cancelContactExchange()   // hides the requestor PIN drawer
-                    ctx.become(normal)
-                }
-
-                is Protocol.ContactExchangeFailed -> {
-                    log.warn("[exchange] Exchange failed (${m.reason}) — resetting.")
+                is Protocol.BleContactExchangeSucceeded -> {
+                    ctx.exchangeJob = null
+                    state.acceptContact(m.peerCard)
                     state.cancelContactExchange()
                     ctx.become(normal)
                 }
 
-                is Protocol.ChatMessageReceived -> state.appendMessage(m.message)
+                is Protocol.BleContactExchangeFailed -> {
+                    log.warn("[exchange] Exchange failed: ${m.reason}")
+                    val userReason = friendlyBleError(m.reason)
+                    viewState.exchangeFailed(userReason)
+                    // Stay in exchange until user dismisses the Failed drawer via BleContactExchangeCancelled
+                }
+
+                is Protocol.ChatMessageReceived -> state.appendMessage(m.msg)
                 is Protocol.ContentReceived -> state.receiveContent(m.envelope)
                 else -> log.warn("[exchange] Contact exchange in process.. (ignored $m)")
             }
@@ -210,6 +214,22 @@ class AppActor(
                 else -> log.warn("[reset] Resetting app data... (ignored $m)")
             }
             Behavior.Reply(Protocol.Ok)
+        }
+
+        private fun friendlyBleError(reason: String): String = when {
+            reason.contains("disconnect", ignoreCase = true) ->
+                "Connection lost. Make sure both devices are nearby and try again."
+
+            reason.contains("timeout", ignoreCase = true) ->
+                "Exchange timed out. Make sure both devices are ready and try again."
+
+            reason.contains("PIN", ignoreCase = true) ->
+                "PIN confirmation failed. Check that both devices entered the same PIN."
+
+            reason.contains("mismatch", ignoreCase = true) ->
+                "PIN confirmation failed. Check that both devices entered the same PIN."
+
+            else -> "Exchange failed. Please try again."
         }
     }
 }

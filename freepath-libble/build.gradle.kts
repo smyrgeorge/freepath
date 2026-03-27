@@ -31,6 +31,7 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(project(":freepath-contact"))
+                implementation(project(":freepath-crypto"))
                 implementation(libs.kable.core)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.log4k)

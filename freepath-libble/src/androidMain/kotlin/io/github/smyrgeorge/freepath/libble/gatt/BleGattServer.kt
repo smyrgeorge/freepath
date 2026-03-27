@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.uuid.ExperimentalUuidApi
@@ -27,16 +28,28 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
 
     private val log = Logger.of(this::class)
 
-    private val _receivedCards = MutableSharedFlow<ByteArray>(extraBufferCapacity = 8)
-    actual override val receivedCards: SharedFlow<ByteArray> = _receivedCards
+    private val _events = MutableSharedFlow<BleGattServerPort.Event>(extraBufferCapacity = 8)
+    actual override val events: SharedFlow<BleGattServerPort.Event> = _events
 
     private val started = AtomicBoolean(false)
 
     @Volatile
-    private var localCardBytes: ByteArray = byteArrayOf()
-    private var server: BluetoothGattServer? = null
+    private var ephemeralValue: ByteArray = byteArrayOf()
 
+    @Volatile
+    private var cardValue: ByteArray = byteArrayOf()
+
+    private var server: BluetoothGattServer? = null
     private val preparedWriteBuffers = ConcurrentHashMap<String, ByteArray>()
+    private val preparedWriteChars = ConcurrentHashMap<String, UUID>()
+
+    actual override suspend fun setEphemeralValue(bytes: ByteArray) {
+        ephemeralValue = bytes
+    }
+
+    actual override suspend fun setCardValue(bytes: ByteArray) {
+        cardValue = bytes
+    }
 
     @SuppressLint("MissingPermission")
     private val callback = object : BluetoothGattServerCallback() {
@@ -44,10 +57,13 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             device: BluetoothDevice, requestId: Int, offset: Int,
             characteristic: BluetoothGattCharacteristic,
         ) {
-            if (characteristic.uuid == CARD_READ_JVM_UUID) {
-                val slice = localCardBytes.let {
-                    if (offset < it.size) it.copyOfRange(offset, it.size) else byteArrayOf()
-                }
+            val data = when (characteristic.uuid) {
+                EPHEMERAL_JVM_UUID -> ephemeralValue
+                CARD_JVM_UUID -> cardValue
+                else -> null
+            }
+            if (data != null) {
+                val slice = if (offset < data.size) data.copyOfRange(offset, data.size) else byteArrayOf()
                 server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, slice)
             } else {
                 server?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null)
@@ -59,48 +75,73 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             characteristic: BluetoothGattCharacteristic,
             preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?,
         ) {
-            if (characteristic.uuid == PING_JVM_UUID) {
-                if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
-                return
-            }
-            if (characteristic.uuid != CARD_WRITE_JVM_UUID) {
-                if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null)
-                return
-            }
-            if (value == null) {
-                if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
-                return
-            }
-            if (preparedWrite) {
-                // Accumulate chunk at offset
-                val existing = preparedWriteBuffers[device.address] ?: byteArrayOf()
-                val grown = if (offset <= existing.size) {
-                    existing.copyOf(offset + value.size).also { System.arraycopy(value, 0, it, offset, value.size) }
-                } else {
-                    existing + value
+            when (characteristic.uuid) {
+                PING_JVM_UUID -> {
+                    if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+                    return
                 }
-                preparedWriteBuffers[device.address] = grown
-            } else {
-                // Direct (short) write — emit immediately
-                _receivedCards.tryEmit(value)
+
+                EPHEMERAL_JVM_UUID, CARD_JVM_UUID, STATUS_JVM_UUID -> {
+                    if (value == null) {
+                        if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+                        return
+                    }
+                    if (preparedWrite) {
+                        val key = device.address
+                        val existing = preparedWriteBuffers[key] ?: byteArrayOf()
+                        val grown = if (offset <= existing.size) {
+                            existing.copyOf(offset + value.size)
+                                .also { System.arraycopy(value, 0, it, offset, value.size) }
+                        } else {
+                            existing + value
+                        }
+                        preparedWriteBuffers[key] = grown
+                        preparedWriteChars[key] = characteristic.uuid
+                    } else {
+                        emitWrite(characteristic.uuid, value)
+                    }
+                    if (responseNeeded) server?.sendResponse(
+                        device,
+                        requestId,
+                        BluetoothGatt.GATT_SUCCESS,
+                        offset,
+                        null
+                    )
+                }
+
+                else -> {
+                    if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null)
+                }
             }
-            if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null)
         }
 
         override fun onExecuteWrite(device: BluetoothDevice, requestId: Int, execute: Boolean) {
             if (execute) {
-                preparedWriteBuffers.remove(device.address)?.let { _receivedCards.tryEmit(it) }
+                val key = device.address
+                val bytes = preparedWriteBuffers.remove(key)
+                val uuid = preparedWriteChars.remove(key)
+                if (bytes != null && uuid != null) emitWrite(uuid, bytes)
             } else {
                 preparedWriteBuffers.remove(device.address)
+                preparedWriteChars.remove(device.address)
             }
             server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
         }
     }
 
+    private fun emitWrite(uuid: UUID, bytes: ByteArray) {
+        val event = when (uuid) {
+            EPHEMERAL_JVM_UUID -> BleGattServerPort.Event.EphemeralReceived(bytes)
+            CARD_JVM_UUID -> BleGattServerPort.Event.CardReceived(bytes)
+            STATUS_JVM_UUID -> BleGattServerPort.Event.StatusReceived(bytes.firstOrNull() ?: 0x02)
+            else -> return
+        }
+        _events.tryEmit(event)
+    }
+
     @SuppressLint("MissingPermission")
-    actual override suspend fun start(localCardBytes: ByteArray) {
+    actual override suspend fun start() {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
-        this.localCardBytes = localCardBytes
         withContext(Dispatchers.IO) {
             val ctx = requireNotNull(AndroidContextHolder.applicationContext) {
                 "BleGattServer: AndroidContextHolder.applicationContext must be set"
@@ -108,10 +149,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             val bt = ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
             val gattServer = bt.openGattServer(ctx, callback)
 
-            val service = BluetoothGattService(
-                SERVICE_JVM_UUID,
-                BluetoothGattService.SERVICE_TYPE_PRIMARY,
-            )
+            val service = BluetoothGattService(SERVICE_JVM_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY)
             service.addCharacteristic(
                 BluetoothGattCharacteristic(
                     PING_JVM_UUID,
@@ -121,14 +159,21 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             )
             service.addCharacteristic(
                 BluetoothGattCharacteristic(
-                    CARD_READ_JVM_UUID,
-                    BluetoothGattCharacteristic.PROPERTY_READ,
-                    BluetoothGattCharacteristic.PERMISSION_READ,
+                    EPHEMERAL_JVM_UUID,
+                    BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_WRITE,
+                    BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE,
                 )
             )
             service.addCharacteristic(
                 BluetoothGattCharacteristic(
-                    CARD_WRITE_JVM_UUID,
+                    CARD_JVM_UUID,
+                    BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_WRITE,
+                    BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE,
+                )
+            )
+            service.addCharacteristic(
+                BluetoothGattCharacteristic(
+                    STATUS_JVM_UUID,
                     BluetoothGattCharacteristic.PROPERTY_WRITE,
                     BluetoothGattCharacteristic.PERMISSION_WRITE,
                 )
@@ -145,7 +190,10 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         withContext(Dispatchers.IO) {
             val s = server
             server = null
+            ephemeralValue = byteArrayOf()
+            cardValue = byteArrayOf()
             preparedWriteBuffers.clear()
+            preparedWriteChars.clear()
             s?.close()
             log.info("BleGattServer stopped")
         }
@@ -154,7 +202,8 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     companion object {
         private val SERVICE_JVM_UUID = UUID.fromString(BleConstants.FREEPATH_SERVICE_UUID.toString())
         private val PING_JVM_UUID = UUID.fromString(BleConstants.PING_UUID.toString())
-        private val CARD_READ_JVM_UUID = UUID.fromString(BleConstants.CARD_READ_UUID.toString())
-        private val CARD_WRITE_JVM_UUID = UUID.fromString(BleConstants.CARD_WRITE_UUID.toString())
+        private val EPHEMERAL_JVM_UUID = UUID.fromString(BleConstants.EPHEMERAL_UUID.toString())
+        private val CARD_JVM_UUID = UUID.fromString(BleConstants.CARD_UUID.toString())
+        private val STATUS_JVM_UUID = UUID.fromString(BleConstants.STATUS_UUID.toString())
     }
 }

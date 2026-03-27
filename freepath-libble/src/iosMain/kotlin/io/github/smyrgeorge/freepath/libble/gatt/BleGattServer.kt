@@ -36,13 +36,17 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
 
     private val log = Logger.of(this::class)
 
-    private val _receivedCards = MutableSharedFlow<ByteArray>(extraBufferCapacity = 8)
-    actual override val receivedCards: SharedFlow<ByteArray> = _receivedCards
+    private val _events = MutableSharedFlow<BleGattServerPort.Event>(extraBufferCapacity = 8)
+    actual override val events: SharedFlow<BleGattServerPort.Event> = _events
 
     private val started = AtomicBoolean(false)
 
     @Volatile
-    private var localCardBytes: ByteArray = byteArrayOf()
+    private var ephemeralValue: ByteArray = byteArrayOf()
+
+    @Volatile
+    private var cardValue: ByteArray = byteArrayOf()
+
     private val manager: CBPeripheralManager get() = PeripheralManagerHolder.manager.manager
 
     private val pingChar = CBMutableCharacteristic(
@@ -51,28 +55,46 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         value = null,
         permissions = CBAttributePermissionsWriteable,
     )
-
-    private val cardReadChar = CBMutableCharacteristic(
-        type = CBUUID.UUIDWithString(BleConstants.CARD_READ_UUID.toString()),
-        properties = CBCharacteristicPropertyRead,
+    private val ephemeralChar = CBMutableCharacteristic(
+        type = CBUUID.UUIDWithString(BleConstants.EPHEMERAL_UUID.toString()),
+        properties = CBCharacteristicPropertyRead or CBCharacteristicPropertyWrite,
         value = null,
-        permissions = CBAttributePermissionsReadable,
+        permissions = CBAttributePermissionsReadable or CBAttributePermissionsWriteable,
     )
-
-    private val cardWriteChar = CBMutableCharacteristic(
-        type = CBUUID.UUIDWithString(BleConstants.CARD_WRITE_UUID.toString()),
+    private val cardChar = CBMutableCharacteristic(
+        type = CBUUID.UUIDWithString(BleConstants.CARD_UUID.toString()),
+        properties = CBCharacteristicPropertyRead or CBCharacteristicPropertyWrite,
+        value = null,
+        permissions = CBAttributePermissionsReadable or CBAttributePermissionsWriteable,
+    )
+    private val statusChar = CBMutableCharacteristic(
+        type = CBUUID.UUIDWithString(BleConstants.STATUS_UUID.toString()),
         properties = CBCharacteristicPropertyWrite,
         value = null,
         permissions = CBAttributePermissionsWriteable,
     )
 
+    actual override suspend fun setEphemeralValue(bytes: ByteArray) {
+        ephemeralValue = bytes
+    }
+
+    actual override suspend fun setCardValue(bytes: ByteArray) {
+        cardValue = bytes
+    }
+
+    private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
+        NSData.dataWithBytes(pinned.addressOf(0), size.toULong())
+    }
+
     private val readHandler: (CBATTRequest) -> Unit = readHandler@{ request ->
         if (!started.load()) return@readHandler
-        if (request.characteristic.UUID == cardReadChar.UUID) {
-            val data = localCardBytes.usePinned { pinned ->
-                NSData.dataWithBytes(pinned.addressOf(0), localCardBytes.size.toULong())
-            }
-            request.value = data
+        val data = when (request.characteristic.UUID) {
+            ephemeralChar.UUID -> ephemeralValue
+            cardChar.UUID -> cardValue
+            else -> null
+        }
+        if (data != null) {
+            request.value = data.toNSData()
             manager.respondToRequest(request, CBATTErrorSuccess)
         } else {
             manager.respondToRequest(request, CBATTErrorRequestNotSupported)
@@ -84,15 +106,24 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         requests.forEach { req ->
             when (req.characteristic.UUID) {
                 pingChar.UUID -> {
-                    // PING: ACK immediately, no data processing.
                     manager.respondToRequest(req, CBATTErrorSuccess)
                 }
 
-                cardWriteChar.UUID -> {
-                    req.value?.let { nsData ->
-                        val bytes = nsData.bytes?.readBytes(nsData.length.toInt()) ?: byteArrayOf()
-                        _receivedCards.tryEmit(bytes)
-                    }
+                ephemeralChar.UUID -> {
+                    val bytes = req.value?.bytes?.readBytes(req.value!!.length.toInt()) ?: byteArrayOf()
+                    _events.tryEmit(BleGattServerPort.Event.EphemeralReceived(bytes))
+                    manager.respondToRequest(req, CBATTErrorSuccess)
+                }
+
+                cardChar.UUID -> {
+                    val bytes = req.value?.bytes?.readBytes(req.value!!.length.toInt()) ?: byteArrayOf()
+                    _events.tryEmit(BleGattServerPort.Event.CardReceived(bytes))
+                    manager.respondToRequest(req, CBATTErrorSuccess)
+                }
+
+                statusChar.UUID -> {
+                    val status = req.value?.bytes?.readBytes(1)?.firstOrNull() ?: 0x02
+                    _events.tryEmit(BleGattServerPort.Event.StatusReceived(status))
                     manager.respondToRequest(req, CBATTErrorSuccess)
                 }
 
@@ -113,9 +144,8 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         PeripheralManagerHolder.manager.addWriteRequestsHandler(writeHandler)
     }
 
-    actual override suspend fun start(localCardBytes: ByteArray) {
+    actual override suspend fun start() {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
-        this.localCardBytes = localCardBytes
         withContext(Dispatchers.IO) {
             log.info("BleGattServer starting")
             if (manager.state == CBPeripheralManagerStatePoweredOn) addService()
@@ -125,6 +155,8 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     actual override suspend fun stop() {
         if (!started.compareAndSet(expectedValue = true, newValue = false)) return
         withContext(Dispatchers.IO) {
+            ephemeralValue = byteArrayOf()
+            cardValue = byteArrayOf()
             manager.removeAllServices()
             PeripheralManagerHolder.manager.removeStateListener(stateListener)
             PeripheralManagerHolder.manager.removeReadRequestHandler(readHandler)
@@ -138,7 +170,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             type = CBUUID.UUIDWithString(BleConstants.FREEPATH_SERVICE_UUID.toString()),
             primary = true,
         )
-        service.setCharacteristics(listOf(pingChar, cardReadChar, cardWriteChar))
+        service.setCharacteristics(listOf(pingChar, ephemeralChar, cardChar, statusChar))
         manager.addService(service)
     }
 }

@@ -2,6 +2,7 @@ package io.github.smyrgeorge.freepath.client.codec
 
 import io.github.smyrgeorge.freepath.client.model.StatelessEnvelope
 import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.ContactCardCodec
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.codec.Base58
@@ -40,7 +41,7 @@ object StatelessEnvelopeCodec {
 
         return StatelessEnvelope(
             schema = SCHEMA,
-            senderId = Base58.encode(senderIdRaw),
+            senderId = ContactCardCodec.derivePeerId(sender.sigKeyPublic),
             receiverId = Base58.encode(receiverIdRaw),
             timestamp = timestamp,
             nonce = nonce,
@@ -70,8 +71,10 @@ object StatelessEnvelopeCodec {
 
         val contact = contactLookup(envelope.senderId)
             ?: throw EnvelopeException("Unknown sender peerId")
-        val senderIdRaw = runCatching { Base58.decode(envelope.senderId) }
-            .getOrElse { throw EnvelopeException("Invalid senderId encoding") }
+        // senderIdRaw is sha256(sigKey) — the 32-byte raw peer ID used in AAD and key derivation.
+        // The envelope.senderId carries the full peerId (derivePeerId format) for the contact lookup,
+        // so we re-derive the raw bytes from the contact's sigKey rather than decoding the envelope field.
+        val senderIdRaw = CryptoProvider.sha256(contact.sigKeyPublic)
 
         val nonce = envelope.nonce
         if (nonce.size != 12) throw EnvelopeException("Nonce must be 12 bytes, got ${nonce.size}")

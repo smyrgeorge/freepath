@@ -67,12 +67,12 @@ abstract class AbstractViewState {
         _pendingContactCard.value = QrCodeContactExchange.decode(url).getOrNull()
     }
 
-    fun showRequestorDrawer(pin: String, peerId: String) {
-        _exchangeDrawer.value = ExchangeDrawerState.RequestorWaiting(pin, peerId)
+    fun showRequestorEnterPin(peripheralId: String) {
+        _exchangeDrawer.value = ExchangeDrawerState.RequestorEnterPin(peripheralId)
     }
 
-    fun showRecipientDrawer(peerCard: ContactCard) {
-        _exchangeDrawer.value = ExchangeDrawerState.RecipientEnterPin(peerCard)
+    fun showResponderWaiting(pin: String) {
+        _exchangeDrawer.value = ExchangeDrawerState.ResponderWaiting(pin)
     }
 
     fun exchangeFailed(reason: String) {

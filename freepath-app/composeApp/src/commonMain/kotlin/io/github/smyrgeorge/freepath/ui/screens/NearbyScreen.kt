@@ -79,10 +79,34 @@ fun NearbyScreen(
     val knownPeers = allPeers.filter { it in contactByPeerId }
     val unknownPeers = allPeers.filter { it !in contactByPeerId }
 
+    val scope = rememberCoroutineScope()
     Column(modifier = modifier.fillMaxSize()) {
         FreepathTopBar(
             title = stringResource(Res.string.nearby_title),
-            rightAction = { ScanningIndicator() },
+            rightAction = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    FreepathButton(
+                        onClick = {
+                            scope.launch {
+                                AppResources.system.tell(Protocol.BleInitiateResponderContactExchange)
+                            }
+                        },
+                        variant = ButtonVariant.Outline,
+                        size = ButtonSize.Small,
+                    ) {
+                        Text(
+                            text = "Receive",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    ScanningIndicator()
+                }
+            },
         )
 
         Box(
@@ -287,7 +311,6 @@ private fun RadarView(
 
 @Composable
 private fun PeerCard(peerId: String, contact: ContactCardEntry?, content: ContentBody.Contact?) {
-    val scope = rememberCoroutineScope()
     val isKnown = contact != null
     val displayName = if (isKnown) contact.resolvedDisplayName() ?: peerId.abbrev() else "#${peerId.abbrev()}"
     val avatarLabel = if (isKnown) displayName.first().uppercaseChar().toString() else "?"
@@ -322,31 +345,13 @@ private fun PeerCard(peerId: String, contact: ContactCardEntry?, content: Conten
             )
         }
 
-        if (!isKnown) {
-            FreepathButton(
-                onClick = {
-                    scope.launch {
-                        AppResources.system.tell(Protocol.InitiateContactExchange(peerId))
-                    }
-                },
-                variant = ButtonVariant.Outline,
-                size = ButtonSize.Small,
-            ) {
-                Text(
-                    text = "Add",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
     }
 }
 
 @Composable
 private fun BlePeerCard(peer: LibbleEvent.PeripheralDiscovered) {
     val scope = rememberCoroutineScope()
-    val displayName = peer.peripheralName ?: peer.name ?: peer.peripheralId.take(8) + "…"
+    val displayName = peer.peripheralName ?: peer.name ?: (peer.peripheralId.take(8) + "…")
 
     Row(
         modifier = Modifier
@@ -390,7 +395,7 @@ private fun BlePeerCard(peer: LibbleEvent.PeripheralDiscovered) {
         FreepathButton(
             onClick = {
                 scope.launch {
-                    AppResources.system.tell(Protocol.InitiateBluetoothExchange(peer.peripheralId))
+                    AppResources.system.tell(Protocol.BleInitiateContactExchange(peer.peripheralId))
                 }
             },
             variant = ButtonVariant.Outline,

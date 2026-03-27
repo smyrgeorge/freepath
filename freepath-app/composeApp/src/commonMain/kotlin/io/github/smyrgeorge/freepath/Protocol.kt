@@ -26,27 +26,17 @@ sealed interface Protocol : ActorProtocol {
     data object AppForegrounded : Message<Ok>()
     data object AppBackgrounded : Message<Ok>()
 
-    // Contact exchange — drawer-based flow
-    data class InitiateContactExchange(val peerId: String) : Message<Ok>()
-    data class InitiateBluetoothExchange(val peripheralId: String) : Message<Ok>()
-    data class ContactExchangePinSubmitted(val enteredPin: String) : Message<Ok>()
-    data object ContactExchangeCancelled : Message<Ok>()
-    data class IncomingContactExchange(
-        val peerId: String,
-        val pin: String,
-        val peerCard: ContactCard,
-    ) : Message<Ok>()
-
-    data class ContactExchangeSucceeded(val peerCard: ContactCard) : Message<Ok>()
-    data class ContactExchangeFailed(val reason: String) : Message<Ok>()
+    // Contact exchange — BLE drawer-based flow
+    data class BleInitiateContactExchange(val peripheralId: String) : Message<Ok>()
+    data class BleBeginInitiatorContactExchange(val peripheralId: String, val pin: String) : Message<Ok>()
+    data object BleInitiateResponderContactExchange : Message<Ok>()
+    data object BleContactExchangeCancelled : Message<Ok>()
+    data class BleContactExchangeSucceeded(val peerCard: ContactCard) : Message<Ok>()
+    data class BleContactExchangeFailed(val reason: String) : Message<Ok>()
 
     // Chat
     data class SendChatMessage(val peerId: String, val text: String) : Message<Ok>()
-    data class ChatMessageReceived(
-        val senderId: String,
-        val receiverId: String,
-        val message: ChatMessage
-    ) : Message<Ok>()
+    data class ChatMessageReceived(val senderId: String, val receiverId: String, val msg: ChatMessage) : Message<Ok>()
 
     // Content
     data class ContentReceived(val envelope: Content) : Message<Ok>()

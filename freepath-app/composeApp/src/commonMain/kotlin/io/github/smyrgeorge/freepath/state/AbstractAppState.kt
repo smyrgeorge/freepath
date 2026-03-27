@@ -72,11 +72,6 @@ abstract class AbstractAppState(
     lateinit var contactCardContentEnvelope: Content
     lateinit var contactCardContentEntry: ContentEntry
 
-    // Contact exchange state — only valid during an active exchange
-    var contactExchangeIncomingPin: String? = null
-    var contactExchangeIncomingPeerId: String? = null
-    var contactExchangeIncomingPeerCard: ContactCard? = null
-
     suspend fun initialize() {
         loadIdentity()
         loadOwnContactCard()
@@ -120,27 +115,8 @@ abstract class AbstractAppState(
             .onSuccess { _feedEntries.value = it }
     }
 
-    fun initiateContactExchange(peerId: String): String {
-        val pin = (0 until 4).map { ('0'..'9').random() }.joinToString("")
-        viewState.showRequestorDrawer(pin, peerId)
-        log.info("[exchange] Exchange initiated with $peerId, PIN $pin")
-        return pin
-    }
-
-    fun resetContactExchange() {
-        contactExchangeIncomingPin = null
-        contactExchangeIncomingPeerId = null
-        contactExchangeIncomingPeerCard = null
-    }
-
     fun cancelContactExchange() {
-        resetContactExchange()
         viewState.hideExchangeDrawer()
-    }
-
-    fun handleContactExchangeFailure(reason: String) {
-        log.info("[exchange] Exchange failed: $reason")
-        viewState.exchangeFailed(reason)
     }
 
     suspend fun completeOnboarding(name: String?, bio: String?, location: String?, avatar: String?) {
