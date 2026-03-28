@@ -73,6 +73,8 @@ abstract class AbstractAppResources(
         }.onFailure {
             log.error { "Error while processing LibbleEvent: $event" }
         }
+    }.setPeripheralIdLookup {
+        contactRoutingEntryRepository.findOneByPeerId(db, it).getOrNull()?.blePeripheralId
     }
 
     fun initialize(system: ActorRef) {
