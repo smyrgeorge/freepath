@@ -128,10 +128,10 @@ wrapped in a `StatelessEnvelope`.
 
 **Why not encrypted.** Two independent bootstrapping problems prevent `StatelessEnvelope` encryption:
 
-1. The contact exchange request (type `0x02`) is sent to a stranger whose `ContactCard` — and
+1. The contact exchange request (type `0x02`) is sent to a stranger whose `Contact` — and
    therefore `encKeyPublic` — the initiator does not yet hold. ECDH is impossible without the
    receiver's public key.
-2. The contact exchange response (type `0x03`) carries the responder's `ContactCard` as its payload.
+2. The contact exchange response (type `0x03`) carries the responder's `Contact` as its payload.
    The initiator cannot decrypt the envelope to read B's keys because B's keys are the encrypted
    content — a circular dependency.
 
@@ -142,28 +142,28 @@ any contact exchange message that did not arrive over a LAN connection (i.e. who
 does not indicate a direct TCP connection — no `p2p-circuit` in the connection multiaddr).
 
 **Existing security.** Exchange messages are authenticated by the Ed25519 signature embedded in the
-`SignedContactCard` payload, as specified in [3-contact-exchange.md](3-contact-exchange.md). The
+`SignedContact` payload, as specified in [3-contact-exchange.md](3-contact-exchange.md). The
 Noise transport layer additionally protects exchange content from network-level interception.
 
 > [!NOTE]
 > **Future improvement.** A future version of this spec may introduce application-layer encryption
 > for exchange messages, for example using an anonymous ephemeral Diffie-Hellman key embedded in
 > the request so the responder can encrypt their reply. Until then the LAN-only constraint and
-> `SignedContactCard` authentication are the applicable security controls.
+> `SignedContact` authentication are the applicable security controls.
 
 ### Contact exchange request wire layout
 
 ```
-[0x02][4-byte BE pin_len][pin bytes][SignedContactCard — JSON-encoded UTF-8 bytes]
+[0x02][4-byte BE pin_len][pin bytes][SignedContact — JSON-encoded UTF-8 bytes]
 ```
 
 ### Contact exchange response wire layout
 
 ```
-[0x03][SignedContactCard — JSON-encoded UTF-8 bytes]
+[0x03][SignedContact — JSON-encoded UTF-8 bytes]
 ```
 
-`SignedContactCard` encoding is defined in [3-contact-exchange.md](3-contact-exchange.md).
+`SignedContact` encoding is defined in [3-contact-exchange.md](3-contact-exchange.md).
 
 ## Security considerations
 
@@ -189,7 +189,7 @@ message from an unknown peer is dropped. This is consistent with the HandshakeHa
 connected via a direct LAN connection. Implementations MUST drop any `0x02` or `0x03` message
 received over a relay circuit (`p2p-circuit` in the connection multiaddr). This prevents remote
 attackers from sending unsolicited exchange requests via internet relay. Exchange messages are
-authenticated by the `SignedContactCard` signature and protected at the network level by Noise; the
+authenticated by the `SignedContact` signature and protected at the network level by Noise; the
 PIN provides the proximity confirmation that is the exchange's security core.
 
 ## Migration path

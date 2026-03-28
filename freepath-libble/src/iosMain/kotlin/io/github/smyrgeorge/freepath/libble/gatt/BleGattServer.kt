@@ -96,7 +96,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         ephemeralValue = bytes
     }
 
-    actual override suspend fun setCardValue(bytes: ByteArray) {
+    actual override suspend fun setContactValue(bytes: ByteArray) {
         cardValue = bytes
     }
 

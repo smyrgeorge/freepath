@@ -16,10 +16,10 @@ interface BleConnectionPort {
     suspend fun readEphemeral(): ByteArray
 
     /** Writes [bytes] (pinConfirm + encrypted card) to CARD. */
-    suspend fun writeContactCard(bytes: ByteArray)
+    suspend fun writeContact(bytes: ByteArray)
 
     /** Reads the peer's response (pinConfirm + encrypted card) from CARD. */
-    suspend fun readContactCard(): ByteArray
+    suspend fun readContact(): ByteArray
 
     /** Writes the exchange [status] byte to STATUS. */
     suspend fun writeStatus(status: Byte)

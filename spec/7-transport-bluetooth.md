@@ -32,7 +32,7 @@ characteristic UUIDs share the same Freepath namespace prefix:
 | `CARD_WRITE` | `81e2d89b-f75f-4c72-95c4-8db84b24bf13` | Write           |
 
 `CARD_READ` returns the device's own signed contact card bytes (the wire format produced
-by `ContactCardSignedCodec.encode()`). `CARD_WRITE` accepts the peer's signed contact
+by `ContactSignedCodec.encode()`). `CARD_WRITE` accepts the peer's signed contact
 card bytes in the same format.
 
 Both characteristics carry raw bytes with no additional framing. Cards larger than the

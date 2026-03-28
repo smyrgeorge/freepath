@@ -85,10 +85,10 @@ import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.AppViewState
 import io.github.smyrgeorge.freepath.Protocol
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
-import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
 import io.github.smyrgeorge.freepath.ui.components.FreepathAvatar
@@ -105,7 +105,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 @Composable
-fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactCardEntry) -> Unit)? = null) {
+fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactEntry) -> Unit)? = null) {
     val contacts by AppState.contacts.collectAsState()
     val contactContents by AppState.contactContents.collectAsState()
 
@@ -252,17 +252,17 @@ private fun NetworkSectionHeader(text: String) {
 
 @Composable
 private fun ContactRow(
-    entry: ContactCardEntry,
+    entry: ContactEntry,
     content: io.github.smyrgeorge.freepath.content.ContentBody.Contact?,
     grayed: Boolean = false,
-    onContactClick: ((ContactCardEntry) -> Unit)? = null,
+    onContactClick: ((ContactEntry) -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val onSurface = MaterialTheme.colorScheme.onSurface
     val contentAlpha = if (grayed) 0.5f else 1f
 
     val localName = entry.name?.takeIf { it.isNotBlank() }
-    val cardName = entry.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+    val cardName = entry.contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
     val displayName = localName ?: cardName ?: entry.peerId.take(12)
     val avatarLabel = if (grayed) "✕" else displayName.first().uppercaseChar().toString()
 
@@ -374,7 +374,7 @@ fun AddContactDrawerOverlay() {
     var currentlyShown by remember { mutableStateOf(false) }
     var text by remember { mutableStateOf("") }
     var hasError by remember { mutableStateOf(false) }
-    var pendingCard by remember { mutableStateOf<ContactCard?>(null) }
+    var pendingContact by remember { mutableStateOf<Contact?>(null) }
 
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -387,8 +387,8 @@ fun AddContactDrawerOverlay() {
     fun offScreenPx() = drawerHeightPx.takeIf { it > 0f } ?: with(density) { 800.dp.toPx() }
 
     fun dismiss() {
-        val card = pendingCard
-        pendingCard = null
+        val contact = pendingContact
+        pendingContact = null
         scope.launch {
             dragOffsetPx = 0f
             offsetAnim.animateTo(offScreenPx(), tween(300))
@@ -397,9 +397,9 @@ fun AddContactDrawerOverlay() {
             text = ""
             hasError = false
             offsetAnim.snapTo(offScreenPx())
-            if (card != null) {
+            if (contact != null) {
                 delay(50.milliseconds)
-                AppViewState.showContactCard(card)
+                AppViewState.showContact(contact)
             }
         }
     }
@@ -410,9 +410,9 @@ fun AddContactDrawerOverlay() {
             hasError = false
             return@LaunchedEffect
         }
-        val card = QrCodeContactExchange.decode(text.trim()).getOrNull()
-        if (card != null) {
-            pendingCard = card
+        val contact = QrCodeContactExchange.decode(text.trim()).getOrNull()
+        if (contact != null) {
+            pendingContact = contact
             dismiss()
         } else {
             hasError = true
@@ -602,9 +602,9 @@ private fun AddContactDrawer(
  */
 @Composable
 fun ContactDrawerOverlay() {
-    val pendingCard by AppViewState.pendingContactCard.collectAsState()
+    val pendingCard by AppViewState.pendingContact.collectAsState()
     // Keep the card alive during the exit animation.
-    var currentCard by remember { mutableStateOf<ContactCard?>(null) }
+    var currentContact by remember { mutableStateOf<Contact?>(null) }
 
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -624,20 +624,20 @@ fun ContactDrawerOverlay() {
         scope.launch {
             dragOffsetPx = 0f
             offsetAnim.animateTo(offScreenPx(), tween(300))
-            AppViewState.clearPendingContactCard()
-            currentCard = null
+            AppViewState.clearPendingContact()
+            currentContact = null
             offsetAnim.snapTo(offScreenPx())
         }
     }
 
-    fun acceptAnimated(card: ContactCard) {
-        scope.launch { AppResources.system.tell(Protocol.AcceptContact(card)) }
+    fun acceptAnimated(contact: Contact) {
+        scope.launch { AppResources.system.tell(Protocol.AcceptContact(contact)) }
         dismissAnimated()
     }
 
     LaunchedEffect(pendingCard) {
         if (pendingCard != null) {
-            currentCard = pendingCard
+            currentContact = pendingCard
             dragOffsetPx = 0f
             // Wait for the drawer to measure itself so we start from the exact bottom edge.
             val measuredHeight = snapshotFlow { drawerHeightPx }.first { it > 0f }
@@ -654,7 +654,7 @@ fun ContactDrawerOverlay() {
         }
     }
 
-    val showScrim = currentCard != null
+    val showScrim = currentContact != null
     val dismissThresholdPx = with(density) { 120.dp.toPx() }
 
     // Scrim
@@ -676,11 +676,11 @@ fun ContactDrawerOverlay() {
     }
 
     // Drawer
-    if (currentCard != null) {
+    if (currentContact != null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            currentCard?.let { card ->
+            currentContact?.let { card ->
                 ContactDrawer(
-                    card = card,
+                    contact = card,
                     offsetProvider = { (offsetAnim.value + dragOffsetPx).roundToInt() },
                     onHeightMeasured = { drawerHeightPx = it },
                     onDrag = { delta ->
@@ -713,7 +713,7 @@ fun ContactDrawerOverlay() {
 
 @Composable
 private fun ContactDrawer(
-    card: ContactCard,
+    contact: Contact,
     offsetProvider: () -> Int,
     onHeightMeasured: (Float) -> Unit,
     onDrag: (Float) -> Unit,
@@ -724,8 +724,8 @@ private fun ContactDrawer(
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val onSurface = MaterialTheme.colorScheme.onSurface
 
-    val displayName = card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
-        ?: card.peerId.take(8)
+    val displayName = contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+        ?: contact.peerId.take(8)
     val avatarLabel = displayName.first().uppercaseChar().toString()
 
     Column(
@@ -797,7 +797,7 @@ private fun ContactDrawer(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(4.dp))
-        FreepathFingerprint(text = card.peerId)
+        FreepathFingerprint(text = contact.peerId)
 
 
         Spacer(modifier = Modifier.height(24.dp))

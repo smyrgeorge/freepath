@@ -1,9 +1,9 @@
 package io.github.smyrgeorge.freepath.database
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
-import io.github.smyrgeorge.freepath.database.util.ContactCardConverter
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.database.util.Auditable
+import io.github.smyrgeorge.freepath.database.util.ContactConverter
 import io.github.smyrgeorge.freepath.database.util.InstantConverter
 import io.github.smyrgeorge.freepath.database.util.StringListConverter
 import io.github.smyrgeorge.sqlx4k.annotation.Converter
@@ -13,7 +13,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 @Table("contact")
-data class ContactCardEntry(
+data class ContactEntry(
     @Id
     override val id: Int = 0,
     @Converter(InstantConverter::class)
@@ -22,14 +22,14 @@ data class ContactCardEntry(
     override var updatedAt: Instant = Clock.System.now(),
     /** Unique key. Derived locally from the contact's sigKey. */
     val peerId: String,
-    /** The accepted contact card. */
-    @Converter(ContactCardConverter::class)
-    val card: ContactCard,
+    /** The accepted contact contact. */
+    @Converter(ContactConverter::class)
+    val contact: Contact,
     /** Controls how content from this contact is handled. */
     val trustLevel: TrustLevel = TrustLevel.TRUSTED,
-    /** Local override for the contact's display name. Shown instead of card.name when set. */
+    /** Local override for the contact's display name. Shown instead of contact.name when set. */
     val name: String? = null,
-    /** Unix epoch milliseconds when content or a card from this contact was last received. */
+    /** Unix epoch milliseconds when content or a contact from this contact was last received. */
     @Converter(InstantConverter::class)
     val lastSeenAt: Instant? = null,
     /** Free-text field for the user's own reference. Never shared. Max 1024 chars. */
@@ -62,25 +62,25 @@ data class ContactCardEntry(
     /**
      * Merges this entry with an incoming entry, preserving local-only fields.
      *
-     * Per spec 1 Card updates:
-     * - The incoming card is accepted only if its `updatedAt` is strictly greater.
+     * Per spec 1 Contact updates:
+     * - The incoming contact is accepted only if its `updatedAt` is strictly greater.
      * - Local-only fields ([trustLevel], [name], [lastSeenAt], [notes], [pinned], [muted], [tags])
      *   are never modified by the merge.
      *
-     * @param incoming The incoming contact entry with an updated card.
-     * @return A new [ContactCardEntry] with the incoming card and all local-only fields preserved.
+     * @param incoming The incoming contact entry with an updated contact.
+     * @return A new [ContactEntry] with the incoming contact and all local-only fields preserved.
      * @throws IllegalArgumentException if `incoming.peerId` does not match this entry's [peerId].
-     * @throws IllegalArgumentException if `incoming.card` is not newer than the current card.
+     * @throws IllegalArgumentException if `incoming.contact` is not newer than the current contact.
      */
-    fun merge(incoming: ContactCardEntry): ContactCardEntry {
+    fun merge(incoming: ContactEntry): ContactEntry {
         require(incoming.peerId == peerId) {
             "Cannot merge entries with different peer IDs: ${incoming.peerId} != $peerId"
         }
-        require(incoming.card.updatedAt > card.updatedAt) {
-            "Incoming card is not newer than stored card (${incoming.card.updatedAt} <= ${card.updatedAt})"
+        require(incoming.contact.updatedAt > contact.updatedAt) {
+            "Incoming contact is not newer than stored contact (${incoming.contact.updatedAt} <= ${contact.updatedAt})"
         }
         return copy(
-            card = incoming.card,
+            contact = incoming.contact,
             // All local-only fields are preserved from this entry
         )
     }
@@ -91,7 +91,7 @@ data class ContactCardEntry(
         const val MAX_TAG_LENGTH = 32
         private val BASE58_REGEX = Regex("[1-9A-HJ-NP-Za-km-z]{52}")
 
-        /** Tag applied to the user's own card on first creation. Used to route to the onboarding screen. */
+        /** Tag applied to the user's own contact on first creation. Used to route to the onboarding screen. */
         const val TAG_ONBOARDING = "ONBOARDING"
     }
 }

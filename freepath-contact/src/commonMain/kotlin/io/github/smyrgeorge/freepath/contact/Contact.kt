@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.contact
 
-import io.github.smyrgeorge.freepath.contact.ContactCard.Companion.SCHEMA
+import io.github.smyrgeorge.freepath.contact.Contact.Companion.SCHEMA
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -11,19 +11,19 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-data class ContactCard(
-    /** Schema version. Always [SCHEMA] for cards produced by this implementation. */
+data class Contact(
+    /** Schema version. Always [SCHEMA] for contacts produced by this implementation. */
     @ProtoNumber(1) val schema: Int,
-    /** Base64-encoded Ed25519 public key. Used to verify the card signature and all attributed content. */
+    /** Base64-encoded Ed25519 public key. Used to verify the contact signature and all attributed content. */
     @ProtoNumber(2) val sigKey: String,
     /** Base64-encoded X25519 public key. Used to derive shared secrets for end-to-end encryption. */
     @ProtoNumber(3) val encKey: String,
-    /** Unix epoch milliseconds of the last change to this card. */
+    /** Unix epoch milliseconds of the last change to this contact. */
     @ProtoNumber(4) @Serializable(with = InstantSerializer::class) val updatedAt: Instant = Clock.System.now(),
     /** Human-readable display name chosen by the owner. Max 64 chars. */
     @ProtoNumber(5) val name: String? = null,
 ) {
-    val peerId: String by lazy { ContactCardCodec.derivePeerId(Base64.decode(sigKey)) }
+    val peerId: String by lazy { ContactCodec.derivePeerId(Base64.decode(sigKey)) }
     val sigKeyPublic: ByteArray by lazy { Base64.decode(sigKey) }
     val encKeyPublic: ByteArray by lazy { Base64.decode(encKey) }
 
@@ -45,7 +45,7 @@ data class ContactCard(
     }
 
     override fun toString(): String {
-        return "ContactCard(name=$name, updatedAt=$updatedAt, peerId='$peerId', schema=$schema)"
+        return "Contact(name=$name, updatedAt=$updatedAt, peerId='$peerId', schema=$schema)"
     }
 
     companion object {

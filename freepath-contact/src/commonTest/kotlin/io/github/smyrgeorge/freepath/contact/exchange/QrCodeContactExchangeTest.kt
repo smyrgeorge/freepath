@@ -1,8 +1,8 @@
 package io.github.smyrgeorge.freepath.contact.exchange
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
-import io.github.smyrgeorge.freepath.contact.ContactCardSigned
-import io.github.smyrgeorge.freepath.contact.ContactCardSignedCodec
+import io.github.smyrgeorge.freepath.contact.Contact
+import io.github.smyrgeorge.freepath.contact.ContactSigned
+import io.github.smyrgeorge.freepath.contact.ContactSignedCodec
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
 import kotlin.io.encoding.Base64
@@ -14,14 +14,14 @@ import kotlin.time.Instant
 
 class QrCodeContactExchangeTest {
 
-    private fun makeCard(
+    private fun makeContact(
         sigKp: KeyPair,
         encKp: KeyPair,
         updatedAt: Instant = Clock.System.now(),
         name: String? = null,
-    ): ContactCard =
-        ContactCard(
-            schema = ContactCard.SCHEMA,
+    ): Contact =
+        Contact(
+            schema = Contact.SCHEMA,
             sigKey = Base64.encode(sigKp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
             updatedAt = Instant.fromEpochMilliseconds(updatedAt.toEpochMilliseconds()),
@@ -29,16 +29,16 @@ class QrCodeContactExchangeTest {
         )
 
     private fun makeQrCode(
-        card: ContactCard,
+        contact: Contact,
         sigKeyPrivate: ByteArray,
-    ): String = QrCodeContactExchange.encode(card, sigKeyPrivate).decodeToString()
+    ): String = QrCodeContactExchange.encode(contact, sigKeyPrivate).decodeToString()
 
     @Test
     fun encode_producesValidPrefix() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val qrCode = makeQrCode(card, kp.privateKey)
+        val contact = makeContact(kp, encKp)
+        val qrCode = makeQrCode(contact, kp.privateKey)
 
         assertTrue(qrCode.startsWith("freepath://contact/v1/"))
     }
@@ -47,63 +47,63 @@ class QrCodeContactExchangeTest {
     fun encode_isDeterministic() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val qrCode1 = makeQrCode(card, kp.privateKey)
-        val qrCode2 = makeQrCode(card, kp.privateKey)
+        val contact = makeContact(kp, encKp)
+        val qrCode1 = makeQrCode(contact, kp.privateKey)
+        val qrCode2 = makeQrCode(contact, kp.privateKey)
 
         // Apple CryptoKit uses hedged (randomized) Ed25519 for security, so the raw
         // QR strings may differ across calls on iOS. Both must still decode to the
-        // same verified card — that is the meaningful determinism guarantee.
+        // same verified contact — that is the meaningful determinism guarantee.
         val decoded1 = QrCodeContactExchange.decode(qrCode1).getOrThrow()
         val decoded2 = QrCodeContactExchange.decode(qrCode2).getOrThrow()
-        assertEquals(card, decoded1)
-        assertEquals(card, decoded2)
+        assertEquals(contact, decoded1)
+        assertEquals(contact, decoded2)
     }
 
     @Test
-    fun encode_includesAllCardFields() {
+    fun encode_includesAllContactFields() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp, name = "Alice")
-        val qrCode = makeQrCode(card, kp.privateKey)
+        val contact = makeContact(kp, encKp, name = "Alice")
+        val qrCode = makeQrCode(contact, kp.privateKey)
 
         // Decode and verify all fields are preserved
-        val decodedCard = QrCodeContactExchange.decode(qrCode).getOrThrow()
-        assertEquals(card.name, decodedCard.name)
+        val decodedContact = QrCodeContactExchange.decode(qrCode).getOrThrow()
+        assertEquals(contact.name, decodedContact.name)
     }
 
     @Test
     fun encode_withOptionalFieldsOmitted() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val qrCode = makeQrCode(card, kp.privateKey)
+        val contact = makeContact(kp, encKp)
+        val qrCode = makeQrCode(contact, kp.privateKey)
 
-        val decodedCard = QrCodeContactExchange.decode(qrCode).getOrThrow()
-        assertEquals(card.name, decodedCard.name)
+        val decodedContact = QrCodeContactExchange.decode(qrCode).getOrThrow()
+        assertEquals(contact.name, decodedContact.name)
     }
 
     @Test
     fun decode_roundTrip() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val qrCode = makeQrCode(card, kp.privateKey)
+        val contact = makeContact(kp, encKp)
+        val qrCode = makeQrCode(contact, kp.privateKey)
 
-        val decodedCard = QrCodeContactExchange.decode(qrCode).getOrThrow()
+        val decodedContact = QrCodeContactExchange.decode(qrCode).getOrThrow()
 
-        assertEquals(card, decodedCard)
+        assertEquals(contact, decodedContact)
     }
 
     @Test
     fun decode_withAllOptionalFields() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp, name = "Bob")
-        val qrCode = makeQrCode(card, kp.privateKey)
+        val contact = makeContact(kp, encKp, name = "Bob")
+        val qrCode = makeQrCode(contact, kp.privateKey)
 
-        val decodedCard = QrCodeContactExchange.decode(qrCode).getOrThrow()
-        assertEquals("Bob", decodedCard.name)
+        val decodedContact = QrCodeContactExchange.decode(qrCode).getOrThrow()
+        assertEquals("Bob", decodedContact.name)
     }
 
     @Test
@@ -152,39 +152,39 @@ class QrCodeContactExchangeTest {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val kp2 = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
+        val contact = makeContact(kp, encKp)
 
         // Sign with wrong key
-        val signed = ContactCardSignedCodec.seal(card, kp2.privateKey)
-        val base64Url = Base64.encode(ContactCardSignedCodec.encode(signed))
+        val signed = ContactSignedCodec.seal(contact, kp2.privateKey)
+        val base64Url = Base64.encode(ContactSignedCodec.encode(signed))
         val qrCode = "freepath://contact/v1/$base64Url"
 
         val result = QrCodeContactExchange.decode(qrCode)
 
         assertTrue(result.isFailure)
-        assertEquals(result.exceptionOrNull()?.message?.contains("Invalid card signature"), true)
+        assertEquals(result.exceptionOrNull()?.message?.contains("Invalid contact signature"), true)
     }
 
     @Test
-    fun decode_failsForTamperedCard() {
+    fun decode_failsForTamperedContact() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp, name = "Original")
+        val contact = makeContact(kp, encKp, name = "Original")
 
         // Create valid QR code
-        val qrCode = makeQrCode(card, kp.privateKey)
+        val qrCode = makeQrCode(contact, kp.privateKey)
 
         // Tamper by decoding, modifying, and re-encoding (signature won't match)
         val raw = QrCodeContactExchange.decodeRaw(qrCode)!!
-        val tamperedCard = raw.card.copy(name = "Tampered")
-        val tamperedSigned = ContactCardSigned(tamperedCard, raw.signature)
-        val tamperedBase64 = Base64.encode(ContactCardSignedCodec.encode(tamperedSigned))
+        val tamperedContact = raw.contact.copy(name = "Tampered")
+        val tamperedSigned = ContactSigned(tamperedContact, raw.signature)
+        val tamperedBase64 = Base64.encode(ContactSignedCodec.encode(tamperedSigned))
         val tamperedQrCode = "freepath://contact/v1/$tamperedBase64"
 
         val result = QrCodeContactExchange.decode(tamperedQrCode)
 
         assertTrue(result.isFailure)
-        assertEquals(result.exceptionOrNull()?.message?.contains("Invalid card signature"), true)
+        assertEquals(result.exceptionOrNull()?.message?.contains("Invalid contact signature"), true)
     }
 
     @Test
@@ -200,24 +200,24 @@ class QrCodeContactExchangeTest {
     }
 
     @Test
-    fun decodeRaw_returnsSignedCardWithoutVerification() {
+    fun decodeRaw_returnsSignedContactWithoutVerification() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val qrCode = makeQrCode(card, kp.privateKey)
+        val contact = makeContact(kp, encKp)
+        val qrCode = makeQrCode(contact, kp.privateKey)
 
         val result = QrCodeContactExchange.decodeRaw(qrCode)
 
-        assertEquals(card, result?.card)
+        assertEquals(contact, result?.contact)
     }
 
     @Test
     fun estimateQrCodeLength_returnsPositiveValue() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
+        val contact = makeContact(kp, encKp)
 
-        val length = QrCodeContactExchange.estimateQrCodeLength(card)
+        val length = QrCodeContactExchange.estimateQrCodeLength(contact)
 
         assertTrue(length > 0)
         assertTrue(length > "freepath://contact/v1/".length)
@@ -227,11 +227,11 @@ class QrCodeContactExchangeTest {
     fun estimateQrCodeLength_increasesWithOptionalFields() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val minimalCard = makeCard(kp, encKp)
-        val fullCard = makeCard(kp, encKp, name = "Alice")
+        val minimalContact = makeContact(kp, encKp)
+        val fullContact = makeContact(kp, encKp, name = "Alice")
 
-        val minimalLength = QrCodeContactExchange.estimateQrCodeLength(minimalCard)
-        val fullLength = QrCodeContactExchange.estimateQrCodeLength(fullCard)
+        val minimalLength = QrCodeContactExchange.estimateQrCodeLength(minimalContact)
+        val fullLength = QrCodeContactExchange.estimateQrCodeLength(fullContact)
 
         assertTrue(fullLength > minimalLength)
     }

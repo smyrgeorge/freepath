@@ -9,11 +9,15 @@ import kotlin.test.assertFails
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-class ContactCardSignedCodecTest {
+class ContactSignedCodecTest {
 
-    private fun makeCard(sigKp: KeyPair, encKp: KeyPair, updatedAt: Instant = Clock.System.now()): ContactCard =
-        ContactCard(
-            schema = ContactCardCodec.SCHEMA,
+    private fun makeContact(
+        sigKp: KeyPair,
+        encKp: KeyPair,
+        updatedAt: Instant = Clock.System.now()
+    ): Contact =
+        Contact(
+            schema = ContactCodec.SCHEMA,
             sigKey = Base64.encode(sigKp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
             updatedAt = Instant.fromEpochMilliseconds(updatedAt.toEpochMilliseconds()),
@@ -23,10 +27,10 @@ class ContactCardSignedCodecTest {
     fun sealOpen_roundTrip() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val signed = ContactCardSignedCodec.seal(card, kp.privateKey)
-        val opened = ContactCardSignedCodec.open(signed).getOrThrow()
-        assertEquals(card, opened)
+        val contact = makeContact(kp, encKp)
+        val signed = ContactSignedCodec.seal(contact, kp.privateKey)
+        val opened = ContactSignedCodec.open(signed).getOrThrow()
+        assertEquals(contact, opened)
     }
 
     @Test
@@ -34,19 +38,19 @@ class ContactCardSignedCodecTest {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val kp2 = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val wrongSig = ContactCardCodec.sign(card, kp2.privateKey)
+        val contact = makeContact(kp, encKp)
+        val wrongSig = ContactCodec.sign(contact, kp2.privateKey)
         assertFails {
-            ContactCardSignedCodec.open(ContactCardSigned(card, Base64.encode(wrongSig))).getOrThrow()
+            ContactSignedCodec.open(ContactSigned(contact, Base64.encode(wrongSig))).getOrThrow()
         }
     }
 
     @Test
-    fun encodeDecodeSignedContactCard_roundTrip() {
+    fun encodeDecodeSignedContact_roundTrip() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val signed = ContactCardSignedCodec.seal(card, kp.privateKey)
-        assertEquals(signed, ContactCardSignedCodec.decode(ContactCardSignedCodec.encode(signed)))
+        val contact = makeContact(kp, encKp)
+        val signed = ContactSignedCodec.seal(contact, kp.privateKey)
+        assertEquals(signed, ContactSignedCodec.decode(ContactSignedCodec.encode(signed)))
     }
 }

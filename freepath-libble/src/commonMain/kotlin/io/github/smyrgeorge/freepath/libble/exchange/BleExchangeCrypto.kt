@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.libble.exchange
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
-import io.github.smyrgeorge.freepath.contact.ContactCardSignedCodec
+import io.github.smyrgeorge.freepath.contact.Contact
+import io.github.smyrgeorge.freepath.contact.ContactSignedCodec
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 
 internal object BleExchangeCrypto {
@@ -49,27 +49,27 @@ internal object BleExchangeCrypto {
         return SessionKeys(sessionKey, sessionId, pinConfirmI, pinConfirmR)
     }
 
-    /** Returns `nonce (12 bytes) || ciphertext+tag` for [card]. */
-    fun encryptCard(
-        card: ContactCard,
+    /** Returns `nonce (12 bytes) || ciphertext+tag` for [contact]. */
+    fun encryptContact(
+        contact: Contact,
         sigKeyPrivate: ByteArray,
         sessionKey: ByteArray,
         aad: ByteArray,
     ): ByteArray {
-        val signed = ContactCardSignedCodec.seal(card, sigKeyPrivate)
-        val cardBytes = ContactCardSignedCodec.encode(signed)
+        val signed = ContactSignedCodec.seal(contact, sigKeyPrivate)
+        val cardBytes = ContactSignedCodec.encode(signed)
         val nonce = CryptoProvider.randomBytes(12)
         val ciphertext = CryptoProvider.chacha20Poly1305Encrypt(sessionKey, nonce, cardBytes, aad)
         return nonce + ciphertext
     }
 
     /** Decrypts and verifies a card from `nonce || ciphertext+tag`. */
-    fun decryptCard(encryptedCard: ByteArray, sessionKey: ByteArray, aad: ByteArray): ContactCard {
-        require(encryptedCard.size > 12) { "encrypted card payload too short" }
-        val nonce = encryptedCard.copyOfRange(0, 12)
-        val ciphertext = encryptedCard.copyOfRange(12, encryptedCard.size)
+    fun decryptContact(encryptedContact: ByteArray, sessionKey: ByteArray, aad: ByteArray): Contact {
+        require(encryptedContact.size > 12) { "encrypted card payload too short" }
+        val nonce = encryptedContact.copyOfRange(0, 12)
+        val ciphertext = encryptedContact.copyOfRange(12, encryptedContact.size)
         val cardBytes = CryptoProvider.chacha20Poly1305Decrypt(sessionKey, nonce, ciphertext, aad)
-        return ContactCardSignedCodec.open(ContactCardSignedCodec.decode(cardBytes)).getOrThrow()
+        return ContactSignedCodec.open(ContactSignedCodec.decode(cardBytes)).getOrThrow()
     }
 
     /** `role_byte || session_id` */

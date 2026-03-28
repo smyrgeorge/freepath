@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.libble.exchange
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.ROLE_I
@@ -8,9 +8,9 @@ import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.ROLE_R
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.STATUS_SUCCESS
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.cardAad
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.constantTimeEquals
-import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.decryptCard
+import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.decryptContact
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.deriveKeys
-import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.encryptCard
+import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.encryptContact
 import io.github.smyrgeorge.freepath.libble.gatt.BleGattServerPort
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.filterIsInstance
@@ -33,13 +33,13 @@ internal class BleExchangeResponder(
     }
 
     suspend fun run(
-        localCard: ContactCard,
+        localContact: Contact,
         sigKeyPrivate: ByteArray,
         onEvent: suspend (LibbleEvent.ContactExchange) -> Unit,
-    ): Result<Pair<ContactCard, String>> = runCatching {
+    ): Result<Pair<Contact, String>> = runCatching {
         onEvent(LibbleEvent.ContactExchange.Started)
         try {
-            exchange(localCard, sigKeyPrivate, onEvent)
+            exchange(localContact, sigKeyPrivate, onEvent)
         } catch (e: CancellationException) {
             throw e  // propagate cancellation without emitting a Failed event
         } catch (e: Exception) {
@@ -53,10 +53,10 @@ internal class BleExchangeResponder(
     }
 
     private suspend fun exchange(
-        localCard: ContactCard,
+        localContact: Contact,
         sigKeyPrivate: ByteArray,
         onEvent: suspend (LibbleEvent.ContactExchange) -> Unit,
-    ): Pair<ContactCard, String> {
+    ): Pair<Contact, String> {
         // Step 1: Wait for initiator's ephemeral public key.
         val ephemeralEvent = withTimeout(STEP_TIMEOUT) {
             gattServer.events
@@ -84,16 +84,16 @@ internal class BleExchangeResponder(
         val receivedPinConfirmI = cardPayload.copyOfRange(0, PIN_CONFIRM_LEN)
         require(constantTimeEquals(receivedPinConfirmI, keys.pinConfirmI)) { "PIN confirmation mismatch" }
 
-        val peerCard = decryptCard(
-            encryptedCard = cardPayload.copyOfRange(PIN_CONFIRM_LEN, cardPayload.size),
+        val peerContact = decryptContact(
+            encryptedContact = cardPayload.copyOfRange(PIN_CONFIRM_LEN, cardPayload.size),
             sessionKey = keys.sessionKey,
             aad = cardAad(ROLE_I, keys.sessionId),
         )
         onEvent(LibbleEvent.ContactExchange.PinConfirmed)
 
         // Step 4: Serve responder's pinConfirm_R + encrypted card for initiator to read.
-        val encCard = encryptCard(localCard, sigKeyPrivate, keys.sessionKey, cardAad(ROLE_R, keys.sessionId))
-        gattServer.setCardValue(keys.pinConfirmR + encCard)
+        val encContact = encryptContact(localContact, sigKeyPrivate, keys.sessionKey, cardAad(ROLE_R, keys.sessionId))
+        gattServer.setContactValue(keys.pinConfirmR + encContact)
 
         // Step 5: Wait for initiator's STATUS write.
         val status = withTimeout(STEP_TIMEOUT) {
@@ -104,8 +104,8 @@ internal class BleExchangeResponder(
         }
         require(status == STATUS_SUCCESS) { "Initiator reported failure: 0x${status.toString(16)}" }
 
-        onEvent(LibbleEvent.ContactExchange.Completed(peerCard))
-        return Pair(peerCard, centralId)
+        onEvent(LibbleEvent.ContactExchange.Completed(peerContact))
+        return Pair(peerContact, centralId)
     }
 
     companion object {

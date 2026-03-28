@@ -1,26 +1,26 @@
 package io.github.smyrgeorge.freepath.ui.screens
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.content.ImageFormat
-import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.database.ContactEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
 
 class FeedHelpersTest {
 
-    // ContactCardEntry.init enforces nodeId must be 52-character Base58
+    // ContactEntry.init enforces nodeId must be 52-character Base58
     private val NODE_A = "Qm11111111111111111111111111111111111111111111111111"  // 52 chars
     private val NODE_B = "Qm22222222222222222222222222222222222222222222222222"
     private val NODE_C = "Qm33333333333333333333333333333333333333333333333333"
     private val NODE_X = "Qm44444444444444444444444444444444444444444444444444"
 
-    private fun fakeEntry(peerId: String, trust: TrustLevel): ContactCardEntry =
-        ContactCardEntry(
+    private fun fakeEntry(peerId: String, trust: TrustLevel): ContactEntry =
+        ContactEntry(
             peerId = peerId,
-            card = ContactCard(
+            contact = Contact(
                 schema = 1,
                 sigKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                 encKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",

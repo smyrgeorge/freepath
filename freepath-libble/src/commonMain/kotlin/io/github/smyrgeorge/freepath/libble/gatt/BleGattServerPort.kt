@@ -10,7 +10,7 @@ interface BleGattServerPort {
     suspend fun setEphemeralValue(bytes: ByteArray)
 
     /** Sets the value returned for CARD reads (responder's pinConfirm + encrypted card). */
-    suspend fun setCardValue(bytes: ByteArray)
+    suspend fun setContactValue(bytes: ByteArray)
 
     /**
      * Sends a success response notification to the central that sent request [reqId].

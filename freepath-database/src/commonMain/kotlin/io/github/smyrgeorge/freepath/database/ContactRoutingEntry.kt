@@ -16,7 +16,7 @@ data class ContactRoutingEntry(
     override var createdAt: Instant = Clock.System.now(),
     @Converter(InstantConverter::class)
     override var updatedAt: Instant = Clock.System.now(),
-    /** Peer node ID — references ContactCardEntry.peerId. */
+    /** Peer node ID — references ContactEntry.peerId. */
     val peerId: String,
     /** BLE peripheral ID assigned by the OS (UUID on iOS, MAC address on Android). Stored as TEXT. */
     val blePeripheralId: String? = null,

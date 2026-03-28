@@ -1,8 +1,8 @@
 package io.github.smyrgeorge.freepath.client.codec
 
 import io.github.smyrgeorge.freepath.client.model.StatelessEnvelope
-import io.github.smyrgeorge.freepath.contact.ContactCard
-import io.github.smyrgeorge.freepath.contact.ContactCardCodec
+import io.github.smyrgeorge.freepath.contact.Contact
+import io.github.smyrgeorge.freepath.contact.ContactCodec
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.codec.Base58
@@ -41,7 +41,7 @@ object StatelessEnvelopeCodec {
 
         return StatelessEnvelope(
             schema = SCHEMA,
-            senderId = ContactCardCodec.derivePeerId(sender.sigKeyPublic),
+            senderId = ContactCodec.derivePeerId(sender.sigKeyPublic),
             receiverId = Base58.encode(receiverIdRaw),
             timestamp = timestamp,
             nonce = nonce,
@@ -55,7 +55,7 @@ object StatelessEnvelopeCodec {
     fun open(
         envelope: StatelessEnvelope,
         receiver: Identity,
-        contactLookup: (peerId: String) -> ContactCard?,
+        contactLookup: (peerId: String) -> Contact?,
     ): ByteArray {
         if (envelope.schema != SCHEMA)
             throw EnvelopeException("Unsupported schema: ${envelope.schema}")

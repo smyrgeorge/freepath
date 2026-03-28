@@ -2,7 +2,7 @@ package io.github.smyrgeorge.freepath.libble
 
 import com.juul.kable.Advertisement
 import com.juul.kable.Scanner
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.libble.BleConstants.FREEPATH_SERVICE_UUID
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeInitiator
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeResponder
@@ -171,12 +171,12 @@ class LibbleModule {
     suspend fun beginInitiatorExchange(
         peripheralId: String,
         pin: String,
-        localCard: ContactCard,
+        localContact: Contact,
         sigKeyPrivate: ByteArray,
-    ): Result<ContactCard> = runCatching {
+    ): Result<Contact> = runCatching {
         pool.withConnection(peripheralId) { conn ->
             BleExchangeInitiator(conn, pin)
-                .run(localCard, sigKeyPrivate) { sendEvent(it) }
+                .run(localContact, sigKeyPrivate) { sendEvent(it) }
                 .getOrThrow()
         }
     }.also { result ->
@@ -196,10 +196,10 @@ class LibbleModule {
      */
     suspend fun beginResponderExchange(
         pin: String,
-        localCard: ContactCard,
+        localContact: Contact,
         sigKeyPrivate: ByteArray,
-    ): Result<Pair<ContactCard, String>> =
-        BleExchangeResponder(gattServer, pin).run(localCard, sigKeyPrivate) { event ->
+    ): Result<Pair<Contact, String>> =
+        BleExchangeResponder(gattServer, pin).run(localContact, sigKeyPrivate) { event ->
             sendEvent(event)
         }
 

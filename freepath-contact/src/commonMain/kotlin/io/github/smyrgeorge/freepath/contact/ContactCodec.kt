@@ -9,7 +9,7 @@ import kotlinx.serialization.encodeToByteArray
 import kotlin.io.encoding.Base64
 
 @OptIn(ExperimentalSerializationApi::class)
-object ContactCardCodec {
+object ContactCodec {
     const val SCHEMA = 1
 
     /**
@@ -45,17 +45,17 @@ object ContactCardCodec {
         return Base58.encode(multihash)
     }
 
-    /** Signs the protobuf-encoded card bytes with [sigKeyPrivate]; returns the raw 64-byte Ed25519 signature. */
-    fun sign(card: ContactCard, sigKeyPrivate: ByteArray): ByteArray =
-        CryptoProvider.ed25519Sign(sigKeyPrivate, encode(card))
+    /** Signs the protobuf-encoded contact bytes with [sigKeyPrivate]; returns the raw 64-byte Ed25519 signature. */
+    fun sign(contact: Contact, sigKeyPrivate: ByteArray): ByteArray =
+        CryptoProvider.ed25519Sign(sigKeyPrivate, encode(contact))
 
     /**
-     * Verifies [signatureBytes] against the card's own `sigKey`.
+     * Verifies [signatureBytes] against the contact's own `sigKey`.
      * Returns `true` if the signature is valid.
      */
-    fun verify(card: ContactCard, signatureBytes: ByteArray): Boolean {
-        val sigKeyBytes = Base64.decode(card.sigKey)
-        return CryptoProvider.ed25519Verify(sigKeyBytes, encode(card), signatureBytes)
+    fun verify(contact: Contact, signatureBytes: ByteArray): Boolean {
+        val sigKeyBytes = Base64.decode(contact.sigKey)
+        return CryptoProvider.ed25519Verify(sigKeyBytes, encode(contact), signatureBytes)
     }
 
     /**
@@ -65,13 +65,13 @@ object ContactCardCodec {
      * 1. `incoming.sigKey` must equal `stored.sigKey` (no key rotation).
      * 2. `incoming.updatedAt` must be strictly greater than `stored.updatedAt`.
      *
-     * Callers are responsible for verifying the card signature separately before calling this.
+     * Callers are responsible for verifying the contact signature separately before calling this.
      */
-    fun shouldUpdate(stored: ContactCard, incoming: ContactCard): Boolean {
+    fun shouldUpdate(stored: Contact, incoming: Contact): Boolean {
         if (stored.sigKey != incoming.sigKey) return false
         return incoming.updatedAt > stored.updatedAt
     }
 
-    fun encode(card: ContactCard): ByteArray = ProtobufCodec.protobuf.encodeToByteArray(card)
-    fun decode(bytes: ByteArray): ContactCard = ProtobufCodec.protobuf.decodeFromByteArray(bytes)
+    fun encode(contact: Contact): ByteArray = ProtobufCodec.protobuf.encodeToByteArray(contact)
+    fun decode(bytes: ByteArray): Contact = ProtobufCodec.protobuf.decodeFromByteArray(bytes)
 }

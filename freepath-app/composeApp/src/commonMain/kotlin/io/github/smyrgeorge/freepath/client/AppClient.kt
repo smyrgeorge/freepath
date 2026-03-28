@@ -7,7 +7,7 @@ import io.github.smyrgeorge.freepath.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.client.model.failure
 import io.github.smyrgeorge.freepath.client.model.success
 import io.github.smyrgeorge.freepath.client.model.toResult
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.content.ContentCodec
 import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
@@ -30,11 +30,11 @@ class AppClient(
         libp2p.scope.launch { libp2p.requests.consumeAsFlow().collect { r -> open(r) } }
     }
 
-    private fun onlineRecieverOf(peerId: String): Result<ContactCard> {
+    private fun onlineRecieverOf(peerId: String): Result<Contact> {
         val peerId = peerId.takeIf { libp2pMetrics.value.identifiedPeers.contains(it) }
             ?: return failure("Peer $peerId not identified yet, message not sent")
         return state.contacts.value
-            .firstOrNull { it.peerId == peerId }?.card
+            .firstOrNull { it.peerId == peerId }?.contact
             ?.let { Result.success(it) }
             ?: failure("No contact card for $peerId, cannot encrypt")
     }
@@ -108,8 +108,8 @@ class AppClient(
         }
     }
 
-    private fun seal(receiverCard: ContactCard, type: Byte, plaintext: ByteArray): ByteArray =
-        AppClientCodec.seal(state.identity, receiverCard, type, plaintext)
+    private fun seal(receiverContact: Contact, type: Byte, plaintext: ByteArray): ByteArray =
+        AppClientCodec.seal(state.identity, receiverContact, type, plaintext)
 
     private fun open(peerId: String, payload: ByteArray): Result<Pair<Byte, ByteArray>> {
         val decrypted = AppClientCodec.open(payload, resources.identity, resources.contactLookup)

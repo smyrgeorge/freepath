@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.content.ContentBody
-import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize
 import io.github.smyrgeorge.freepath.ui.components.FreepathAvatar
@@ -47,7 +47,7 @@ import kotlin.io.encoding.Base64
 
 // ── Pure helpers (testable without Compose) ───────────────────────────────────
 
-fun trustLabel(contacts: List<ContactCardEntry>, authorId: String): String =
+fun trustLabel(contacts: List<ContactEntry>, authorId: String): String =
     when (contacts.firstOrNull { it.peerId == authorId }?.trustLevel) {
         TrustLevel.TRUSTED -> "Trusted"
         TrustLevel.KNOWN -> "Known"
@@ -135,14 +135,14 @@ fun FeedScreen(
 @Composable
 private fun FeedPostCard(
     entry: ContentEntry,
-    contacts: List<ContactCardEntry>,
+    contacts: List<ContactEntry>,
     contactContents: Map<String, ContentBody.Contact>,
     onClick: () -> Unit,
 ) {
     val contact = contacts.firstOrNull { it.peerId == entry.authorId }
     val displayName = contact?.let { c ->
         c.name?.takeIf { it.isNotBlank() }
-            ?: c.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+            ?: c.contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
     } ?: "${entry.authorId.take(4)}·${entry.authorId.takeLast(4)}"
     val avatarLabel = if (contact != null) displayName.first().uppercaseChar().toString() else "?"
     val onSurface = MaterialTheme.colorScheme.onSurface

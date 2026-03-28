@@ -1,7 +1,6 @@
 package io.github.smyrgeorge.freepath.libble.exchange
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
-import kotlinx.coroutines.CancellationException
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.ROLE_I
@@ -11,10 +10,11 @@ import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.STATUS_FA
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.STATUS_SUCCESS
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.cardAad
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.constantTimeEquals
-import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.decryptCard
+import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.decryptContact
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.deriveKeys
-import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.encryptCard
+import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.encryptContact
 import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPort
+import kotlinx.coroutines.CancellationException
 
 /**
  * Drives the initiator side of the secure BLE contact exchange (5-message protocol).
@@ -30,13 +30,13 @@ internal class BleExchangeInitiator(
     }
 
     suspend fun run(
-        localCard: ContactCard,
+        localContact: Contact,
         sigKeyPrivate: ByteArray,
         onEvent: suspend (LibbleEvent.ContactExchange) -> Unit,
-    ): Result<ContactCard> = runCatching {
+    ): Result<Contact> = runCatching {
         onEvent(LibbleEvent.ContactExchange.Started)
         try {
-            exchange(localCard, sigKeyPrivate, onEvent)
+            exchange(localContact, sigKeyPrivate, onEvent)
         } catch (e: CancellationException) {
             throw e  // propagate cancellation without emitting a Failed event
         } catch (e: Exception) {
@@ -50,10 +50,10 @@ internal class BleExchangeInitiator(
     }
 
     private suspend fun exchange(
-        localCard: ContactCard,
+        localContact: Contact,
         sigKeyPrivate: ByteArray,
         onEvent: suspend (LibbleEvent.ContactExchange) -> Unit,
-    ): ContactCard {
+    ): Contact {
         // Step 1: Generate ephemeral keypair and send public key.
         val iEphKp = CryptoProvider.generateX25519KeyPair()
         connection.writeEphemeral(iEphKp.publicKey)
@@ -63,17 +63,17 @@ internal class BleExchangeInitiator(
         val keys = deriveKeys(iEphKp.privateKey, iEphKp.publicKey, rEphPub, isInitiator = true, pin)
 
         // Step 3: Send pinConfirm_I + encrypted card.
-        val encCard = encryptCard(localCard, sigKeyPrivate, keys.sessionKey, cardAad(ROLE_I, keys.sessionId))
-        connection.writeContactCard(keys.pinConfirmI + encCard)
+        val encContact = encryptContact(localContact, sigKeyPrivate, keys.sessionKey, cardAad(ROLE_I, keys.sessionId))
+        connection.writeContact(keys.pinConfirmI + encContact)
 
         // Step 4: Read and validate responder's response.
-        val respPayload = connection.readContactCard()
+        val respPayload = connection.readContact()
         require(respPayload.size > PIN_CONFIRM_LEN) { "CARD response too short" }
         val receivedPinConfirmR = respPayload.copyOfRange(0, PIN_CONFIRM_LEN)
         require(constantTimeEquals(receivedPinConfirmR, keys.pinConfirmR)) { "PIN confirmation mismatch" }
 
-        val peerCard = decryptCard(
-            encryptedCard = respPayload.copyOfRange(PIN_CONFIRM_LEN, respPayload.size),
+        val peerContact = decryptContact(
+            encryptedContact = respPayload.copyOfRange(PIN_CONFIRM_LEN, respPayload.size),
             sessionKey = keys.sessionKey,
             aad = cardAad(ROLE_R, keys.sessionId),
         )
@@ -81,8 +81,8 @@ internal class BleExchangeInitiator(
 
         // Step 5: Signal success to responder.
         connection.writeStatus(STATUS_SUCCESS)
-        onEvent(LibbleEvent.ContactExchange.Completed(peerCard))
-        return peerCard
+        onEvent(LibbleEvent.ContactExchange.Completed(peerContact))
+        return peerContact
     }
 
     companion object {

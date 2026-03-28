@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.database
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import kotlin.io.encoding.Base64
@@ -12,15 +12,15 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
-class ContactCardEntryTest {
+class ContactEntryTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun makeCard(updatedAt: Instant = Clock.System.now()): ContactCard {
+    private fun makeContact(updatedAt: Instant = Clock.System.now()): Contact {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        return ContactCard(
-            schema = ContactCard.SCHEMA,
+        return Contact(
+            schema = Contact.SCHEMA,
             sigKey = Base64.encode(kp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
             updatedAt = updatedAt,
@@ -28,7 +28,7 @@ class ContactCardEntryTest {
     }
 
     private fun makeEntry(
-        card: ContactCard? = null,
+        contact: Contact? = null,
         trustLevel: TrustLevel = TrustLevel.TRUSTED,
         name: String? = null,
         lastSeenAt: Instant? = null,
@@ -36,11 +36,11 @@ class ContactCardEntryTest {
         pinned: Boolean = false,
         muted: Boolean = false,
         tags: List<String> = emptyList(),
-    ): ContactCardEntry {
-        val actualCard = card ?: makeCard()
-        return ContactCardEntry(
-            peerId = actualCard.peerId,
-            card = actualCard,
+    ): ContactEntry {
+        val actualContact = contact ?: makeContact()
+        return ContactEntry(
+            peerId = actualContact.peerId,
+            contact = actualContact,
             trustLevel = trustLevel,
             name = name,
             lastSeenAt = lastSeenAt,
@@ -61,14 +61,14 @@ class ContactCardEntryTest {
 
     @Test
     fun contactEntry_validation_acceptsMaxNotesLength() {
-        val maxNotes = "a".repeat(ContactCardEntry.MAX_NOTES_LENGTH)
+        val maxNotes = "a".repeat(ContactEntry.MAX_NOTES_LENGTH)
         val entry = makeEntry(notes = maxNotes)
-        assertEquals(ContactCardEntry.MAX_NOTES_LENGTH, entry.notes?.length)
+        assertEquals(ContactEntry.MAX_NOTES_LENGTH, entry.notes?.length)
     }
 
     @Test
     fun contactEntry_validation_rejectsNotesTooLong() {
-        val longNotes = "a".repeat(ContactCardEntry.MAX_NOTES_LENGTH + 1)
+        val longNotes = "a".repeat(ContactEntry.MAX_NOTES_LENGTH + 1)
         assertFails {
             makeEntry(notes = longNotes)
         }
@@ -84,14 +84,14 @@ class ContactCardEntryTest {
 
     @Test
     fun contactEntry_validation_acceptsMaxTagsCount() {
-        val maxTags = List(ContactCardEntry.MAX_TAGS_COUNT) { "tag$it" }
+        val maxTags = List(ContactEntry.MAX_TAGS_COUNT) { "tag$it" }
         val entry = makeEntry(tags = maxTags)
-        assertEquals(ContactCardEntry.MAX_TAGS_COUNT, entry.tags.size)
+        assertEquals(ContactEntry.MAX_TAGS_COUNT, entry.tags.size)
     }
 
     @Test
     fun contactEntry_validation_rejectsTooManyTags() {
-        val tooManyTags = List(ContactCardEntry.MAX_TAGS_COUNT + 1) { "tag$it" }
+        val tooManyTags = List(ContactEntry.MAX_TAGS_COUNT + 1) { "tag$it" }
         assertFails {
             makeEntry(tags = tooManyTags)
         }
@@ -99,14 +99,14 @@ class ContactCardEntryTest {
 
     @Test
     fun contactEntry_validation_acceptsMaxTagLength() {
-        val maxTag = "a".repeat(ContactCardEntry.MAX_TAG_LENGTH)
+        val maxTag = "a".repeat(ContactEntry.MAX_TAG_LENGTH)
         val entry = makeEntry(tags = listOf(maxTag))
-        assertEquals(ContactCardEntry.MAX_TAG_LENGTH, entry.tags.first().length)
+        assertEquals(ContactEntry.MAX_TAG_LENGTH, entry.tags.first().length)
     }
 
     @Test
     fun contactEntry_validation_rejectsTagTooLong() {
-        val longTag = "a".repeat(ContactCardEntry.MAX_TAG_LENGTH + 1)
+        val longTag = "a".repeat(ContactEntry.MAX_TAG_LENGTH + 1)
         assertFails {
             makeEntry(tags = listOf(longTag))
         }
@@ -115,26 +115,26 @@ class ContactCardEntryTest {
     // ── merge ─────────────────────────────────────────────────────────────────
 
     @Test
-    fun merge_returnsNewEntryWithIncomingCard() {
+    fun merge_returnsNewEntryWithIncomingContact() {
         val now = Clock.System.now()
-        val storedCard = makeCard(updatedAt = now).copy(name = "Old Name")
-        val stored = makeEntry(card = storedCard, name = "Local Name", notes = "My notes")
+        val storedContact = makeContact(updatedAt = now).copy(name = "Old Name")
+        val stored = makeEntry(contact = storedContact, name = "Local Name", notes = "My notes")
 
-        val incomingCard = storedCard.copy(updatedAt = now + 1000.milliseconds, name = "New Name")
-        val incoming = makeEntry(card = incomingCard, name = "Other Local Name")
+        val incomingContact = storedContact.copy(updatedAt = now + 1000.milliseconds, name = "New Name")
+        val incoming = makeEntry(contact = incomingContact, name = "Other Local Name")
 
         val merged = stored.merge(incoming)
 
-        assertEquals(incomingCard, merged.card)
-        assertEquals("New Name", merged.card.name)
+        assertEquals(incomingContact, merged.contact)
+        assertEquals("New Name", merged.contact.name)
     }
 
     @Test
     fun merge_preservesLocalOnlyFields() {
         val now = Clock.System.now()
-        val storedCard = makeCard(updatedAt = now)
+        val storedContact = makeContact(updatedAt = now)
         val stored = makeEntry(
-            card = storedCard,
+            contact = storedContact,
             trustLevel = TrustLevel.KNOWN,
             name = "Local Name",
             lastSeenAt = Clock.System.now(),
@@ -144,12 +144,12 @@ class ContactCardEntryTest {
             tags = listOf("family"),
         )
 
-        val incomingCard = storedCard.copy(updatedAt = now + 1000.milliseconds, name = "New Name")
-        val incoming = makeEntry(card = incomingCard)
+        val incomingContact = storedContact.copy(updatedAt = now + 1000.milliseconds, name = "New Name")
+        val incoming = makeEntry(contact = incomingContact)
 
         val merged = stored.merge(incoming)
 
-        assertEquals("New Name", merged.card.name)
+        assertEquals("New Name", merged.contact.name)
         assertEquals(TrustLevel.KNOWN, merged.trustLevel)
         assertEquals("Local Name", merged.name)
         assertEquals(stored.lastSeenAt, merged.lastSeenAt)
@@ -162,10 +162,10 @@ class ContactCardEntryTest {
     @Test
     fun merge_throwsForDifferentPeerId() {
         val now = Clock.System.now()
-        val card1 = makeCard(updatedAt = now)
-        val card2 = makeCard(updatedAt = now + 1000.milliseconds)
-        val stored = makeEntry(card = card1)
-        val incoming = makeEntry(card = card2)
+        val contact1 = makeContact(updatedAt = now)
+        val contact2 = makeContact(updatedAt = now + 1000.milliseconds)
+        val stored = makeEntry(contact = contact1)
+        val incoming = makeEntry(contact = contact2)
 
         assertFailsWith<IllegalArgumentException> {
             stored.merge(incoming)
@@ -175,9 +175,9 @@ class ContactCardEntryTest {
     @Test
     fun merge_throwsForSameUpdatedAt() {
         val now = Clock.System.now()
-        val storedCard = makeCard(updatedAt = now)
-        val stored = makeEntry(card = storedCard)
-        val incoming = makeEntry(card = storedCard.copy(updatedAt = now))
+        val storedContact = makeContact(updatedAt = now)
+        val stored = makeEntry(contact = storedContact)
+        val incoming = makeEntry(contact = storedContact.copy(updatedAt = now))
 
         assertFailsWith<IllegalArgumentException> {
             stored.merge(incoming)
@@ -187,9 +187,9 @@ class ContactCardEntryTest {
     @Test
     fun merge_throwsForOlderUpdatedAt() {
         val now = Clock.System.now()
-        val storedCard = makeCard(updatedAt = now)
-        val stored = makeEntry(card = storedCard)
-        val incoming = makeEntry(card = storedCard.copy(updatedAt = now - 1000.milliseconds))
+        val storedContact = makeContact(updatedAt = now)
+        val stored = makeEntry(contact = storedContact)
+        val incoming = makeEntry(contact = storedContact.copy(updatedAt = now - 1000.milliseconds))
 
         assertFailsWith<IllegalArgumentException> {
             stored.merge(incoming)

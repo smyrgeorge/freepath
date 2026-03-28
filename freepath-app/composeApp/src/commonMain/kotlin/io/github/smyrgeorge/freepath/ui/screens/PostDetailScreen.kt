@@ -52,7 +52,7 @@ fun PostDetailScreen(
     val contact = contacts.firstOrNull { it.peerId == entry.authorId }
     val displayName = contact?.let { c ->
         c.name?.takeIf { it.isNotBlank() }
-            ?: c.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+            ?: c.contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
     } ?: "${entry.authorId.take(4)}·${entry.authorId.takeLast(4)}"
     val avatarLabel = if (contact != null) displayName.first().uppercaseChar().toString() else "?"
     val avatarBg = if (contact != null) MaterialTheme.colorScheme.secondaryContainer

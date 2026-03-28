@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.client.codec
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import kotlin.time.Clock
@@ -13,12 +13,12 @@ object AppClientCodec {
 
     fun seal(
         identity: Identity,
-        receiverCard: ContactCard,
+        receiverContact: Contact,
         type: Byte,
         plaintext: ByteArray,
     ): ByteArray {
-        val receiverIdRaw = CryptoProvider.sha256(receiverCard.sigKeyPublic)
-        val receiverEncKeyPublic = receiverCard.encKeyPublic
+        val receiverIdRaw = CryptoProvider.sha256(receiverContact.sigKeyPublic)
+        val receiverEncKeyPublic = receiverContact.encKeyPublic
         val envelope = StatelessEnvelopeCodec.seal(
             sender = identity,
             receiverIdRaw = receiverIdRaw,
@@ -33,7 +33,7 @@ object AppClientCodec {
     fun open(
         bytes: ByteArray,
         identity: Identity,
-        contactLookup: (String) -> ContactCard?,
+        contactLookup: (String) -> Contact?,
     ): Pair<Byte, ByteArray>? = try {
         require(bytes.size >= 4) { "Message too short: ${bytes.size} bytes" }
         require(bytes[0] == VERSION) { "Unsupported version: ${bytes[0].toInt()}" }

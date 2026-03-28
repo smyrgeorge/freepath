@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.libble
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import kotlin.time.Instant
 
 sealed class LibbleEvent {
@@ -30,7 +30,7 @@ sealed class LibbleEvent {
         data object PinConfirmed : ContactExchange()
 
         /** Exchange completed successfully. */
-        data class Completed(val peerCard: ContactCard) : ContactExchange()
+        data class Completed(val contact: Contact) : ContactExchange()
 
         /** Exchange failed or was aborted. */
         data class Failed(val reason: String) : ContactExchange()

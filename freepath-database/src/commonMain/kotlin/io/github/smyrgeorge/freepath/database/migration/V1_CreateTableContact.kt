@@ -2,14 +2,14 @@ package io.github.smyrgeorge.freepath.database.migration
 
 @Suppress("SqlNoDataSourceInspection")
 // language=SQLite
-internal const val V1_CreateTableContactCard = """
+internal const val V1_CreateTableContact = """
 CREATE TABLE IF NOT EXISTS contact
 (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at   INTEGER NOT NULL,
     updated_at   INTEGER NOT NULL,
     peer_id      TEXT    NOT NULL,
-    card         JSON    NOT NULL,
+    contact      JSON    NOT NULL,
     trust_level  TEXT    NOT NULL,
     name         TEXT,
     last_seen_at INTEGER,

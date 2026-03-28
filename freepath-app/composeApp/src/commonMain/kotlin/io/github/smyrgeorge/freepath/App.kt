@@ -19,7 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.state.model.StartupRoute
 import io.github.smyrgeorge.freepath.ui.components.DeleteContentDrawer
@@ -56,7 +56,7 @@ private val APP_SCREENS = setOf(Screen.Nearby, Screen.Network, Screen.Feed, Scre
 @Composable
 fun App() {
     var screen by remember { mutableStateOf(Screen.Splash) }
-    var chatContact by remember { mutableStateOf<ContactCardEntry?>(null) }
+    var chatContact by remember { mutableStateOf<ContactEntry?>(null) }
     var selectedFeedEntry by remember { mutableStateOf<ContentEntry?>(null) }
     val startupRoute by AppViewState.startupRoute.collectAsState()
     val pendingDeepLink by AppViewState.pendingDeepLink.collectAsState()

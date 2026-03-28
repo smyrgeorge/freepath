@@ -56,10 +56,10 @@ class BleConnection internal constructor(
     override suspend fun readEphemeral(): ByteArray =
         peripheral.read(ephemeralChar)
 
-    override suspend fun writeContactCard(bytes: ByteArray): Unit =
+    override suspend fun writeContact(bytes: ByteArray): Unit =
         peripheral.write(cardChar, bytes, WriteType.WithResponse)
 
-    override suspend fun readContactCard(): ByteArray =
+    override suspend fun readContact(): ByteArray =
         peripheral.read(cardChar)
 
     override suspend fun writeStatus(status: Byte): Unit =

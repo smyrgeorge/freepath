@@ -4,14 +4,14 @@ import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.client.AppClient
 import io.github.smyrgeorge.freepath.client.model.success
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
-import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
+import io.github.smyrgeorge.freepath.database.ContactEntryRepository
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
-import io.github.smyrgeorge.freepath.database.generated.ContactCardEntryRepositoryImpl
+import io.github.smyrgeorge.freepath.database.generated.ContactEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContactRoutingEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContentEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.IdentityEntryRepositoryImpl
@@ -40,10 +40,10 @@ abstract class AbstractAppResources(
 
     lateinit var identity: Identity
     lateinit var identityEntry: IdentityEntry
-    lateinit var contactLookup: (String) -> ContactCard?
+    lateinit var contactLookup: (String) -> Contact?
 
     val identityRepository: IdentityEntryRepository = IdentityEntryRepositoryImpl
-    val contactCardRepository: ContactCardEntryRepository = ContactCardEntryRepositoryImpl
+    val contactRepository: ContactEntryRepository = ContactEntryRepositoryImpl
     val contentEntryRepository: ContentEntryRepository = ContentEntryRepositoryImpl
     val contactRoutingEntryRepository: ContactRoutingEntryRepository = ContactRoutingEntryRepositoryImpl
 
@@ -113,7 +113,7 @@ abstract class AbstractAppResources(
         peerId: String,
         sigKeyPrivate: ByteArray,
         identityEntry: IdentityEntry,
-        contactLookup: (String) -> ContactCard?,
+        contactLookup: (String) -> Contact?,
     ) {
         this.identity = identityEntry.identity
         this.identityEntry = identityEntry

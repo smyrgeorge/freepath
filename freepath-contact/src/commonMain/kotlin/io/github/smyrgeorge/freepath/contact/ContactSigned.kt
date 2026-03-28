@@ -6,7 +6,7 @@ import kotlinx.serialization.protobuf.ProtoNumber
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-data class ContactCardSigned(
-    @ProtoNumber(1) val card: ContactCard,
+data class ContactSigned(
+    @ProtoNumber(1) val contact: Contact,
     @ProtoNumber(2) val signature: String,
 )

@@ -53,14 +53,14 @@ import androidx.compose.ui.unit.sp
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.Protocol
-import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
 import kotlinx.coroutines.launch
 
 @Composable
 fun ChatScreen(
-    contact: ContactCardEntry,
+    contact: ContactEntry,
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -72,7 +72,7 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
 
     val localName = contact.name?.takeIf { it.isNotBlank() }
-    val cardName = contact.card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+    val cardName = contact.contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
     val displayName = localName ?: cardName ?: contact.peerId.take(12)
 
     val isOnline = contact.peerId in nearbyPeers
@@ -139,7 +139,7 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(messages) { msg ->
-                    ChatBubble(text = msg.text, fromMe = msg.senderId == AppState.contactCard.peerId)
+                    ChatBubble(text = msg.text, fromMe = msg.senderId == AppState.contact.peerId)
                 }
             }
         }

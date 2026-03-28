@@ -3,7 +3,7 @@ package io.github.smyrgeorge.freepath
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.actor4k.actor.impl.BehaviorActor
 import io.github.smyrgeorge.freepath.client.model.ChatMessage
-import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.state.AbstractAppState
 import io.github.smyrgeorge.freepath.state.AbstractViewState
@@ -42,7 +42,7 @@ class AppActor(
             state.initialize()
             resources.initializeAppClient(state = state)
             resources.startLibp2p(
-                peerId = state.contactCard.peerId,
+                peerId = state.contact.peerId,
                 sigKeyPrivate = state.identity.sigKeyPrivate,
                 identityEntry = state.identityEntry,
                 contactLookup = { state.contactLookup(it) },
@@ -51,12 +51,12 @@ class AppActor(
         }
 
         log.info("[onActivate] Identity: ${state.identityEntry}")
-        log.info("[onActivate] ContactCard: ${state.contactCardEntry}")
+        log.info("[onActivate] Contact: ${state.contactEntry}")
         log.info("[onActivate] Initialization took $time")
 
 
         val route = when {
-            ContactCardEntry.TAG_ONBOARDING in state.contactCardEntry.tags -> StartupRoute.Onboarding
+            ContactEntry.TAG_ONBOARDING in state.contactEntry.tags -> StartupRoute.Onboarding
             viewState.pendingDeepLink.value != null -> {
                 viewState.clearPendingDeepLink()
                 StartupRoute.Network
@@ -89,7 +89,7 @@ class AppActor(
             val resources = ctx.resources
             when (m) {
                 is Protocol.Ping -> return@normal Behavior.Reply(Protocol.Pong)
-                is Protocol.AcceptContact -> state.acceptContact(m.card)
+                is Protocol.AcceptContact -> state.acceptContact(m.contact)
                 is Protocol.SetTrustLevel -> state.setTrustLevel(m.entry, m.level)
                 is Protocol.BleInitiateContactExchange -> {
                     viewState.showRequestorEnterPin(m.peripheralId)
@@ -103,7 +103,7 @@ class AppActor(
                     ctx.exchangeJob = launch {
                         val result = resources.libble.beginResponderExchange(
                             pin = pin,
-                            localCard = state.contactCard,
+                            localContact = state.contact,
                             sigKeyPrivate = state.identity.sigKeyPrivate,
                         )
                         result.onSuccess { (peerCard, centralId) ->
@@ -124,7 +124,7 @@ class AppActor(
                 is Protocol.ChatMessageReceived -> state.appendMessage(m.msg)
                 is Protocol.ContentReceived -> state.receiveContent(m.envelope)
                 is Protocol.PeerIdentified -> {
-                    resources.client.send(state.contactCardContentEnvelope, m.peerId)
+                    resources.client.send(state.contactContentEnvelope, m.peerId)
                         .onFailure { log.warn("[PeerIdentified] Failed to push contact card to ${m.peerId}: ${it.message}") }
                 }
 
@@ -160,7 +160,7 @@ class AppActor(
             val resources = ctx.resources
             when (m) {
                 is Protocol.Ping -> return@exchange Behavior.Reply(Protocol.Pong)
-                is Protocol.AcceptContact -> state.acceptContact(m.card)
+                is Protocol.AcceptContact -> state.acceptContact(m.contact)
 
                 is Protocol.BleBeginInitiatorContactExchange -> {
                     viewState.hideExchangeDrawer()
@@ -168,7 +168,7 @@ class AppActor(
                         val result = resources.libble.beginInitiatorExchange(
                             peripheralId = m.peripheralId,
                             pin = m.pin,
-                            localCard = state.contactCard,
+                            localContact = state.contact,
                             sigKeyPrivate = state.identity.sigKeyPrivate,
                         )
                         result.onSuccess { peerCard ->

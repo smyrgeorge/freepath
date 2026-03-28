@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.state
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.state.model.ExchangeDrawerState
 import io.github.smyrgeorge.freepath.state.model.ResetOverlayState
@@ -19,8 +19,8 @@ abstract class AbstractViewState {
     private val _showAddContactDrawer = MutableStateFlow(false)
     val showAddContactDrawer: StateFlow<Boolean> = _showAddContactDrawer.asStateFlow()
 
-    private val _pendingContactCard = MutableStateFlow<ContactCard?>(null)
-    val pendingContactCard: StateFlow<ContactCard?> = _pendingContactCard.asStateFlow()
+    private val _pendingContact = MutableStateFlow<Contact?>(null)
+    val pendingContact: StateFlow<Contact?> = _pendingContact.asStateFlow()
 
     private val _pendingDeepLink = MutableStateFlow<String?>(null)
     val pendingDeepLink: StateFlow<String?> = _pendingDeepLink.asStateFlow()
@@ -49,12 +49,12 @@ abstract class AbstractViewState {
         _showAddContactDrawer.value = false
     }
 
-    fun showContactCard(card: ContactCard) {
-        _pendingContactCard.value = card
+    fun showContact(contact: Contact) {
+        _pendingContact.value = contact
     }
 
-    fun clearPendingContactCard() {
-        _pendingContactCard.value = null
+    fun clearPendingContact() {
+        _pendingContact.value = null
     }
 
     fun clearPendingDeepLink() {
@@ -64,7 +64,7 @@ abstract class AbstractViewState {
     fun handleDeepLink(url: String) {
         log.info { "Deep link received: $url" }
         _pendingDeepLink.value = url
-        _pendingContactCard.value = QrCodeContactExchange.decode(url).getOrNull()
+        _pendingContact.value = QrCodeContactExchange.decode(url).getOrNull()
     }
 
     fun showRequestorEnterPin(peripheralId: String) {

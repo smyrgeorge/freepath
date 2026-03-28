@@ -4,7 +4,7 @@ import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.content.ContentType
 import io.github.smyrgeorge.freepath.content.ImageFormat
-import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.util.generateCheckerboardPng
 import kotlin.io.encoding.Base64
@@ -13,7 +13,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 object RandomContentGenerator {
-    fun generateRandomContent(contacts: List<ContactCardEntry>): List<ContentEntry> {
+    fun generateRandomContent(contacts: List<ContactEntry>): List<ContentEntry> {
         val now = Clock.System.now().toEpochMilliseconds()
         return contacts.flatMap { contact ->
             listOf(

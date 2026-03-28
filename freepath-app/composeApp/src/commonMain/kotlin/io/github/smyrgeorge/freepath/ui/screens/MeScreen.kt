@@ -75,7 +75,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.me_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.contact.ContactCardSignedCodec
+import io.github.smyrgeorge.freepath.contact.ContactSignedCodec
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetricsSnapshot
 import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetricsSnapshot
@@ -96,34 +96,34 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun MeScreen(modifier: Modifier = Modifier) {
-    val card = AppState.contactCard
-    val peerId = card.peerId
+    val contact = AppState.contact
+    val peerId = contact.peerId
 
-    val displayName = remember(card) {
-        card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") } ?: "you"
+    val displayName = remember(contact) {
+        contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") } ?: "you"
     }
-    val avatarLabel = remember(card) {
-        val name = card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+    val avatarLabel = remember(contact) {
+        val name = contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
         (name?.firstOrNull()?.uppercaseChar() ?: peerId.first().uppercaseChar()).toString()
     }
     var avatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var isRefreshingAvatar by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(peerId) {
-        val stored = AppState.contactCardContent.avatar
+        val stored = AppState.contactContent.avatar
         if (stored != null) {
             avatarBitmap = runCatching { Base64.decode(stored).toImageBitmap() }.getOrNull()
             return@LaunchedEffect
         }
         // No stored avatar yet — fetch from DiceBear
-        val name = card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") } ?: return@LaunchedEffect
+        val name = contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") } ?: return@LaunchedEffect
         RandomAvatarGenerator.randomAvatar(name)?.let { b64 ->
             avatarBitmap = runCatching { Base64.decode(b64).toImageBitmap() }.getOrNull()
         }
     }
     val onRefreshAvatar: () -> Unit = {
         if (!isRefreshingAvatar) {
-            val name = card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+            val name = contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
             if (name != null) {
                 scope.launch {
                     isRefreshingAvatar = true
@@ -137,8 +137,8 @@ fun MeScreen(modifier: Modifier = Modifier) {
             }
         }
     }
-    val qrData = remember(card) {
-        val signed = ContactCardSignedCodec.seal(card, AppState.identity.sigKeyPrivate)
+    val qrData = remember(contact) {
+        val signed = ContactSignedCodec.seal(contact, AppState.identity.sigKeyPrivate)
         QrCodeContactExchange.encode(signed)
     }
 
@@ -173,7 +173,7 @@ private fun DeveloperSection() {
     val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(text = stringResource(Res.string.dev_section_title))
-        Libp2pMetricsPanel(metrics = libp2pMetrics, selfPeerId = AppState.contactCard.peerId)
+        Libp2pMetricsPanel(metrics = libp2pMetrics, selfPeerId = AppState.contact.peerId)
         LibbleMetricsPanel(metrics = libbleMetrics)
         FreepathButton(
             onClick = { scope.launch { AppState.generateRandomContent() } },

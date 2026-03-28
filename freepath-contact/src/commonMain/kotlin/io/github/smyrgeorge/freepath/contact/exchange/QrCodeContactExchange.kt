@@ -1,9 +1,9 @@
 package io.github.smyrgeorge.freepath.contact.exchange
 
-import io.github.smyrgeorge.freepath.contact.ContactCard
-import io.github.smyrgeorge.freepath.contact.ContactCardCodec
-import io.github.smyrgeorge.freepath.contact.ContactCardSigned
-import io.github.smyrgeorge.freepath.contact.ContactCardSignedCodec
+import io.github.smyrgeorge.freepath.contact.Contact
+import io.github.smyrgeorge.freepath.contact.ContactCodec
+import io.github.smyrgeorge.freepath.contact.ContactSigned
+import io.github.smyrgeorge.freepath.contact.ContactSignedCodec
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange.decode
 import kotlin.io.encoding.Base64
 
@@ -16,20 +16,20 @@ object QrCodeContactExchange : ContactExchange {
     private const val VERSION = "v1"
     private const val PREFIX = "$SCHEME://$PATH_CONTACT/$VERSION/"
 
-    override fun encode(card: ContactCard, sigKeyPrivate: ByteArray): ByteArray {
-        val signed = ContactCardSignedCodec.seal(card, sigKeyPrivate)
+    override fun encode(contact: Contact, sigKeyPrivate: ByteArray): ByteArray {
+        val signed = ContactSignedCodec.seal(contact, sigKeyPrivate)
         return encode(signed).encodeToByteArray()
     }
 
-    fun encode(signed: ContactCardSigned): String {
-        val bytes = ContactCardSignedCodec.encode(signed)
+    fun encode(signed: ContactSigned): String {
+        val bytes = ContactSignedCodec.encode(signed)
         val base64Url = Base64.encode(bytes)
         return "$PREFIX$base64Url"
     }
 
-    fun decode(qrCode: String): Result<ContactCard> = decode(qrCode.encodeToByteArray())
+    fun decode(qrCode: String): Result<Contact> = decode(qrCode.encodeToByteArray())
 
-    override fun decode(data: ByteArray): Result<ContactCard> {
+    override fun decode(data: ByteArray): Result<Contact> {
         val qrCode = data.decodeToString()
 
         // Validate prefix
@@ -54,36 +54,36 @@ object QrCodeContactExchange : ContactExchange {
             )
         }
 
-        // Parse signed card
-        val signed: ContactCardSigned
+        // Parse signed contact
+        val signed: ContactSigned
         try {
-            signed = ContactCardSignedCodec.decode(bytes)
+            signed = ContactSignedCodec.decode(bytes)
         } catch (e: Exception) {
-            return Result.failure(IllegalArgumentException("Failed to parse contact card PROTOBUF", e))
+            return Result.failure(IllegalArgumentException("Failed to parse contact PROTOBUF", e))
         }
 
         // (1) Schema check - per spec 3: step 1
-        if (signed.card.schema != ContactCard.SCHEMA) {
-            return Result.failure(IllegalStateException("Unsupported card schema: ${signed.card.schema}"))
+        if (signed.contact.schema != Contact.SCHEMA) {
+            return Result.failure(IllegalStateException("Unsupported contact schema: ${signed.contact.schema}"))
         }
 
         // (2) Verify signature - per spec 3: step 2
         val signatureBytes = Base64.decode(signed.signature)
-        if (!ContactCardCodec.verify(signed.card, signatureBytes)) {
-            return Result.failure(IllegalStateException("Invalid card signature"))
+        if (!ContactCodec.verify(signed.contact, signatureBytes)) {
+            return Result.failure(IllegalStateException("Invalid contact signature"))
         }
 
-        return Result.success(signed.card)
+        return Result.success(signed.contact)
     }
 
     /**
-     * Decodes a QR code string and returns the raw [ContactCardSigned] without verification.
+     * Decodes a QR code string and returns the raw [ContactSigned] without verification.
      * Use [decode] for the standard flow with verification.
      *
      * @param qrCode The QR code string to decode.
-     * @return The decoded [ContactCardSigned], or null if parsing fails.
+     * @return The decoded [ContactSigned], or null if parsing fails.
      */
-    fun decodeRaw(qrCode: String): ContactCardSigned? {
+    fun decodeRaw(qrCode: String): ContactSigned? {
         if (!qrCode.startsWith(PREFIX)) return null
 
         val base64Payload = qrCode.substring(PREFIX.length)
@@ -92,7 +92,7 @@ object QrCodeContactExchange : ContactExchange {
         return try {
             val paddedBase64 = addBase64Padding(base64Payload)
             val bytes = Base64.decode(paddedBase64)
-            ContactCardSignedCodec.decode(bytes)
+            ContactSignedCodec.decode(bytes)
         } catch (_: Exception) {
             null
         }
@@ -109,11 +109,11 @@ object QrCodeContactExchange : ContactExchange {
 
     /**
      * Returns the maximum expected QR code string length for capacity planning.
-     * This is approximate and depends on the card's optional fields.
+     * This is approximate and depends on the contact's optional fields.
      */
-    fun estimateQrCodeLength(card: ContactCard): Int {
-        val signed = ContactCardSigned(card, Base64.encode(ByteArray(64))) // 64-byte signature
-        val length = ContactCardSignedCodec.encode(signed).size
+    fun estimateQrCodeLength(contact: Contact): Int {
+        val signed = ContactSigned(contact, Base64.encode(ByteArray(64))) // 64-byte signature
+        val length = ContactSignedCodec.encode(signed).size
         val base64Length = ((length + 2) / 3) * 4 // Base64 encoding overhead
         return PREFIX.length + base64Length
     }

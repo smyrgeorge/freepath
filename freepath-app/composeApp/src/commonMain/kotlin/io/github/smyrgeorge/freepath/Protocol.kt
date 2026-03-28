@@ -2,10 +2,10 @@ package io.github.smyrgeorge.freepath
 
 import io.github.smyrgeorge.actor4k.actor.ActorProtocol
 import io.github.smyrgeorge.freepath.client.model.ChatMessage
-import io.github.smyrgeorge.freepath.contact.ContactCard
+import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.content.Content
-import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.database.ContactEntry
 
 sealed interface Protocol : ActorProtocol {
     sealed class Message<R : ActorProtocol.Response> : Protocol, ActorProtocol.Message<R>()
@@ -19,8 +19,8 @@ sealed interface Protocol : ActorProtocol {
     data object Pong : Response()
 
     // Contact management
-    data class AcceptContact(val card: ContactCard) : Message<Ok>()
-    data class SetTrustLevel(val entry: ContactCardEntry, val level: TrustLevel) : Message<Ok>()
+    data class AcceptContact(val contact: Contact) : Message<Ok>()
+    data class SetTrustLevel(val entry: ContactEntry, val level: TrustLevel) : Message<Ok>()
 
     // App lifecycle
     data object AppForegrounded : Message<Ok>()
@@ -31,7 +31,7 @@ sealed interface Protocol : ActorProtocol {
     data class BleBeginInitiatorContactExchange(val peripheralId: String, val pin: String) : Message<Ok>()
     data object BleInitiateResponderContactExchange : Message<Ok>()
     data object BleContactExchangeCancelled : Message<Ok>()
-    data class BleContactExchangeSucceeded(val peerCard: ContactCard, val peripheralId: String) : Message<Ok>()
+    data class BleContactExchangeSucceeded(val contact: Contact, val peripheralId: String) : Message<Ok>()
     data class BleContactExchangeFailed(val reason: String) : Message<Ok>()
 
     // Chat

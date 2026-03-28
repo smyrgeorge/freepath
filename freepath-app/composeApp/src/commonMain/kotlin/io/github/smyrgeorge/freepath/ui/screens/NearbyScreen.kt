@@ -50,7 +50,7 @@ import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.content.ContentBody
-import io.github.smyrgeorge.freepath.database.ContactCardEntry
+import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.state.abbrev
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize
@@ -219,7 +219,7 @@ private fun ScanningIndicator() {
 @Composable
 private fun RadarView(
     peers: List<String>,
-    contactByPeerId: Map<String, ContactCardEntry>,
+    contactByPeerId: Map<String, ContactEntry>,
     contactContents: Map<String, ContentBody.Contact>,
     modifier: Modifier = Modifier,
 ) {
@@ -310,7 +310,7 @@ private fun RadarView(
 }
 
 @Composable
-private fun PeerCard(peerId: String, contact: ContactCardEntry?, content: ContentBody.Contact?) {
+private fun PeerCard(peerId: String, contact: ContactEntry?, content: ContentBody.Contact?) {
     val isKnown = contact != null
     val displayName = if (isKnown) contact.resolvedDisplayName() ?: peerId.abbrev() else "#${peerId.abbrev()}"
     val avatarLabel = if (isKnown) displayName.first().uppercaseChar().toString() else "?"
@@ -411,8 +411,8 @@ private fun BlePeerCard(peer: LibbleEvent.PeripheralDiscovered) {
     }
 }
 
-private fun ContactCardEntry.resolvedDisplayName(): String? {
+private fun ContactEntry.resolvedDisplayName(): String? {
     val local = name?.takeIf { it.isNotBlank() }
-    val card = card.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
-    return local ?: card
+    val c = contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
+    return local ?: c
 }

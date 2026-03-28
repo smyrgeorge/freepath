@@ -12,11 +12,15 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
-class ContactCardCodecTest {
+class ContactCodecTest {
 
-    private fun makeCard(sigKp: KeyPair, encKp: KeyPair, updatedAt: Instant = Clock.System.now()): ContactCard =
-        ContactCard(
-            schema = ContactCardCodec.SCHEMA,
+    private fun makeContact(
+        sigKp: KeyPair,
+        encKp: KeyPair,
+        updatedAt: Instant = Clock.System.now()
+    ): Contact =
+        Contact(
+            schema = ContactCodec.SCHEMA,
             sigKey = Base64.encode(sigKp.publicKey),
             encKey = Base64.encode(encKp.publicKey),
             updatedAt = Instant.fromEpochMilliseconds(updatedAt.toEpochMilliseconds()),
@@ -25,7 +29,7 @@ class ContactCardCodecTest {
     @Test
     fun derivePeerId_produces52CharBase58String() {
         val kp = CryptoProvider.generateEd25519KeyPair()
-        val peerId = ContactCardCodec.derivePeerId(kp.publicKey)
+        val peerId = ContactCodec.derivePeerId(kp.publicKey)
         assertEquals(52, peerId.length)
         assertTrue(peerId.all { it in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" })
     }
@@ -34,8 +38,8 @@ class ContactCardCodecTest {
     fun derivePeerId_isDeterministic() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         assertEquals(
-            ContactCardCodec.derivePeerId(kp.publicKey),
-            ContactCardCodec.derivePeerId(kp.publicKey),
+            ContactCodec.derivePeerId(kp.publicKey),
+            ContactCodec.derivePeerId(kp.publicKey),
         )
     }
 
@@ -43,8 +47,8 @@ class ContactCardCodecTest {
     fun derivePeerId_differsByKey() {
         val kp1 = CryptoProvider.generateEd25519KeyPair()
         val kp2 = CryptoProvider.generateEd25519KeyPair()
-        val id1 = ContactCardCodec.derivePeerId(kp1.publicKey)
-        val id2 = ContactCardCodec.derivePeerId(kp2.publicKey)
+        val id1 = ContactCodec.derivePeerId(kp1.publicKey)
+        val id2 = ContactCodec.derivePeerId(kp2.publicKey)
         assertTrue(id1 != id2)
     }
 
@@ -52,27 +56,27 @@ class ContactCardCodecTest {
     fun signVerify_roundTrip() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val sig = ContactCardCodec.sign(card, kp.privateKey)
-        assertTrue(ContactCardCodec.verify(card, sig))
+        val contact = makeContact(kp, encKp)
+        val sig = ContactCodec.sign(contact, kp.privateKey)
+        assertTrue(ContactCodec.verify(contact, sig))
     }
 
     @Test
     fun verify_failsForTamperedName() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val sig = ContactCardCodec.sign(card, kp.privateKey)
-        assertFalse(ContactCardCodec.verify(card.copy(name = "tampered"), sig))
+        val contact = makeContact(kp, encKp)
+        val sig = ContactCodec.sign(contact, kp.privateKey)
+        assertFalse(ContactCodec.verify(contact.copy(name = "tampered"), sig))
     }
 
     @Test
     fun verify_failsForTamperedUpdatedAt() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val sig = ContactCardCodec.sign(card, kp.privateKey)
-        assertFalse(ContactCardCodec.verify(card.copy(updatedAt = card.updatedAt + 1.milliseconds), sig))
+        val contact = makeContact(kp, encKp)
+        val sig = ContactCodec.sign(contact, kp.privateKey)
+        assertFalse(ContactCodec.verify(contact.copy(updatedAt = contact.updatedAt + 1.milliseconds), sig))
     }
 
     @Test
@@ -80,9 +84,9 @@ class ContactCardCodecTest {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val kp2 = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        val sig = ContactCardCodec.sign(card, kp2.privateKey)
-        assertFalse(ContactCardCodec.verify(card, sig))
+        val contact = makeContact(kp, encKp)
+        val sig = ContactCodec.sign(contact, kp2.privateKey)
+        assertFalse(ContactCodec.verify(contact, sig))
     }
 
     @Test
@@ -90,9 +94,9 @@ class ContactCardCodecTest {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
         val now = Clock.System.now()
-        val stored = makeCard(kp, encKp, updatedAt = now)
-        val incoming = makeCard(kp, encKp, updatedAt = now + 1000.milliseconds)
-        assertTrue(ContactCardCodec.shouldUpdate(stored, incoming))
+        val stored = makeContact(kp, encKp, updatedAt = now)
+        val incoming = makeContact(kp, encKp, updatedAt = now + 1000.milliseconds)
+        assertTrue(ContactCodec.shouldUpdate(stored, incoming))
     }
 
     @Test
@@ -100,9 +104,9 @@ class ContactCardCodecTest {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
         val now = Clock.System.now()
-        val stored = makeCard(kp, encKp, updatedAt = now)
-        val incoming = makeCard(kp, encKp, updatedAt = now)
-        assertFalse(ContactCardCodec.shouldUpdate(stored, incoming))
+        val stored = makeContact(kp, encKp, updatedAt = now)
+        val incoming = makeContact(kp, encKp, updatedAt = now)
+        assertFalse(ContactCodec.shouldUpdate(stored, incoming))
     }
 
     @Test
@@ -110,9 +114,9 @@ class ContactCardCodecTest {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
         val now = Clock.System.now()
-        val stored = makeCard(kp, encKp, updatedAt = now)
-        val incoming = makeCard(kp, encKp, updatedAt = now - 1000.milliseconds)
-        assertFalse(ContactCardCodec.shouldUpdate(stored, incoming))
+        val stored = makeContact(kp, encKp, updatedAt = now)
+        val incoming = makeContact(kp, encKp, updatedAt = now - 1000.milliseconds)
+        assertFalse(ContactCodec.shouldUpdate(stored, incoming))
     }
 
     @Test
@@ -121,69 +125,69 @@ class ContactCardCodecTest {
         val kp2 = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
         val now = Clock.System.now()
-        val stored = makeCard(kp, encKp, updatedAt = now)
-        val incoming = makeCard(kp2, encKp, updatedAt = now + 1000.milliseconds)
-        assertFalse(ContactCardCodec.shouldUpdate(stored, incoming))
+        val stored = makeContact(kp, encKp, updatedAt = now)
+        val incoming = makeContact(kp2, encKp, updatedAt = now + 1000.milliseconds)
+        assertFalse(ContactCodec.shouldUpdate(stored, incoming))
     }
 
     @Test
-    fun encodeDecodeContactCard_roundTripRequiredFieldsOnly() {
+    fun encodeDecodeContact_roundTripRequiredFieldsOnly() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp)
-        assertEquals(card, ContactCardCodec.decode(ContactCardCodec.encode(card)))
+        val contact = makeContact(kp, encKp)
+        assertEquals(contact, ContactCodec.decode(ContactCodec.encode(contact)))
     }
 
     @Test
-    fun encodeDecodeContactCard_roundTripWithOptionalFields() {
+    fun encodeDecodeContact_roundTripWithOptionalFields() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp).copy(name = "Alice")
-        assertEquals(card, ContactCardCodec.decode(ContactCardCodec.encode(card)))
+        val contact = makeContact(kp, encKp).copy(name = "Alice")
+        assertEquals(contact, ContactCodec.decode(ContactCodec.encode(contact)))
     }
 
     @Test
-    fun encodeContactCard_nullOptionalFieldsNotEncoded() {
+    fun encodeContact_nullOptionalFieldsNotEncoded() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val cardWithoutName = makeCard(kp, encKp)
-        val cardWithName = cardWithoutName.copy(name = "Alice")
-        assertTrue(ContactCardCodec.encode(cardWithoutName).size < ContactCardCodec.encode(cardWithName).size)
+        val contactWithoutName = makeContact(kp, encKp)
+        val contactWithName = contactWithoutName.copy(name = "Alice")
+        assertTrue(ContactCodec.encode(contactWithoutName).size < ContactCodec.encode(contactWithName).size)
     }
 
     @Test
-    fun contactCard_validation_acceptsValidCard() {
+    fun contact_validation_acceptsValidContact() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val card = makeCard(kp, encKp).copy(name = "Alice")
-        assertEquals("Alice", card.name)
+        val contact = makeContact(kp, encKp).copy(name = "Alice")
+        assertEquals("Alice", contact.name)
     }
 
     @Test
-    fun contactCard_validation_rejectsNameTooLong() {
+    fun contact_validation_rejectsNameTooLong() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val longName = "a".repeat(ContactCard.MAX_NAME_LENGTH + 1)
+        val longName = "a".repeat(Contact.MAX_NAME_LENGTH + 1)
         assertFails {
-            makeCard(kp, encKp).copy(name = longName)
+            makeContact(kp, encKp).copy(name = longName)
         }
     }
 
     @Test
-    fun contactCard_validation_acceptsMaxNameLength() {
+    fun contact_validation_acceptsMaxNameLength() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
-        val maxName = "a".repeat(ContactCard.MAX_NAME_LENGTH)
-        val card = makeCard(kp, encKp).copy(name = maxName)
-        assertEquals(ContactCard.MAX_NAME_LENGTH, card.name?.length)
+        val maxName = "a".repeat(Contact.MAX_NAME_LENGTH)
+        val contact = makeContact(kp, encKp).copy(name = maxName)
+        assertEquals(Contact.MAX_NAME_LENGTH, contact.name?.length)
     }
 
     @Test
-    fun contactCard_validation_rejectsWrongSchema() {
+    fun contact_validation_rejectsWrongSchema() {
         val kp = CryptoProvider.generateEd25519KeyPair()
         val encKp = CryptoProvider.generateX25519KeyPair()
         assertFails {
-            makeCard(kp, encKp).copy(schema = 99)
+            makeContact(kp, encKp).copy(schema = 99)
         }
     }
 }
