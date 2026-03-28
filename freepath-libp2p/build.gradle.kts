@@ -41,6 +41,7 @@ kotlin {
         configureEach { languageSettings.progressiveMode = true }
         commonMain {
             dependencies {
+                implementation(project(":freepath-util"))
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.log4k)
             }

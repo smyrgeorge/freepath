@@ -7,10 +7,12 @@ import io.github.smyrgeorge.freepath.client.model.success
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
+import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.database.generated.ContactCardEntryRepositoryImpl
+import io.github.smyrgeorge.freepath.database.generated.ContactRoutingEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContentEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.IdentityEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.migration.migrations
@@ -43,6 +45,7 @@ abstract class AbstractAppResources(
     val identityRepository: IdentityEntryRepository = IdentityEntryRepositoryImpl
     val contactCardRepository: ContactCardEntryRepository = ContactCardEntryRepositoryImpl
     val contentEntryRepository: ContentEntryRepository = ContentEntryRepositoryImpl
+    val contactRoutingEntryRepository: ContactRoutingEntryRepository = ContactRoutingEntryRepositoryImpl
 
     val libp2p: Libp2pModule = Libp2pModule().setEventHandler { event ->
         log.info { "Libp2pEvent: $event" }
@@ -59,12 +62,17 @@ abstract class AbstractAppResources(
     }
 
     val libble: LibbleModule = LibbleModule().setEventHandler { event ->
+        log.info { "LibbleEvent: $event" }
         when (event) {
-            is LibbleEvent.ContactExchange.Failed -> log.warn { "LibbleEvent: exchange failed: ${event.reason}" }
-            is LibbleEvent.ContactExchange -> log.info { "LibbleEvent: $event" }
-            else -> Unit
+            is LibbleEvent.ContactExchange.Failed -> {
+                log.warn("LibbleEvent: exchange failed: ${event.reason}")
+                Unit.success()
+            }
+
+            else -> Unit.success()
+        }.onFailure {
+            log.error { "Error while processing LibbleEvent: $event" }
         }
-        Unit.success()
     }
 
     fun initialize(system: ActorRef) {

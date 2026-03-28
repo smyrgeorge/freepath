@@ -1,4 +1,6 @@
-package io.github.smyrgeorge.freepath.libble.gatt
+package io.github.smyrgeorge.freepath.libble.pool
+
+import kotlinx.coroutines.flow.Flow
 
 interface BleConnectionPort {
     suspend fun connect()
@@ -14,11 +16,24 @@ interface BleConnectionPort {
     suspend fun readEphemeral(): ByteArray
 
     /** Writes [bytes] (pinConfirm + encrypted card) to CARD. */
-    suspend fun writeCard(bytes: ByteArray)
+    suspend fun writeContactCard(bytes: ByteArray)
 
     /** Reads the peer's response (pinConfirm + encrypted card) from CARD. */
-    suspend fun readCard(): ByteArray
+    suspend fun readContactCard(): ByteArray
 
     /** Writes the exchange [status] byte to STATUS. */
     suspend fun writeStatus(status: Byte)
+
+    /**
+     * Writes a generic request frame to REQUEST: reqId (8 bytes LE) + payload.
+     * Used by the initiator side of the BLE RPC protocol.
+     */
+    suspend fun writeRequest(reqId: Long, payload: ByteArray)
+
+    /**
+     * Returns a [Flow] that emits raw response frames from the RESPONSE notify characteristic.
+     * Each frame: reqId (8 bytes LE) + status (1 byte) + payload/error bytes.
+     * Subscribes to BLE notifications when collected.
+     */
+    fun observeResponses(): Flow<ByteArray>
 }

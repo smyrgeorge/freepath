@@ -17,6 +17,8 @@ import platform.CoreBluetooth.CBATTErrorSuccess
 import platform.CoreBluetooth.CBATTRequest
 import platform.CoreBluetooth.CBAttributePermissionsReadable
 import platform.CoreBluetooth.CBAttributePermissionsWriteable
+import platform.CoreBluetooth.CBCentral
+import platform.CoreBluetooth.CBCharacteristicPropertyNotify
 import platform.CoreBluetooth.CBCharacteristicPropertyRead
 import platform.CoreBluetooth.CBCharacteristicPropertyWrite
 import platform.CoreBluetooth.CBMutableCharacteristic
@@ -25,13 +27,13 @@ import platform.CoreBluetooth.CBPeripheralManager
 import platform.CoreBluetooth.CBPeripheralManagerStatePoweredOn
 import platform.CoreBluetooth.CBUUID
 import platform.Foundation.NSData
+import platform.Foundation.NSLock
 import platform.Foundation.dataWithBytes
 import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalAtomicApi::class, ExperimentalUuidApi::class, ExperimentalForeignApi::class)
+@OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 actual class BleGattServer actual constructor() : BleGattServerPort {
 
     private val log = Logger.of(this::class)
@@ -48,6 +50,10 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     private var cardValue: ByteArray = byteArrayOf()
 
     private val manager: CBPeripheralManager get() = PeripheralManagerHolder.manager.manager
+
+    // Tracks which CBCentral sent each request so we can notify the right central.
+    private val lock = NSLock()
+    private val pendingCentrals = HashMap<Long, CBCentral>()
 
     private val pingChar = CBMutableCharacteristic(
         type = CBUUID.UUIDWithString(BleConstants.PING_UUID.toString()),
@@ -73,6 +79,18 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         value = null,
         permissions = CBAttributePermissionsWriteable,
     )
+    private val requestChar = CBMutableCharacteristic(
+        type = CBUUID.UUIDWithString(BleConstants.REQUEST_UUID.toString()),
+        properties = CBCharacteristicPropertyWrite,
+        value = null,
+        permissions = CBAttributePermissionsWriteable,
+    )
+    private val responseChar = CBMutableCharacteristic(
+        type = CBUUID.UUIDWithString(BleConstants.RESPONSE_UUID.toString()),
+        properties = CBCharacteristicPropertyNotify,
+        value = null,
+        permissions = CBAttributePermissionsReadable,
+    )
 
     actual override suspend fun setEphemeralValue(bytes: ByteArray) {
         ephemeralValue = bytes
@@ -80,6 +98,37 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
 
     actual override suspend fun setCardValue(bytes: ByteArray) {
         cardValue = bytes
+    }
+
+    actual override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
+        val central = lock.withLock { pendingCentrals.remove(reqId) } ?: return
+        val frame = encodeResponseFrame(reqId, 0x00, payload)
+        withContext(Dispatchers.IO) { notifyCentral(central, frame) }
+    }
+
+    actual override suspend fun sendResponseFailed(reqId: Long, error: String) {
+        val central = lock.withLock { pendingCentrals.remove(reqId) } ?: return
+        val frame = encodeResponseFrame(reqId, 0x01, error.encodeToByteArray())
+        withContext(Dispatchers.IO) { notifyCentral(central, frame) }
+    }
+
+    private fun notifyCentral(central: CBCentral, frame: ByteArray) {
+        manager.updateValue(frame.toNSData(), forCharacteristic = responseChar, onSubscribedCentrals = listOf(central))
+    }
+
+    private fun encodeResponseFrame(reqId: Long, status: Byte, payload: ByteArray): ByteArray {
+        val header = ByteArray(9)
+        for (i in 0..7) header[i] = (reqId shr (i * 8)).toByte()
+        header[8] = status
+        return header + payload
+    }
+
+    private fun emitRequest(central: CBCentral, bytes: ByteArray) {
+        if (bytes.size < 8) return
+        val reqId = (0 until 8).fold(0L) { acc, i -> acc or ((bytes[i].toLong() and 0xFF) shl (i * 8)) }
+        val payload = bytes.copyOfRange(8, bytes.size)
+        lock.withLock { pendingCentrals[reqId] = central }
+        _events.tryEmit(BleGattServerPort.Event.RequestReceived(central.identifier.UUIDString, reqId, payload))
     }
 
     private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
@@ -127,6 +176,12 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
                     manager.respondToRequest(req, CBATTErrorSuccess)
                 }
 
+                requestChar.UUID -> {
+                    val bytes = req.value?.bytes?.readBytes(req.value!!.length.toInt()) ?: byteArrayOf()
+                    emitRequest(req.central, bytes)
+                    manager.respondToRequest(req, CBATTErrorSuccess)
+                }
+
                 else -> manager.respondToRequest(req, CBATTErrorRequestNotSupported)
             }
         }
@@ -157,6 +212,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         withContext(Dispatchers.IO) {
             ephemeralValue = byteArrayOf()
             cardValue = byteArrayOf()
+            lock.withLock { pendingCentrals.clear() }
             manager.removeAllServices()
             PeripheralManagerHolder.manager.removeStateListener(stateListener)
             PeripheralManagerHolder.manager.removeReadRequestHandler(readHandler)
@@ -170,7 +226,16 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             type = CBUUID.UUIDWithString(BleConstants.FREEPATH_SERVICE_UUID.toString()),
             primary = true,
         )
-        service.setCharacteristics(listOf(pingChar, ephemeralChar, cardChar, statusChar))
+        service.setCharacteristics(listOf(pingChar, ephemeralChar, cardChar, statusChar, requestChar, responseChar))
         manager.addService(service)
+    }
+}
+
+private fun <T> NSLock.withLock(block: () -> T): T {
+    lock()
+    return try {
+        block()
+    } finally {
+        unlock()
     }
 }

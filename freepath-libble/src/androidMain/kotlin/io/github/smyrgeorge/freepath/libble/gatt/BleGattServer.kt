@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattServer
 import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothGattService
@@ -21,9 +22,9 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalAtomicApi::class, ExperimentalUuidApi::class)
+@OptIn(ExperimentalAtomicApi::class)
+@SuppressLint("MissingPermission")
 actual class BleGattServer actual constructor() : BleGattServerPort {
 
     private val log = Logger.of(this::class)
@@ -43,6 +44,13 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     private val preparedWriteBuffers = ConcurrentHashMap<String, ByteArray>()
     private val preparedWriteChars = ConcurrentHashMap<String, UUID>()
 
+    // Tracks which BluetoothDevice sent each request, so we can notify the right device.
+    private val pendingRequests = ConcurrentHashMap<Long, BluetoothDevice>()
+
+    // responseChar is set when the GATT server is started (used for notifyCharacteristicChanged).
+    @Volatile
+    private var responseChar: BluetoothGattCharacteristic? = null
+
     actual override suspend fun setEphemeralValue(bytes: ByteArray) {
         ephemeralValue = bytes
     }
@@ -51,7 +59,25 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         cardValue = bytes
     }
 
-    @SuppressLint("MissingPermission")
+    actual override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
+        val device = pendingRequests.remove(reqId) ?: return
+        val frame = encodeResponseFrame(reqId, 0x00, payload)
+        withContext(Dispatchers.IO) { notifyDevice(device, frame) }
+    }
+
+    actual override suspend fun sendResponseFailed(reqId: Long, error: String) {
+        val device = pendingRequests.remove(reqId) ?: return
+        val frame = encodeResponseFrame(reqId, 0x01, error.encodeToByteArray())
+        withContext(Dispatchers.IO) { notifyDevice(device, frame) }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun notifyDevice(device: BluetoothDevice, frame: ByteArray) {
+        val char = responseChar ?: return
+        char.value = frame
+        server?.notifyCharacteristicChanged(device, char, false)
+    }
+
     private val callback = object : BluetoothGattServerCallback() {
         override fun onCharacteristicReadRequest(
             device: BluetoothDevice, requestId: Int, offset: Int,
@@ -81,24 +107,16 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
                     return
                 }
 
-                EPHEMERAL_JVM_UUID, CARD_JVM_UUID, STATUS_JVM_UUID -> {
+                REQUEST_JVM_UUID, EPHEMERAL_JVM_UUID, CARD_JVM_UUID, STATUS_JVM_UUID -> {
                     if (value == null) {
                         if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
                         return
                     }
                     if (preparedWrite) {
-                        val key = device.address
-                        val existing = preparedWriteBuffers[key] ?: byteArrayOf()
-                        val grown = if (offset <= existing.size) {
-                            existing.copyOf(offset + value.size)
-                                .also { System.arraycopy(value, 0, it, offset, value.size) }
-                        } else {
-                            existing + value
-                        }
-                        preparedWriteBuffers[key] = grown
-                        preparedWriteChars[key] = characteristic.uuid
+                        accumulatePreparedWrite(device, characteristic.uuid, offset, value)
                     } else {
-                        emitWrite(characteristic.uuid, value)
+                        if (characteristic.uuid == REQUEST_JVM_UUID) emitRequest(device, value)
+                        else emitWrite(characteristic.uuid, value)
                     }
                     if (responseNeeded) server?.sendResponse(
                         device,
@@ -120,13 +138,53 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
                 val key = device.address
                 val bytes = preparedWriteBuffers.remove(key)
                 val uuid = preparedWriteChars.remove(key)
-                if (bytes != null && uuid != null) emitWrite(uuid, bytes)
+                if (bytes != null && uuid != null) {
+                    if (uuid == REQUEST_JVM_UUID) emitRequest(device, bytes)
+                    else emitWrite(uuid, bytes)
+                }
             } else {
                 preparedWriteBuffers.remove(device.address)
                 preparedWriteChars.remove(device.address)
             }
             server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
         }
+
+        override fun onDescriptorWriteRequest(
+            device: BluetoothDevice, requestId: Int,
+            descriptor: BluetoothGattDescriptor,
+            preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?,
+        ) {
+            // Accept all CCCD writes (enables/disables notifications from connected centrals).
+            if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+        }
+    }
+
+    private fun accumulatePreparedWrite(device: BluetoothDevice, uuid: UUID, offset: Int, value: ByteArray) {
+        val key = device.address
+        val existing = preparedWriteBuffers[key] ?: byteArrayOf()
+        val grown = if (offset <= existing.size) {
+            existing.copyOf(offset + value.size)
+                .also { System.arraycopy(value, 0, it, offset, value.size) }
+        } else {
+            existing + value
+        }
+        preparedWriteBuffers[key] = grown
+        preparedWriteChars[key] = uuid
+    }
+
+    private fun emitRequest(device: BluetoothDevice, bytes: ByteArray) {
+        if (bytes.size < 8) return
+        val reqId = (0 until 8).fold(0L) { acc, i -> acc or ((bytes[i].toLong() and 0xFF) shl (i * 8)) }
+        val payload = bytes.copyOfRange(8, bytes.size)
+        pendingRequests[reqId] = device
+        _events.tryEmit(BleGattServerPort.Event.RequestReceived(device.address, reqId, payload))
+    }
+
+    private fun encodeResponseFrame(reqId: Long, status: Byte, payload: ByteArray): ByteArray {
+        val header = ByteArray(9)
+        for (i in 0..7) header[i] = (reqId shr (i * 8)).toByte()
+        header[8] = status
+        return header + payload
     }
 
     private fun emitWrite(uuid: UUID, bytes: ByteArray) {
@@ -139,7 +197,6 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         _events.tryEmit(event)
     }
 
-    @SuppressLint("MissingPermission")
     actual override suspend fun start() {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
         withContext(Dispatchers.IO) {
@@ -178,18 +235,39 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
                     BluetoothGattCharacteristic.PERMISSION_WRITE,
                 )
             )
+            service.addCharacteristic(
+                BluetoothGattCharacteristic(
+                    REQUEST_JVM_UUID,
+                    BluetoothGattCharacteristic.PROPERTY_WRITE,
+                    BluetoothGattCharacteristic.PERMISSION_WRITE,
+                )
+            )
+            val responseCharInst = BluetoothGattCharacteristic(
+                RESPONSE_JVM_UUID,
+                BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+                BluetoothGattCharacteristic.PERMISSION_READ,
+            ).also { char ->
+                char.addDescriptor(
+                    BluetoothGattDescriptor(
+                        CCCD_UUID,
+                        BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE,
+                    )
+                )
+            }
+            service.addCharacteristic(responseCharInst)
             gattServer.addService(service)
+            responseChar = responseCharInst
             server = gattServer
             log.info("BleGattServer started")
         }
     }
 
-    @SuppressLint("MissingPermission")
     actual override suspend fun stop() {
         if (!started.compareAndSet(expectedValue = true, newValue = false)) return
         withContext(Dispatchers.IO) {
             val s = server
             server = null
+            responseChar = null
             ephemeralValue = byteArrayOf()
             cardValue = byteArrayOf()
             preparedWriteBuffers.clear()
@@ -205,5 +283,8 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         private val EPHEMERAL_JVM_UUID = UUID.fromString(BleConstants.EPHEMERAL_UUID.toString())
         private val CARD_JVM_UUID = UUID.fromString(BleConstants.CARD_UUID.toString())
         private val STATUS_JVM_UUID = UUID.fromString(BleConstants.STATUS_UUID.toString())
+        private val REQUEST_JVM_UUID = UUID.fromString(BleConstants.REQUEST_UUID.toString())
+        private val RESPONSE_JVM_UUID = UUID.fromString(BleConstants.RESPONSE_UUID.toString())
+        private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 }

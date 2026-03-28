@@ -15,8 +15,12 @@ sealed class LibbleEvent {
     ) : LibbleEvent()
 
     data class PeripheralExpired(val peripheralId: String) : LibbleEvent()
-    data class PeripheralConnected(val peripheralId: String) : LibbleEvent()
-    data class PeripheralDisconnected(val peripheralId: String) : LibbleEvent()
+
+    /**
+     * A central wrote a request frame to the REQUEST characteristic on our GATT server.
+     * [peripheralId] is the OS-assigned BLE address/UUID of the remote central.
+     */
+    class RequestReceived(val peripheralId: String, val reqId: Long, val payload: ByteArray) : LibbleEvent()
 
     sealed class ContactExchange : LibbleEvent() {
         /** Exchange handshake has started. */

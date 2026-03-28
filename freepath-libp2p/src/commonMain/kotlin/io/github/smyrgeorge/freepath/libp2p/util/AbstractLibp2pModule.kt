@@ -2,6 +2,7 @@ package io.github.smyrgeorge.freepath.libp2p.util
 
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent.Response
+import io.github.smyrgeorge.freepath.util.rpc.RpcManager
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

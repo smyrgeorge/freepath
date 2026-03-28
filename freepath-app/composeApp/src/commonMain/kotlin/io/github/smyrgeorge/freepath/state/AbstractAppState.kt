@@ -12,6 +12,7 @@ import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
+import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
@@ -37,6 +38,7 @@ abstract class AbstractAppState(
     private val identityRepository: IdentityEntryRepository = resources.identityRepository
     private val contactCardRepository: ContactCardEntryRepository = resources.contactCardRepository
     private val contentEntryRepository: ContentEntryRepository = resources.contentEntryRepository
+    private val contactRoutingEntryRepository: ContactRoutingEntryRepository = resources.contactRoutingEntryRepository
 
     private val _contacts = MutableStateFlow<List<ContactCardEntry>>(emptyList())
     val contacts: StateFlow<List<ContactCardEntry>> = _contacts.asStateFlow()
@@ -168,6 +170,7 @@ abstract class AbstractAppState(
                 contactCardRepository.deleteAll(this).getOrThrow()
                 identityRepository.deleteAll(this).getOrThrow()
                 contentEntryRepository.deleteAll(this).getOrThrow()
+                contactRoutingEntryRepository.deleteAll(this).getOrThrow()
             }
         }.onSuccess {
             log.info("[dev] All data deleted.")

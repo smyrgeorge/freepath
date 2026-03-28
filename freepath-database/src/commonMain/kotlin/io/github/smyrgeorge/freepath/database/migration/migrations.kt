@@ -6,4 +6,5 @@ val migrations: List<MigrationFile> = listOf(
     MigrationFile("1_create_table_contact_card.sql", V1_CreateTableContactCard),
     MigrationFile("2_create_table_identity.sql", V2_CreateTableIdentity),
     MigrationFile("3_create_table_content.sql", V3_CreateTableContent),
+    MigrationFile("4_create_table_contact_routing.sql", V4_CreateTableContactRouting),
 )

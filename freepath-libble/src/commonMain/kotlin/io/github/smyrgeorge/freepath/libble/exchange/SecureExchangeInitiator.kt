@@ -14,7 +14,7 @@ import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.constantT
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.decryptCard
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.deriveKeys
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.encryptCard
-import io.github.smyrgeorge.freepath.libble.gatt.BleConnectionPort
+import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPort
 
 /**
  * Drives the initiator side of the secure BLE contact exchange (5-message protocol).
@@ -35,7 +35,6 @@ internal class SecureExchangeInitiator(
         onEvent: suspend (LibbleEvent.ContactExchange) -> Unit,
     ): Result<ContactCard> = runCatching {
         onEvent(LibbleEvent.ContactExchange.Started)
-        connection.connect()
         try {
             exchange(localCard, sigKeyPrivate, onEvent)
         } catch (e: CancellationException) {
@@ -45,8 +44,6 @@ internal class SecureExchangeInitiator(
             runCatching { connection.writeStatus(status) }
             onEvent(LibbleEvent.ContactExchange.Failed(e.message ?: "exchange failed"))
             throw e
-        } finally {
-            runCatching { connection.disconnect() }
         }
     }.also { result ->
         result.exceptionOrNull()?.let { if (it is CancellationException) throw it }
@@ -67,10 +64,10 @@ internal class SecureExchangeInitiator(
 
         // Step 3: Send pinConfirm_I + encrypted card.
         val encCard = encryptCard(localCard, sigKeyPrivate, keys.sessionKey, cardAad(ROLE_I, keys.sessionId))
-        connection.writeCard(keys.pinConfirmI + encCard)
+        connection.writeContactCard(keys.pinConfirmI + encCard)
 
         // Step 4: Read and validate responder's response.
-        val respPayload = connection.readCard()
+        val respPayload = connection.readContactCard()
         require(respPayload.size > PIN_CONFIRM_LEN) { "CARD response too short" }
         val receivedPinConfirmR = respPayload.copyOfRange(0, PIN_CONFIRM_LEN)
         require(constantTimeEquals(receivedPinConfirmR, keys.pinConfirmR)) { "PIN confirmation mismatch" }

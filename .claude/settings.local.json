@@ -22,7 +22,11 @@
       "Bash(./gradlew :freepath-libble:compileKotlinJvm)",
       "Bash(./gradlew :freepath-content:compileKotlinJvm)",
       "Bash(./gradlew :freepath-content:jvmTest --info)",
-      "Bash(./gradlew :freepath-libble:compileIosMainKotlinMetadata)"
+      "Bash(./gradlew :freepath-libble:compileIosMainKotlinMetadata)",
+      "Bash(./gradlew :freepath-libble:compileKotlinMetadata)",
+      "Bash(./gradlew :freepath-app:composeApp:compileKotlinMetadata)",
+      "Bash(./gradlew :freepath-libble:build)",
+      "Bash(./gradlew :freepath-database:compileKotlinMetadata)"
     ]
   }
 }

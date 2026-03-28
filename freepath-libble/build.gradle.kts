@@ -27,11 +27,15 @@ kotlin {
     }
 
     sourceSets {
-        configureEach { languageSettings.progressiveMode = true }
+        configureEach {
+            languageSettings.progressiveMode = true
+            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+        }
         commonMain {
             dependencies {
                 implementation(project(":freepath-contact"))
                 implementation(project(":freepath-crypto"))
+                implementation(project(":freepath-util"))
                 implementation(libs.kable.core)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.log4k)
