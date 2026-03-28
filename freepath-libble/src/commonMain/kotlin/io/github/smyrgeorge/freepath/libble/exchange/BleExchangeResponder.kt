@@ -24,7 +24,7 @@ import kotlin.time.Duration.Companion.seconds
  * Subscribes to [BleGattServerPort.events] and reacts to incoming writes from the initiator.
  * The GATT server must be running before [run] is called.
  */
-internal class SecureExchangeResponder(
+internal class BleExchangeResponder(
     private val gattServer: BleGattServerPort,
     private val pin: String,
 ) {
@@ -36,7 +36,7 @@ internal class SecureExchangeResponder(
         localCard: ContactCard,
         sigKeyPrivate: ByteArray,
         onEvent: suspend (LibbleEvent.ContactExchange) -> Unit,
-    ): Result<ContactCard> = runCatching {
+    ): Result<Pair<ContactCard, String>> = runCatching {
         onEvent(LibbleEvent.ContactExchange.Started)
         try {
             exchange(localCard, sigKeyPrivate, onEvent)
@@ -56,14 +56,15 @@ internal class SecureExchangeResponder(
         localCard: ContactCard,
         sigKeyPrivate: ByteArray,
         onEvent: suspend (LibbleEvent.ContactExchange) -> Unit,
-    ): ContactCard {
+    ): Pair<ContactCard, String> {
         // Step 1: Wait for initiator's ephemeral public key.
-        val iEphPub = withTimeout(STEP_TIMEOUT) {
+        val ephemeralEvent = withTimeout(STEP_TIMEOUT) {
             gattServer.events
                 .filterIsInstance<BleGattServerPort.Event.EphemeralReceived>()
                 .first()
-                .bytes
         }
+        val centralId = ephemeralEvent.centralId
+        val iEphPub = ephemeralEvent.bytes
 
         // Generate responder's ephemeral keypair and derive all session keys.
         val rEphKp = CryptoProvider.generateX25519KeyPair()
@@ -104,7 +105,7 @@ internal class SecureExchangeResponder(
         require(status == STATUS_SUCCESS) { "Initiator reported failure: 0x${status.toString(16)}" }
 
         onEvent(LibbleEvent.ContactExchange.Completed(peerCard))
-        return peerCard
+        return Pair(peerCard, centralId)
     }
 
     companion object {

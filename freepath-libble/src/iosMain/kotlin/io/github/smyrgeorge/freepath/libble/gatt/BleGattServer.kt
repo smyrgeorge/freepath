@@ -160,7 +160,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
 
                 ephemeralChar.UUID -> {
                     val bytes = req.value?.bytes?.readBytes(req.value!!.length.toInt()) ?: byteArrayOf()
-                    _events.tryEmit(BleGattServerPort.Event.EphemeralReceived(bytes))
+                    _events.tryEmit(BleGattServerPort.Event.EphemeralReceived(req.central.identifier.UUIDString, bytes))
                     manager.respondToRequest(req, CBATTErrorSuccess)
                 }
 

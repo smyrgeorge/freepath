@@ -4,8 +4,8 @@ import com.juul.kable.Advertisement
 import com.juul.kable.Scanner
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.libble.BleConstants.FREEPATH_SERVICE_UUID
-import io.github.smyrgeorge.freepath.libble.exchange.SecureExchangeInitiator
-import io.github.smyrgeorge.freepath.libble.exchange.SecureExchangeResponder
+import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeInitiator
+import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeResponder
 import io.github.smyrgeorge.freepath.libble.gatt.BleGattServer
 import io.github.smyrgeorge.freepath.libble.gatt.BleGattServerPort
 import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetrics
@@ -175,7 +175,7 @@ class LibbleModule {
         sigKeyPrivate: ByteArray,
     ): Result<ContactCard> = runCatching {
         pool.withConnection(peripheralId) { conn ->
-            SecureExchangeInitiator(conn, pin)
+            BleExchangeInitiator(conn, pin)
                 .run(localCard, sigKeyPrivate) { sendEvent(it) }
                 .getOrThrow()
         }
@@ -198,8 +198,8 @@ class LibbleModule {
         pin: String,
         localCard: ContactCard,
         sigKeyPrivate: ByteArray,
-    ): Result<ContactCard> =
-        SecureExchangeResponder(gattServer, pin).run(localCard, sigKeyPrivate) { event ->
+    ): Result<Pair<ContactCard, String>> =
+        BleExchangeResponder(gattServer, pin).run(localCard, sigKeyPrivate) { event ->
             sendEvent(event)
         }
 

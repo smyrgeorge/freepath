@@ -106,8 +106,8 @@ class AppActor(
                             localCard = state.contactCard,
                             sigKeyPrivate = state.identity.sigKeyPrivate,
                         )
-                        result.onSuccess { peerCard ->
-                            ctx.tell(Protocol.BleContactExchangeSucceeded(peerCard)).getOrThrow()
+                        result.onSuccess { (peerCard, centralId) ->
+                            ctx.tell(Protocol.BleContactExchangeSucceeded(peerCard, centralId)).getOrThrow()
                         }.onFailure { e ->
                             ctx.tell(Protocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed")).getOrThrow()
                         }
@@ -172,7 +172,7 @@ class AppActor(
                             sigKeyPrivate = state.identity.sigKeyPrivate,
                         )
                         result.onSuccess { peerCard ->
-                            ctx.tell(Protocol.BleContactExchangeSucceeded(peerCard)).getOrThrow()
+                            ctx.tell(Protocol.BleContactExchangeSucceeded(peerCard, m.peripheralId)).getOrThrow()
                         }.onFailure { e ->
                             ctx.tell(Protocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed")).getOrThrow()
                         }
@@ -188,7 +188,7 @@ class AppActor(
 
                 is Protocol.BleContactExchangeSucceeded -> {
                     ctx.exchangeJob = null
-                    state.acceptContact(m.peerCard)
+                    state.acceptContact(m)
                     state.cancelContactExchange()
                     ctx.become(normal)
                 }

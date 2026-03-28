@@ -7,7 +7,6 @@ import io.github.smyrgeorge.sqlx4k.annotation.Id
 import io.github.smyrgeorge.sqlx4k.annotation.Table
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 @Table("contact_routing")
 data class ContactRoutingEntry(
@@ -19,8 +18,8 @@ data class ContactRoutingEntry(
     override var updatedAt: Instant = Clock.System.now(),
     /** Peer node ID — references ContactCardEntry.peerId. */
     val peerId: String,
-    /** BLE peripheral UUID assigned by the OS. Stored as TEXT. */
-    val blePeripheralId: Uuid? = null,
+    /** BLE peripheral ID assigned by the OS (UUID on iOS, MAC address on Android). Stored as TEXT. */
+    val blePeripheralId: String? = null,
     /** When the BLE route was last confirmed (i.e. last successful exchange). */
     @Converter(InstantConverter::class)
     val bleUpdatedAt: Instant? = null,

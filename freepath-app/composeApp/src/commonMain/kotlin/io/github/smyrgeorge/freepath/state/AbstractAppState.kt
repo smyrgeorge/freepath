@@ -1,5 +1,6 @@
 package io.github.smyrgeorge.freepath.state
 
+import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.contact.ContactCard
 import io.github.smyrgeorge.freepath.contact.ContactCardCodec
@@ -12,6 +13,7 @@ import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
 import io.github.smyrgeorge.freepath.database.ContactCardEntry
 import io.github.smyrgeorge.freepath.database.ContactCardEntryRepository
+import io.github.smyrgeorge.freepath.database.ContactRoutingEntry
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
@@ -19,6 +21,7 @@ import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.state.model.ConnectionSource
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.sqlx4k.QueryExecutor
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -81,7 +84,8 @@ abstract class AbstractAppState(
         loadContacts()
     }
 
-    suspend fun acceptContact(card: ContactCard) {
+    suspend fun acceptContact(card: ContactCard) = acceptContact(db, card)
+    suspend fun acceptContact(db: QueryExecutor, card: ContactCard) {
         val existing = contactCardRepository.findOneByPeerId(db, card.peerId).getOrThrow()
         if (existing == null) {
             val entry = ContactCardEntry(peerId = card.peerId, card = card)
@@ -92,6 +96,20 @@ abstract class AbstractAppState(
         }
         // else: stored card is already up to date — no-op
         loadContacts()
+    }
+
+    suspend fun acceptContact(res: Protocol.BleContactExchangeSucceeded) {
+        val card = res.peerCard
+        val peripheralId = res.peripheralId
+        db.transaction {
+            acceptContact(this, card)
+            val peerId = card.peerId
+            val now = Clock.System.now()
+            val existing = contactRoutingEntryRepository.findOneByPeerId(this, peerId).getOrNull()
+            val entry = existing?.copy(blePeripheralId = peripheralId, bleUpdatedAt = now)
+                ?: ContactRoutingEntry(peerId = peerId, blePeripheralId = peripheralId, bleUpdatedAt = now)
+            contactRoutingEntryRepository.save(this, entry).getOrThrow()
+        }
     }
 
     suspend fun setTrustLevel(entry: ContactCardEntry, level: TrustLevel) {

@@ -116,7 +116,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
                         accumulatePreparedWrite(device, characteristic.uuid, offset, value)
                     } else {
                         if (characteristic.uuid == REQUEST_JVM_UUID) emitRequest(device, value)
-                        else emitWrite(characteristic.uuid, value)
+                        else emitWrite(device, characteristic.uuid, value)
                     }
                     if (responseNeeded) server?.sendResponse(
                         device,
@@ -140,7 +140,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
                 val uuid = preparedWriteChars.remove(key)
                 if (bytes != null && uuid != null) {
                     if (uuid == REQUEST_JVM_UUID) emitRequest(device, bytes)
-                    else emitWrite(uuid, bytes)
+                    else emitWrite(device, uuid, bytes)
                 }
             } else {
                 preparedWriteBuffers.remove(device.address)
@@ -187,9 +187,9 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         return header + payload
     }
 
-    private fun emitWrite(uuid: UUID, bytes: ByteArray) {
+    private fun emitWrite(device: BluetoothDevice, uuid: UUID, bytes: ByteArray) {
         val event = when (uuid) {
-            EPHEMERAL_JVM_UUID -> BleGattServerPort.Event.EphemeralReceived(bytes)
+            EPHEMERAL_JVM_UUID -> BleGattServerPort.Event.EphemeralReceived(device.address, bytes)
             CARD_JVM_UUID -> BleGattServerPort.Event.CardReceived(bytes)
             STATUS_JVM_UUID -> BleGattServerPort.Event.StatusReceived(bytes.firstOrNull() ?: 0x02)
             else -> return

@@ -29,7 +29,7 @@ interface BleGattServerPort {
 
     sealed class Event {
         /** Initiator wrote its ephemeral X25519 public key to EPHEMERAL. */
-        class EphemeralReceived(val bytes: ByteArray) : Event()
+        class EphemeralReceived(val centralId: String, val bytes: ByteArray) : Event()
 
         /** Initiator wrote its pinConfirm + encrypted card to CARD. */
         class CardReceived(val bytes: ByteArray) : Event()

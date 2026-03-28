@@ -21,7 +21,7 @@ import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPort
  *
  * The caller is responsible for connecting to the correct peripheral before calling [run].
  */
-internal class SecureExchangeInitiator(
+internal class BleExchangeInitiator(
     private val connection: BleConnectionPort,
     private val pin: String,
 ) {

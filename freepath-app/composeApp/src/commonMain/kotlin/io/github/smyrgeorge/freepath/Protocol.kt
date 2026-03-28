@@ -31,7 +31,7 @@ sealed interface Protocol : ActorProtocol {
     data class BleBeginInitiatorContactExchange(val peripheralId: String, val pin: String) : Message<Ok>()
     data object BleInitiateResponderContactExchange : Message<Ok>()
     data object BleContactExchangeCancelled : Message<Ok>()
-    data class BleContactExchangeSucceeded(val peerCard: ContactCard) : Message<Ok>()
+    data class BleContactExchangeSucceeded(val peerCard: ContactCard, val peripheralId: String) : Message<Ok>()
     data class BleContactExchangeFailed(val reason: String) : Message<Ok>()
 
     // Chat
