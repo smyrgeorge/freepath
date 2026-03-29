@@ -3,9 +3,15 @@
 An information network that lives in your pocket and spreads through human contact.
 
 > [!NOTE]
-> Freepath is at a very early stage. There is no code, no technical design, and no roadmap yet. We are currently in the
-> process of thinking through how this could be built — collecting ideas, perspectives, and opinions. If something here
-> resonates with you, we'd love to hear your thoughts.
+> Freepath is at an early development stage. We are currently in the process of thinking through how this could be
+> built — collecting ideas, perspectives, and opinions. If something here resonates with you, we'd love to hear your
+> thoughts.
+
+> [!WARNING]
+> Freepath uses cryptographic primitives (Ed25519, X25519, ChaCha20-Poly1305) for identity, key agreement, and
+> encryption. However, the protocol and its implementation have **not undergone any independent security audit or
+> formal cryptographic review**. Do not rely on Freepath to protect sensitive information. Use it for experimentation
+> and development purposes only.
 
 🏠 [Homepage](https://smyrgeorge.github.io/freepath)
 
@@ -45,7 +51,6 @@ An information network that lives in your pocket and spreads through human conta
 - [Concepts worth exploring](#concepts-worth-exploring)
     - [Messaging](#messaging)
     - [Presence-based voting](#presence-based-voting)
-- [Where we are](#where-we-are)
 - [Get involved](#get-involved)
 
 ## The idea
@@ -462,17 +467,6 @@ ballots from a distance. The network enforces locality not through rules but thr
 This is still an open direction. Questions of eligibility, double-voting prevention, anonymity, and result verification
 are not yet resolved. But the direction feels right: governance that is local, physical, and grounded in the act of
 showing up.
-
-## Where we are
-
-Freepath is currently an idea. This repository exists to share that idea and find out whether others think it's worth
-building.
-
-There is no technical design yet, and no code. The next steps are to start shaping the technical foundations of the
-protocol and to begin building the application. Both are open — if you want to be part of that process, now is the time.
-
-If you've thought about these problems — decentralized communication, mesh networking, offline-first systems, digital
-sovereignty — we'd love to hear from you.
 
 ## Get involved
 
