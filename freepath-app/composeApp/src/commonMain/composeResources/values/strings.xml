@@ -72,4 +72,5 @@
     <string name="dev_libble_none">none</string>
     <string name="dev_libble_tx_power">TX power</string>
     <string name="dev_libble_connectable">Connectable</string>
+    <string name="dev_libble_identified_peers">Identified peers</string>
 </resources>

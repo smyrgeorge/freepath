@@ -56,6 +56,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_content
 import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_content_subtitle
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_connectable
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_discovered_peripherals
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_identified_peers
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_metrics_title
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_none
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_tx_power
@@ -275,6 +276,11 @@ private fun LibbleMetricsPanel(metrics: LibbleMetricsSnapshot) {
                     val connectable = p.isConnectable?.let { " | $connectableLabel: $it" } ?: ""
                     "$label ${p.peripheralId.abbrev()} (rssi: ${p.rssi}dBm$tx$connectable)"
                 } ?: none,
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libble_identified_peers),
+            value = metrics.identifiedPeers.takeIf { it.isNotEmpty() }
+                ?.joinToString("\n") { it.abbrev() } ?: none,
         )
     }
 }

@@ -40,8 +40,8 @@ class LibbleModule {
     @Volatile
     private var handler: (suspend (LibbleEvent) -> Unit)? = null
 
-    @Volatile
-    private var peripheralIdLookup: (suspend (peerId: String) -> String?)? = null
+    private lateinit var peerIdLookup: suspend (peripheralId: String) -> String?
+    private lateinit var peripheralIdLookup: suspend (peerId: String) -> String?
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val rpcManager = RpcManager<Result<ByteArray>>()
@@ -82,13 +82,19 @@ class LibbleModule {
             expired.forEach { id ->
                 pool.remove(id)
                 sendEvent(LibbleEvent.PeripheralExpired(id))
+                peerIdLookup(id)?.let { peerId -> sendEvent(LibbleEvent.PeerLost(peerId)) }
                 log.debug("Removed expired peripheral: $id")
             }
         }
     }
 
-    suspend fun start() {
+    suspend fun start(
+        peripheralIdLookup: suspend (peerId: String) -> String?,
+        peerIdLookup: suspend (peripheralId: String) -> String?,
+    ) {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
+        this.peripheralIdLookup = peripheralIdLookup
+        this.peerIdLookup = peerIdLookup
         log.info("LibbleModule starting")
         advertiser.start()
         startGattServer()
@@ -119,7 +125,12 @@ class LibbleModule {
                         advertisement = advertisement,
                     )
                 }
-                if (isNew) sendEvent(event)
+                if (isNew) {
+                    sendEvent(event)
+                    peerIdLookup(peripheralId)?.let { peerId ->
+                        sendEvent(LibbleEvent.PeerIdentified(peerId, peripheralId))
+                    }
+                }
             }
         }
     }
@@ -129,14 +140,8 @@ class LibbleModule {
         return this
     }
 
-    fun setPeripheralIdLookup(lookup: suspend (peerId: String) -> String?): LibbleModule {
-        this.peripheralIdLookup = lookup
-        return this
-    }
-
     suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray): Result<ByteArray> = runCatching {
-        val lookup = peripheralIdLookup ?: error("peripheralIdLookup not set")
-        val peripheralId = lookup(peerId) ?: error("No BLE peripheral ID found for peerId=$peerId")
+        val peripheralId = peripheralIdLookup(peerId) ?: error("No BLE peripheral ID found for peerId=$peerId")
         rpcManager.request(reqId) {
             pool.withConnection(peripheralId) { conn -> conn.writeRequest(reqId, payload) }
         }.getOrThrow()

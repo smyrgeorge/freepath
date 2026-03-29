@@ -17,6 +17,17 @@ sealed class LibbleEvent {
     data class PeripheralExpired(val peripheralId: String) : LibbleEvent()
 
     /**
+     * A discovered peripheral has been matched to a known contact via the routing table.
+     * Emitted once per peripheral, the first time the match is found.
+     */
+    data class PeerIdentified(val peerId: String, val peripheralId: String) : LibbleEvent()
+
+    /**
+     * A previously identified peripheral has expired and is no longer in range.
+     */
+    data class PeerLost(val peerId: String) : LibbleEvent()
+
+    /**
      * A central wrote a request frame to the REQUEST characteristic on our GATT server.
      * [peripheralId] is the OS-assigned BLE address/UUID of the remote central.
      */

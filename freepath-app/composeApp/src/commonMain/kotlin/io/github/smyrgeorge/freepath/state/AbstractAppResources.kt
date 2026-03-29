@@ -73,8 +73,6 @@ abstract class AbstractAppResources(
         }.onFailure {
             log.error { "Error while processing LibbleEvent: $event" }
         }
-    }.setPeripheralIdLookup {
-        contactRoutingEntryRepository.findOneByPeerId(db, it).getOrNull()?.blePeripheralId
     }
 
     fun initialize(system: ActorRef) {
@@ -128,7 +126,10 @@ abstract class AbstractAppResources(
     }
 
     suspend fun startupLibble() {
-        libble.start()
+        libble.start(
+            peripheralIdLookup = { contactRoutingEntryRepository.findOneByPeerId(db, it).getOrNull()?.blePeripheralId },
+            peerIdLookup = { contactRoutingEntryRepository.findOneByBlePeripheralId(db, it).getOrNull()?.peerId },
+        )
     }
 
     suspend fun stopLibble() {

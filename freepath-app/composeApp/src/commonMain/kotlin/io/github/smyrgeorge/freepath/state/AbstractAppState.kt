@@ -95,7 +95,7 @@ abstract class AbstractAppState(
             contactRepository.update(db, entry).getOrThrow()
         }
         // else: stored card is already up to date — no-op
-        loadContacts()
+        loadContacts(db)
     }
 
     suspend fun acceptContact(res: Protocol.BleContactExchangeSucceeded) {
@@ -118,7 +118,8 @@ abstract class AbstractAppState(
         loadContacts()
     }
 
-    suspend fun loadContacts() {
+    suspend fun loadContacts() = loadContacts(db)
+    suspend fun loadContacts(db: QueryExecutor) {
         val ownPeerId = contactEntry.peerId
         val list = contactRepository.findAll(db).getOrThrow().filter { it.peerId != ownPeerId }
         _contacts.value = list
