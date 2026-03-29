@@ -21,6 +21,9 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -28,6 +31,7 @@ import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalAtomicApi::class)
@@ -36,6 +40,10 @@ class LibbleModule {
     private val log = Logger.of(this::class)
 
     val metrics: LibbleMetrics = LibbleMetrics()
+    val requests: Channel<LibbleEvent.RequestReceived> = Channel(
+        capacity = 1000,
+        onBufferOverflow = BufferOverflow.DROP_LATEST,
+    )
     private val started = AtomicBoolean(false)
 
     @Volatile
@@ -43,6 +51,8 @@ class LibbleModule {
 
     private lateinit var peerIdLookup: suspend (peripheralId: String) -> String?
     private lateinit var peripheralIdLookup: suspend (peerId: String) -> String?
+    private lateinit var peerIdByRawBytesLookup: suspend (rawBytes: ByteArray) -> String?
+    private lateinit var onNewPeripheralId: suspend (peerId: String, peripheralId: String) -> Unit
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val rpc = RpcManager<Response>()
@@ -90,14 +100,19 @@ class LibbleModule {
     }
 
     suspend fun start(
+        bleBeaconId: ByteArray,
         peripheralIdLookup: suspend (peerId: String) -> String?,
         peerIdLookup: suspend (peripheralId: String) -> String?,
+        peerIdByRawBytesLookup: suspend (rawBytes: ByteArray) -> String?,
+        onNewPeripheralId: suspend (peerId: String, peripheralId: String) -> Unit,
     ) {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
         this.peripheralIdLookup = peripheralIdLookup
         this.peerIdLookup = peerIdLookup
+        this.peerIdByRawBytesLookup = peerIdByRawBytesLookup
+        this.onNewPeripheralId = onNewPeripheralId
         log.info("LibbleModule starting")
-        advertiser.start()
+        advertiser.start(bleBeaconId)
         startGattServer()
         scope.launch {
             val scanner = Scanner {
@@ -128,9 +143,21 @@ class LibbleModule {
                 }
                 if (isNew) {
                     sendEvent(event)
-                    peerIdLookup(peripheralId)?.let { peerId ->
-                        sendEvent(LibbleEvent.PeerIdentified(peerId, peripheralId))
-                    }
+                    // Primary: look up by peripheralId in the routing table (fast).
+                    val peerId = peerIdLookup(peripheralId)
+                        ?: run {
+                            // Fallback: read the BLE beacon ID from service data — works even
+                            // when Android randomizes its BLE MAC address on restart.
+                            val raw = advertisement.serviceData(FREEPATH_SERVICE_UUID)
+                                ?.takeIf { it.size >= 8 }
+                                ?.copyOfRange(0, 8)
+                                ?: return@run null
+                            peerIdByRawBytesLookup(raw)?.also { found ->
+                                // Update routing table so future peripheralId lookups hit directly.
+                                onNewPeripheralId(found, peripheralId)
+                            }
+                        }
+                    peerId?.let { sendEvent(LibbleEvent.PeerIdentified(it, peripheralId)) }
                 }
             }
         }
@@ -141,8 +168,11 @@ class LibbleModule {
         return this
     }
 
-    suspend fun request(peerId: String, payload: ByteArray): Response =
-        rpc.request { sendRequest(peerId, it, payload) }
+    suspend fun request(
+        timeout: Duration,
+        peerId: String,
+        payload: ByteArray
+    ): Response = rpc.request(timeout) { sendRequest(peerId, it, payload) }
 
     suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray) {
         val peripheralId = peripheralIdLookup(peerId) ?: error("No BLE peripheral ID found for peerId=$peerId")
@@ -216,8 +246,13 @@ class LibbleModule {
         scope.launch {
             gattServer.events.collect { event ->
                 when (event) {
-                    is BleGattServerPort.Event.RequestReceived ->
-                        sendEvent(LibbleEvent.RequestReceived(event.peripheralId, event.reqId, event.payload))
+                    is BleGattServerPort.Event.RequestReceived -> {
+                        val req = LibbleEvent.RequestReceived(event.senderId, event.reqId, event.payload)
+                        requests.trySend(req).onFailure {
+                            log.error { "Failed to send message to requests channel: $it" }
+                        }
+                        sendEvent(req)
+                    }
 
                     else -> Unit
                 }
@@ -238,7 +273,7 @@ class LibbleModule {
         val status = bytes[8]
         val body = bytes.copyOfRange(9, bytes.size)
         val result = if (status == 0x00.toByte()) LibbleEvent.ResponseReceived(reqId, peripheralId, body)
-        else LibbleEvent.RequestFailed(reqId, peripheralId, body.decodeToString())
+        else LibbleEvent.RequestFailed(reqId, senderId = peripheralId, error = body.decodeToString())
         scope.launch { rpc.response(reqId, result) }
     }
 

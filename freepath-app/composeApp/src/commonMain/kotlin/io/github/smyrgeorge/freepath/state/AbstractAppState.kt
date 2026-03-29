@@ -1,7 +1,6 @@
 package io.github.smyrgeorge.freepath.state
 
 import io.github.smyrgeorge.freepath.Protocol
-import io.github.smyrgeorge.freepath.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.ContactCodec
 import io.github.smyrgeorge.freepath.contact.Identity
@@ -19,6 +18,7 @@ import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
+import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.state.model.ConnectionSource
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
@@ -26,6 +26,7 @@ import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlin.io.encoding.Base64
@@ -55,18 +56,31 @@ abstract class AbstractAppState(
     private val _feedEntries = MutableStateFlow<List<ContentEntry>>(emptyList())
     val feedEntries: StateFlow<List<ContentEntry>> = _feedEntries.asStateFlow()
 
-    val nearbyLanPeers: StateFlow<Map<String, ConnectionSource>> =
-        resources.libp2p.metrics.value.map {
-            it.connectedPeers
-                .filter { peerId -> peerId != identityEntry.peerId }
-                .associateWith { ConnectionSource.LAN }
-        }.stateIn(emptyMap())
-
     val identifiedLanPeers: StateFlow<Map<String, ConnectionSource>> =
         resources.libp2p.metrics.value.map {
             it.identifiedPeers
                 .filter { peerId -> peerId != identityEntry.peerId }
                 .associateWith { ConnectionSource.LAN }
+        }.stateIn(emptyMap())
+
+    /**
+     * Unified view of contacts reachable via any transport, keyed by peerId.
+     * Value is the set of transports ([ConnectionSource]) on which the peer is currently visible.
+     * A peer reachable on both LAN and BLE appears once with both sources in the set.
+     */
+    val nearbyIdentifiedContacts: StateFlow<Map<String, Set<ConnectionSource>>> =
+        combine(
+            resources.libp2p.metrics.value,
+            resources.libble.metrics.value,
+        ) { lan, ble ->
+            val result = mutableMapOf<String, MutableSet<ConnectionSource>>()
+            lan.identifiedPeers
+                .filter { it != identityEntry.peerId }
+                .forEach { result.getOrPut(it) { mutableSetOf() }.add(ConnectionSource.LAN) }
+            ble.identifiedPeers
+                .filter { it != identityEntry.peerId }
+                .forEach { result.getOrPut(it) { mutableSetOf() }.add(ConnectionSource.BLE) }
+            result.mapValues { it.value.toSet() }
         }.stateIn(emptyMap())
 
     lateinit var identity: Identity

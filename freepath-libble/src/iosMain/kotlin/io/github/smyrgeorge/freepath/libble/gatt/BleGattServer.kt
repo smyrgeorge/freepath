@@ -31,7 +31,9 @@ import platform.Foundation.NSLock
 import platform.Foundation.dataWithBytes
 import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.fetchAndIncrement
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 actual class BleGattServer actual constructor() : BleGattServerPort {
@@ -51,9 +53,12 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
 
     private val manager: CBPeripheralManager get() = PeripheralManagerHolder.manager.manager
 
-    // Tracks which CBCentral sent each request so we can notify the right central.
+    // Server-side reqId generator — guarantees uniqueness across all connected centrals.
+    private val serverReqIdGen = AtomicLong(0)
+
+    // Maps server-assigned reqId → (central, clientReqId).
     private val lock = NSLock()
-    private val pendingCentrals = HashMap<Long, CBCentral>()
+    private val pendingCentrals = HashMap<Long, Pair<CBCentral, Long>>()
 
     private val pingChar = CBMutableCharacteristic(
         type = CBUUID.UUIDWithString(BleConstants.PING_UUID.toString()),
@@ -101,14 +106,14 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     }
 
     actual override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
-        val central = lock.withLock { pendingCentrals.remove(reqId) } ?: return
-        val frame = encodeResponseFrame(reqId, 0x00, payload)
+        val (central, clientReqId) = lock.withLock { pendingCentrals.remove(reqId) } ?: return
+        val frame = encodeResponseFrame(clientReqId, 0x00, payload)
         withContext(Dispatchers.IO) { notifyCentral(central, frame) }
     }
 
     actual override suspend fun sendResponseFailed(reqId: Long, error: String) {
-        val central = lock.withLock { pendingCentrals.remove(reqId) } ?: return
-        val frame = encodeResponseFrame(reqId, 0x01, error.encodeToByteArray())
+        val (central, clientReqId) = lock.withLock { pendingCentrals.remove(reqId) } ?: return
+        val frame = encodeResponseFrame(clientReqId, 0x01, error.encodeToByteArray())
         withContext(Dispatchers.IO) { notifyCentral(central, frame) }
     }
 
@@ -125,10 +130,11 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
 
     private fun emitRequest(central: CBCentral, bytes: ByteArray) {
         if (bytes.size < 8) return
-        val reqId = (0 until 8).fold(0L) { acc, i -> acc or ((bytes[i].toLong() and 0xFF) shl (i * 8)) }
+        val clientReqId = (0 until 8).fold(0L) { acc, i -> acc or ((bytes[i].toLong() and 0xFF) shl (i * 8)) }
         val payload = bytes.copyOfRange(8, bytes.size)
-        lock.withLock { pendingCentrals[reqId] = central }
-        _events.tryEmit(BleGattServerPort.Event.RequestReceived(central.identifier.UUIDString, reqId, payload))
+        val serverReqId = serverReqIdGen.fetchAndIncrement()
+        lock.withLock { pendingCentrals[serverReqId] = Pair(central, clientReqId) }
+        _events.tryEmit(BleGattServerPort.Event.RequestReceived(central.identifier.UUIDString, serverReqId, payload))
     }
 
     private fun ByteArray.toNSData(): NSData = usePinned { pinned ->

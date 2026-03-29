@@ -1,6 +1,5 @@
 package io.github.smyrgeorge.freepath.libp2p
 
-import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetrics
 import io.github.smyrgeorge.freepath.libp2p.util.AbstractLibp2pModule
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.coroutines.cancelChildren
@@ -13,8 +12,6 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.seconds
 
 actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds) {
-
-    actual val metrics: Libp2pMetrics = Libp2pMetrics()
 
     private val nodeHandle = AtomicLong(0)
     private val handlerId: Long = handlerCounter.incrementAndGet()
@@ -60,7 +57,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         Libp2pJni.stop(h)
     }
 
-    actual suspend fun dial(multiaddr: String) {
+    actual override suspend fun dial(multiaddr: String) {
         val h = nodeHandle.get()
         if (h <= 0L) return
         Libp2pJni.dial(h, multiaddr)

@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath
 
 import io.github.smyrgeorge.actor4k.actor.ActorProtocol
-import io.github.smyrgeorge.freepath.client.model.ChatMessage
+import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.content.Content

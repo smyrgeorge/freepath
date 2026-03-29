@@ -2,8 +2,8 @@ package io.github.smyrgeorge.freepath
 
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.actor4k.actor.impl.BehaviorActor
-import io.github.smyrgeorge.freepath.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.database.ContactEntry
+import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.state.AbstractAppState
 import io.github.smyrgeorge.freepath.state.AbstractViewState
@@ -40,14 +40,13 @@ class AppActor(
         val time = measureTime {
             resources.initializeDatabase()
             state.initialize()
-            resources.initializeAppClient(state = state)
-            resources.startLibp2p(
-                peerId = state.contact.peerId,
-                sigKeyPrivate = state.identity.sigKeyPrivate,
-                identityEntry = state.identityEntry,
+            resources.initialize(
+                identity = state.identity,
                 contactLookup = { state.contactLookup(it) },
             )
-            resources.startupLibble()
+            resources.startLibp2p()
+            resources.startLibble()
+            resources.startLibnet()
         }
 
         log.info("[onActivate] Identity: ${state.identityEntry}")
@@ -73,6 +72,7 @@ class AppActor(
     override suspend fun onShutdown() {
         log.info("[onShutdown] Shutting down...")
         timer.cancel()
+        resources.stopLibnet()
         resources.stopLibp2p()
         resources.stopLibble()
         resources.closeDatabase()

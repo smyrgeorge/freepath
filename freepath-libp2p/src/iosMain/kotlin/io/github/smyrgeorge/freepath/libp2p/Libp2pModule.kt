@@ -9,7 +9,6 @@ import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_send_response_failed
 import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_set_log_callback
 import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_start
 import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_stop
-import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetrics
 import io.github.smyrgeorge.freepath.libp2p.util.AbstractLibp2pModule
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.cinterop.COpaquePointer
@@ -28,8 +27,6 @@ import kotlin.concurrent.AtomicReference
 import kotlin.time.Duration.Companion.seconds
 
 actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds) {
-
-    actual val metrics: Libp2pMetrics = Libp2pMetrics()
 
     init {
         libp2p_set_log_callback(Libp2pLogger.iosLogDispatcher)
@@ -101,7 +98,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         }
     }
 
-    actual suspend fun dial(multiaddr: String) {
+    actual override suspend fun dial(multiaddr: String) {
         val ptr = mutex.withLock { nodePtr } ?: return
         libp2p_dial(ptr, multiaddr)
     }

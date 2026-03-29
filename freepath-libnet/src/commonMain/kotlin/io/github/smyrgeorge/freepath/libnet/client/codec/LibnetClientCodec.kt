@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.client.codec
+package io.github.smyrgeorge.freepath.libnet.client.codec
 
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
@@ -8,7 +8,7 @@ import kotlin.time.Clock
 /**
  * Wire format: [VERSION (1 byte)][TYPE (1 byte)][RESERVED (2 bytes)] | StatelessEnvelope Protobuf bytes
  */
-object AppClientCodec {
+object LibnetClientCodec {
     const val VERSION: Byte = 1
 
     fun seal(

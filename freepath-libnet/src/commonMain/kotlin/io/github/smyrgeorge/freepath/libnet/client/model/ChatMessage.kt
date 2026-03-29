@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.client.model
+package io.github.smyrgeorge.freepath.libnet.client.model
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable

@@ -37,8 +37,14 @@ class LibbleMetrics {
     private fun reduce(s: LibbleMetricsSnapshot, event: LibbleEvent): LibbleMetricsSnapshot =
         when (event) {
             is LibbleEvent.PeripheralDiscovered -> s.copy(discoveredPeripherals = s.discoveredPeripherals + (event.peripheralId to event))
-            is LibbleEvent.PeripheralExpired -> s.copy(discoveredPeripherals = s.discoveredPeripherals - event.peripheralId)
-            is LibbleEvent.PeerIdentified -> s.copy(identifiedPeers = s.identifiedPeers + event.peerId)
+            is LibbleEvent.PeripheralExpired -> s.copy(
+                discoveredPeripherals = s.discoveredPeripherals - event.peripheralId,
+                identifiedPeripherals = s.identifiedPeripherals - event.peripheralId,
+            )
+            is LibbleEvent.PeerIdentified -> s.copy(
+                identifiedPeers = s.identifiedPeers + event.peerId,
+                identifiedPeripherals = s.identifiedPeripherals + event.peripheralId,
+            )
             is LibbleEvent.PeerLost -> s.copy(identifiedPeers = s.identifiedPeers - event.peerId)
             else -> s
         }

@@ -1,10 +1,10 @@
-package io.github.smyrgeorge.freepath.client.codec
+package io.github.smyrgeorge.freepath.libnet.client.codec
 
-import io.github.smyrgeorge.freepath.client.model.StatelessEnvelope
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.ContactCodec
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
 import io.github.smyrgeorge.freepath.util.codec.Base58
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -71,9 +71,6 @@ object StatelessEnvelopeCodec {
 
         val contact = contactLookup(envelope.senderId)
             ?: throw EnvelopeException("Unknown sender peerId")
-        // senderIdRaw is sha256(sigKey) — the 32-byte raw peer ID used in AAD and key derivation.
-        // The envelope.senderId carries the full peerId (derivePeerId format) for the contact lookup,
-        // so we re-derive the raw bytes from the contact's sigKey rather than decoding the envelope field.
         val senderIdRaw = CryptoProvider.sha256(contact.sigKeyPublic)
 
         val nonce = envelope.nonce
@@ -100,12 +97,10 @@ object StatelessEnvelopeCodec {
         }.getOrElse { throw EnvelopeException("AEAD decryption failed") }
     }
 
-    /** Serialises [envelope] to protobuf bytes. */
     @OptIn(ExperimentalSerializationApi::class)
     fun encode(envelope: StatelessEnvelope): ByteArray =
         ProtoBuf.encodeToByteArray(StatelessEnvelope.serializer(), envelope)
 
-    /** Deserialises a [StatelessEnvelope] from protobuf [bytes]. */
     @OptIn(ExperimentalSerializationApi::class)
     fun decode(bytes: ByteArray): StatelessEnvelope =
         ProtoBuf.decodeFromByteArray(StatelessEnvelope.serializer(), bytes)
@@ -147,6 +142,5 @@ object StatelessEnvelopeCodec {
         return buf
     }
 
-    /** Signature input = AAD ∥ ciphertext. */
     private fun sigInput(aad: ByteArray, ciphertext: ByteArray): ByteArray = aad + ciphertext
 }

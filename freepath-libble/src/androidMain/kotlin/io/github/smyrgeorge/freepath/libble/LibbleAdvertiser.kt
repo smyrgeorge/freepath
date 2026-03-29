@@ -35,7 +35,7 @@ actual class LibbleAdvertiser actual constructor() {
         }
     }
 
-    actual suspend fun start() {
+    actual suspend fun start(bleBeaconId: ByteArray) {
         if (!advertising.compareAndSet(expectedValue = false, newValue = true)) return
 
         withContext(Dispatchers.IO) {
@@ -52,13 +52,11 @@ actual class LibbleAdvertiser actual constructor() {
             }
             advertiser = leAdvertiser
 
-            val settings = AdvertiseSettings.Builder()
-                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-                .setConnectable(true)
-                .build()
-
+            val settings = AdvertiseSettings.Builder().build()
             val serviceUuid = ParcelUuid(UUID.fromString(FREEPATH_SERVICE_UUID.toString()))
-            val data = AdvertiseData.Builder().addServiceUuid(serviceUuid).build()
+            val data = AdvertiseData.Builder()
+                .addServiceUuid(serviceUuid)
+                .build()
             leAdvertiser.startAdvertising(settings, data, callback)
         }
     }

@@ -6,7 +6,7 @@ actual class LibbleAdvertiser actual constructor() {
 
     private val advertising = AtomicBoolean(false)
 
-    actual suspend fun start() {
+    actual suspend fun start(bleBeaconId: ByteArray) {
         if (!advertising.compareAndSet(false, true)) return
         // Intentionally left blank.
     }

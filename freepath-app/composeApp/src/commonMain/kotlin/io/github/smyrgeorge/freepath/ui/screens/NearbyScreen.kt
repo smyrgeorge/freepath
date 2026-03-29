@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +36,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -43,8 +47,6 @@ import io.github.smyrgeorge.composeapp.generated.resources.Res
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_n_devices
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_no_devices
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_one_device
-import io.github.smyrgeorge.composeapp.generated.resources.nearby_status_connected
-import io.github.smyrgeorge.composeapp.generated.resources.nearby_status_stranger
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
@@ -53,6 +55,7 @@ import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.state.abbrev
+import io.github.smyrgeorge.freepath.state.model.ConnectionSource
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
@@ -69,17 +72,30 @@ import kotlin.math.sin
 fun NearbyScreen(
     modifier: Modifier = Modifier,
 ) {
-    val nearbyPeers by AppState.nearbyLanPeers.collectAsState()
+    val allNearbyIdentified by AppState.nearbyIdentifiedContacts.collectAsState()
     val contacts by AppState.contacts.collectAsState()
     val contactContents by AppState.contactContents.collectAsState()
-    val metrics by AppResources.libble.metrics.value.collectAsState()
-    val discoveredBlePeripherals = metrics.discoveredPeripherals
     val contactByPeerId = contacts.associateBy { it.peerId }
-    val allPeers = nearbyPeers.keys.toList()
-    val knownPeers = allPeers.filter { it in contactByPeerId }
-    val unknownPeers = allPeers.filter { it !in contactByPeerId }
 
+    val lanMetrics by AppResources.libp2p.metrics.value.collectAsState()
+    val bleMetrics by AppResources.libble.metrics.value.collectAsState()
+
+    // Only peers that are actually in our contact list
+    val identifiedContacts = allNearbyIdentified.filter { (peerId, _) -> peerId in contactByPeerId }
+
+    // Freepath peers on LAN not yet in our contacts
+    val unidentifiedLanPeers = lanMetrics.identifiedPeers
+        .filter { it !in contactByPeerId }
+        .toList()
+
+    // BLE peripherals not matched to any contact
+    val unidentifiedBlePeripherals = bleMetrics.discoveredPeripherals
+        .filterKeys { it !in bleMetrics.identifiedPeripherals }
+        .values.toList()
+
+    val totalNearby = identifiedContacts.size + unidentifiedLanPeers.size + unidentifiedBlePeripherals.size
     val scope = rememberCoroutineScope()
+
     Column(modifier = modifier.fillMaxSize()) {
         FreepathTopBar(
             title = stringResource(Res.string.nearby_title),
@@ -115,14 +131,18 @@ fun NearbyScreen(
                 .padding(top = 24.dp, bottom = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            RadarView(peers = allPeers, contactByPeerId = contactByPeerId, contactContents = contactContents)
+            RadarView(
+                peers = identifiedContacts.keys.toList(),
+                contactByPeerId = contactByPeerId,
+                contactContents = contactContents,
+            )
         }
 
         Text(
-            text = when {
-                allPeers.isEmpty() -> stringResource(Res.string.nearby_no_devices)
-                allPeers.size == 1 -> stringResource(Res.string.nearby_one_device)
-                else -> stringResource(Res.string.nearby_n_devices, allPeers.size)
+            text = when (totalNearby) {
+                0 -> stringResource(Res.string.nearby_no_devices)
+                1 -> stringResource(Res.string.nearby_one_device)
+                else -> stringResource(Res.string.nearby_n_devices, totalNearby)
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -142,46 +162,51 @@ fun NearbyScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(bottom = 80.dp),
         ) {
-            if (knownPeers.isNotEmpty()) {
-                items(knownPeers, key = { it }) { peerId ->
-                    PeerCard(peerId, contactByPeerId[peerId], contactContents[peerId])
+            // ── Unidentified section (shown above contacts) ─────────────────────
+            if (unidentifiedBlePeripherals.isNotEmpty() || unidentifiedLanPeers.isNotEmpty()) {
+                item {
+                    SectionHeader("Nearby Devices")
+                }
+                items(unidentifiedBlePeripherals, key = { it.peripheralId }) { peer ->
+                    BlePeerCard(peer)
+                }
+                items(unidentifiedLanPeers, key = { it }) { peerId ->
+                    LanUnknownPeerCard(peerId)
                 }
             }
 
-            if (unknownPeers.isNotEmpty()) {
-                if (knownPeers.isNotEmpty()) {
+            // ── Identified contacts section ─────────────────────────────────────
+            if (identifiedContacts.isNotEmpty()) {
+                if (unidentifiedBlePeripherals.isNotEmpty() || unidentifiedLanPeers.isNotEmpty()) {
                     item { Spacer(modifier = Modifier.height(4.dp)) }
                 }
-                items(unknownPeers, key = { it }) { peerId ->
-                    PeerCard(peerId, null, null)
+                item {
+                    SectionHeader("Contacts Nearby")
                 }
-            }
-        }
-
-        if (discoveredBlePeripherals.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Nearby via Bluetooth",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(bottom = 80.dp),
-            ) {
-                items(discoveredBlePeripherals.values.toList(), key = { it.peripheralId }) { peer ->
-                    BlePeerCard(peer)
+                items(identifiedContacts.entries.toList(), key = { it.key }) { (peerId, sources) ->
+                    IdentifiedPeerCard(
+                        peerId = peerId,
+                        contact = contactByPeerId[peerId],
+                        content = contactContents[peerId],
+                        sources = sources,
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+    )
 }
 
 @Composable
@@ -226,7 +251,6 @@ private fun RadarView(
     val radarSize = 200.dp
     val ringColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
     val onSurface = MaterialTheme.colorScheme.onSurface
-    val surface = MaterialTheme.colorScheme.surface
 
     val infiniteTransition = rememberInfiniteTransition(label = "radar")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -252,99 +276,152 @@ private fun RadarView(
         modifier = modifier.size(radarSize),
         contentAlignment = Alignment.Center,
     ) {
-        // Dashed static rings drawn on Canvas
         Canvas(modifier = Modifier.size(radarSize)) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val strokeWidth = 3.5.dp.toPx()
             val dashEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 7f), 0f)
             val stroke = Stroke(width = strokeWidth, pathEffect = dashEffect)
-
             drawCircle(color = ringColor, radius = size.width / 2f - strokeWidth / 2f, center = center, style = stroke)
             drawCircle(color = ringColor, radius = size.width * 0.335f, center = center, style = stroke)
             drawCircle(color = ringColor, radius = size.width * 0.17f, center = center, style = stroke)
         }
 
-        // Pulse ring (solid, animated)
         Box(
             Modifier
                 .size(radarSize * pulseScale)
                 .border(1.dp, onSurface.copy(alpha = pulseAlpha), CircleShape)
         )
 
-        // Device avatars positioned around the radar
         val deviceRadius = radarSize.value * 0.35f
         peers.forEachIndexed { index, peerId ->
             val angle = (2.0 * PI * index / peers.size - PI / 2).toFloat()
             val offsetX = (deviceRadius * cos(angle)).dp
             val offsetY = (deviceRadius * sin(angle)).dp
-
             val contact = contactByPeerId[peerId]
-            val isKnown = contact != null
-            val contactName = contact?.resolvedDisplayName()
-            val avatarLabel = if (isKnown) (contactName ?: peerId).first().uppercaseChar().toString() else "?"
-            val avatar = contactContents[peerId]?.avatar
-
+            val label = contact?.resolvedDisplayName()?.first()?.uppercaseChar()?.toString() ?: "?"
             FreepathAvatar(
-                label = avatarLabel,
-                avatar = avatar,
+                label = label,
+                avatar = contactContents[peerId]?.avatar,
                 size = AvatarSize.Small,
                 modifier = Modifier.offset(x = offsetX, y = offsetY),
             )
         }
 
-        // Center "LAN" mode label
+        // Center dot
         Box(
             modifier = Modifier
-                .size(36.dp)
-                .background(onSurface, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "LAN",
-                style = MaterialTheme.typography.labelSmall,
-                color = surface,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+                .size(12.dp)
+                .background(onSurface.copy(alpha = 0.5f), CircleShape),
+        )
     }
 }
 
 @Composable
-private fun PeerCard(peerId: String, contact: ContactEntry?, content: ContentBody.Contact?) {
-    val isKnown = contact != null
-    val displayName = if (isKnown) contact.resolvedDisplayName() ?: peerId.abbrev() else "#${peerId.abbrev()}"
-    val avatarLabel = if (isKnown) displayName.first().uppercaseChar().toString() else "?"
-    val statusText =
-        if (isKnown) stringResource(Res.string.nearby_status_connected)
-        else stringResource(Res.string.nearby_status_stranger)
+private fun IdentifiedPeerCard(
+    peerId: String,
+    contact: ContactEntry?,
+    content: ContentBody.Contact?,
+    sources: Set<ConnectionSource>,
+) {
+    val displayName = contact?.resolvedDisplayName() ?: peerId.abbrev()
+    val avatarLabel = displayName.first().uppercaseChar().toString()
 
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 RoundedCornerShape(12.dp),
-            )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ),
     ) {
-        FreepathAvatar(label = avatarLabel, avatar = content?.avatar, size = AvatarSize.Medium)
-
-        Column(modifier = Modifier.weight(1f)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FreepathAvatar(label = avatarLabel, avatar = content?.avatar, size = AvatarSize.Medium)
             Text(
                 text = displayName,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+        }
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 7.dp, end = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (ConnectionSource.LAN in sources) {
+                Icon(
+                    imageVector = WifiIcon,
+                    contentDescription = "LAN",
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (ConnectionSource.BLE in sources) {
+                Icon(
+                    imageVector = BluetoothIcon,
+                    contentDescription = "BLE",
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LanUnknownPeerCard(peerId: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                RoundedCornerShape(12.dp),
+            ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "?",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
-                text = statusText,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "#${peerId.abbrev()}",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
-
+        Icon(
+            imageVector = WifiIcon,
+            contentDescription = "LAN",
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 7.dp, end = 10.dp)
+                .size(15.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -353,61 +430,74 @@ private fun BlePeerCard(peer: LibbleEvent.PeripheralDiscovered) {
     val scope = rememberCoroutineScope()
     val displayName = peer.peripheralName ?: peer.name ?: (peer.peripheralId.take(8) + "…")
 
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 RoundedCornerShape(12.dp),
-            )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ),
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(40.dp)
-                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = "BT",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "?",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            Column {
+                Text(
+                    text = displayName,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "${peer.rssi} dBm",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            FreepathButton(
+                onClick = {
+                    scope.launch {
+                        AppResources.system.tell(Protocol.BleInitiateContactExchange(peer.peripheralId))
+                    }
+                },
+                variant = ButtonVariant.Outline,
+                size = ButtonSize.Small,
+            ) {
+                Text(
+                    text = "Add",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = displayName,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "RSSI ${peer.rssi} dBm",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        FreepathButton(
-            onClick = {
-                scope.launch {
-                    AppResources.system.tell(Protocol.BleInitiateContactExchange(peer.peripheralId))
-                }
-            },
-            variant = ButtonVariant.Outline,
-            size = ButtonSize.Small,
-        ) {
-            Text(
-                text = "Add",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        Icon(
+            imageVector = BluetoothIcon,
+            contentDescription = "BLE",
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 7.dp, end = 10.dp)
+                .size(15.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -415,4 +505,32 @@ private fun ContactEntry.resolvedDisplayName(): String? {
     val local = name?.takeIf { it.isNotBlank() }
     val c = contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
     return local ?: c
+}
+
+private val WifiIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        addPath(
+            pathData = addPathNodes("M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"),
+            fill = SolidColor(androidx.compose.ui.graphics.Color.Black),
+        )
+    }.build()
+}
+
+private val BluetoothIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        addPath(
+            pathData = addPathNodes("M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"),
+            fill = SolidColor(androidx.compose.ui.graphics.Color.Black),
+        )
+    }.build()
 }

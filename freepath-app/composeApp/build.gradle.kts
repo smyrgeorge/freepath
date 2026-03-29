@@ -41,6 +41,7 @@ kotlin {
             implementation(project(":freepath-database"))
             implementation(project(":freepath-libble"))
             implementation(project(":freepath-libp2p"))
+            implementation(project(":freepath-libnet"))
             implementation(project(":freepath-util"))
 
             implementation(libs.log4k)

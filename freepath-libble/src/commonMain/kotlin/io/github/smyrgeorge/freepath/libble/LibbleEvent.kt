@@ -43,21 +43,21 @@ sealed class LibbleEvent {
 
     /**
      * A central wrote a request frame to the REQUEST characteristic on our GATT server.
-     * [peripheralId] is the OS-assigned BLE address/UUID of the remote central.
+     * [senderId] is the OS-assigned BLE address/UUID of the remote central.
      */
-    class RequestReceived(val peripheralId: String, val reqId: Long, val payload: ByteArray) : LibbleEvent()
+    class RequestReceived(val senderId: String, val reqId: Long, val payload: ByteArray) : LibbleEvent()
 
     sealed class Response : LibbleEvent()
 
     data class RequestFailed(
         val reqId: Long,
-        val peripheralId: String,
+        val senderId: String,
         val error: String
     ) : Response()
 
     data class ResponseReceived(
         val reqId: Long,
-        val peripheralId: String,
+        val senderId: String,
         val payload: ByteArray
     ) : Response() {
         override fun equals(other: Any?): Boolean {
@@ -69,6 +69,6 @@ sealed class LibbleEvent {
 
         override fun hashCode(): Int = reqId.hashCode()
         override fun toString(): String =
-            "ResponseReceived(reqId=$reqId, peripheralId='$peripheralId', payload=${payload.size} bytes)"
+            "ResponseReceived(reqId=$reqId, senderId='$senderId', payload=${payload.size} bytes)"
     }
 }

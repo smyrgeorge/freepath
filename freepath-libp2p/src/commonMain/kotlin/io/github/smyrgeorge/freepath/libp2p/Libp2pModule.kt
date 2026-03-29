@@ -1,6 +1,5 @@
 package io.github.smyrgeorge.freepath.libp2p
 
-import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetrics
 import io.github.smyrgeorge.freepath.libp2p.util.AbstractLibp2pModule
 
 /**
@@ -16,8 +15,6 @@ import io.github.smyrgeorge.freepath.libp2p.util.AbstractLibp2pModule
  * ```
  */
 expect class Libp2pModule() : AbstractLibp2pModule {
-    val metrics: Libp2pMetrics
-
     /** Register a handler invoked on each swarm event. Call before start(). */
     fun setEventHandler(handler: suspend (Libp2pEvent) -> Unit): Libp2pModule
 
@@ -39,7 +36,7 @@ expect class Libp2pModule() : AbstractLibp2pModule {
     suspend fun stop()
 
     /** Dial a peer by multiaddr string (e.g. "/ip4/192.168.1.5/tcp/12345"). No-op if not started. */
-    suspend fun dial(multiaddr: String)
+    override suspend fun dial(multiaddr: String)
 
     /**
      * Send an RPC request to a connected peer and expect a response.

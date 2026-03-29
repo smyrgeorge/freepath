@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.client.model
+package io.github.smyrgeorge.freepath.libnet.client.model
 
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -60,5 +60,4 @@ data class StatelessEnvelope(
     override fun toString(): String {
         return "StatelessEnvelope(schema=$schema, senderId='$senderId', receiverId='$receiverId', timestamp=$timestamp, fragmentIndex=$fragmentIndex, fragmentCount=$fragmentCount)"
     }
-
 }

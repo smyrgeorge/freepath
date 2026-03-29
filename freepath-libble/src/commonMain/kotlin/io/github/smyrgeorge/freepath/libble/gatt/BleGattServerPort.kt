@@ -39,8 +39,8 @@ interface BleGattServerPort {
 
         /**
          * A central wrote a generic request frame to REQUEST.
-         * [peripheralId] identifies the remote device (Bluetooth address on Android, UUID on iOS).
+         * [senderId] identifies the remote central (Bluetooth address on Android, UUID on iOS).
          */
-        class RequestReceived(val peripheralId: String, val reqId: Long, val payload: ByteArray) : Event()
+        class RequestReceived(val senderId: String, val reqId: Long, val payload: ByteArray) : Event()
     }
 }

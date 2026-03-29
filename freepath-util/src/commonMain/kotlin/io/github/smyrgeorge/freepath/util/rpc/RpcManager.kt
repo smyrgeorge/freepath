@@ -12,15 +12,7 @@ import kotlin.concurrent.atomics.fetchAndIncrement
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * Correlates outgoing requests with incoming responses.
- *
- * Two calling patterns are supported:
- * - [request] with a caller-supplied [reqId] (e.g. BLE, where the reqId is part of the wire frame)
- * - [request] without a reqId (auto-generated via an atomic counter; e.g. libp2p)
- *
- * Concurrent requests with distinct reqIds are fully independent.
- */
+@OptIn(ExperimentalAtomicApi::class)
 class RpcManager<R>(private val timeout: Duration = 30.seconds) {
 
     private val log = Logger.of(this::class)
@@ -28,12 +20,11 @@ class RpcManager<R>(private val timeout: Duration = 30.seconds) {
     private val mutex = Mutex()
     private val channels = HashMap<Long, Channel<R>>(64)
 
-    /**
-     * Send a request with a caller-supplied [reqId] and suspend until the response arrives.
-     *
-     * [send] is invoked after the channel is registered, so no response can be missed.
-     */
-    suspend fun request(reqId: Long, send: suspend () -> Unit): R {
+    suspend fun request(
+        reqId: Long,
+        timeout: Duration = this.timeout,
+        send: suspend () -> Unit
+    ): R {
         val channel = open(reqId)
         return try {
             withTimeout(timeout) {
@@ -51,18 +42,14 @@ class RpcManager<R>(private val timeout: Duration = 30.seconds) {
         }
     }
 
-    /**
-     * Send a request with an auto-generated [reqId] and suspend until the response arrives.
-     *
-     * The generated reqId is passed to [send] so it can be embedded in the wire frame.
-     */
-    @OptIn(ExperimentalAtomicApi::class)
-    suspend fun request(send: suspend (Long) -> Unit): R {
+    suspend fun request(
+        timeout: Duration = this.timeout,
+        send: suspend (Long) -> Unit
+    ): R {
         val reqId = nextReqId.fetchAndIncrement()
-        return request(reqId) { send(reqId) }
+        return request(reqId, timeout) { send(reqId) }
     }
 
-    /** Deliver a response for [reqId] to the suspended [request] call. */
     suspend fun response(reqId: Long, res: R) {
         try {
             withTimeout(2.seconds) {
@@ -80,7 +67,11 @@ class RpcManager<R>(private val timeout: Duration = 30.seconds) {
         return channel
     }
 
-    private suspend fun cancel(reqId: Long, channel: Channel<R>, e: TimeoutCancellationException?) {
+    private suspend fun cancel(
+        reqId: Long,
+        channel: Channel<R>,
+        e: TimeoutCancellationException?
+    ) {
         mutex.withLock { channels.remove(reqId) }
         channel.cancel(e)
     }
@@ -90,7 +81,6 @@ class RpcManager<R>(private val timeout: Duration = 30.seconds) {
     }
 
     companion object {
-        @OptIn(ExperimentalAtomicApi::class)
         private val nextReqId = AtomicLong(0)
     }
 }

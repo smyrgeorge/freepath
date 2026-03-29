@@ -21,7 +21,9 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.fetchAndIncrement
 
 @OptIn(ExperimentalAtomicApi::class)
 @SuppressLint("MissingPermission")
@@ -44,8 +46,14 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     private val preparedWriteBuffers = ConcurrentHashMap<String, ByteArray>()
     private val preparedWriteChars = ConcurrentHashMap<String, UUID>()
 
-    // Tracks which BluetoothDevice sent each request, so we can notify the right device.
-    private val pendingRequests = ConcurrentHashMap<Long, BluetoothDevice>()
+    // Server-side reqId generator — guarantees uniqueness across all connected centrals,
+    // even if two centrals independently start their own counters from 0.
+    private val serverReqIdGen = AtomicLong(0)
+
+    // Maps server-assigned reqId → (device, clientReqId).
+    // The server-assigned reqId is what flows up through LibbleEvent / LibnetModule;
+    // clientReqId is echoed back in the response so the central's RpcManager can correlate.
+    private val pendingRequests = ConcurrentHashMap<Long, Pair<BluetoothDevice, Long>>()
 
     // responseChar is set when the GATT server is started (used for notifyCharacteristicChanged).
     @Volatile
@@ -60,14 +68,14 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     }
 
     actual override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
-        val device = pendingRequests.remove(reqId) ?: return
-        val frame = encodeResponseFrame(reqId, 0x00, payload)
+        val (device, clientReqId) = pendingRequests.remove(reqId) ?: return
+        val frame = encodeResponseFrame(clientReqId, 0x00, payload)
         withContext(Dispatchers.IO) { notifyDevice(device, frame) }
     }
 
     actual override suspend fun sendResponseFailed(reqId: Long, error: String) {
-        val device = pendingRequests.remove(reqId) ?: return
-        val frame = encodeResponseFrame(reqId, 0x01, error.encodeToByteArray())
+        val (device, clientReqId) = pendingRequests.remove(reqId) ?: return
+        val frame = encodeResponseFrame(clientReqId, 0x01, error.encodeToByteArray())
         withContext(Dispatchers.IO) { notifyDevice(device, frame) }
     }
 
@@ -83,6 +91,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             device: BluetoothDevice, requestId: Int, offset: Int,
             characteristic: BluetoothGattCharacteristic,
         ) {
+            if (!started.load()) return
             val data = when (characteristic.uuid) {
                 EPHEMERAL_JVM_UUID -> ephemeralValue
                 CARD_JVM_UUID -> cardValue
@@ -101,6 +110,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             characteristic: BluetoothGattCharacteristic,
             preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?,
         ) {
+            if (!started.load()) return
             when (characteristic.uuid) {
                 PING_JVM_UUID -> {
                     if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
@@ -134,6 +144,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         }
 
         override fun onExecuteWrite(device: BluetoothDevice, requestId: Int, execute: Boolean) {
+            if (!started.load()) return
             if (execute) {
                 val key = device.address
                 val bytes = preparedWriteBuffers.remove(key)
@@ -174,10 +185,11 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
 
     private fun emitRequest(device: BluetoothDevice, bytes: ByteArray) {
         if (bytes.size < 8) return
-        val reqId = (0 until 8).fold(0L) { acc, i -> acc or ((bytes[i].toLong() and 0xFF) shl (i * 8)) }
+        val clientReqId = (0 until 8).fold(0L) { acc, i -> acc or ((bytes[i].toLong() and 0xFF) shl (i * 8)) }
         val payload = bytes.copyOfRange(8, bytes.size)
-        pendingRequests[reqId] = device
-        _events.tryEmit(BleGattServerPort.Event.RequestReceived(device.address, reqId, payload))
+        val serverReqId = serverReqIdGen.fetchAndIncrement()
+        pendingRequests[serverReqId] = Pair(device, clientReqId)
+        _events.tryEmit(BleGattServerPort.Event.RequestReceived(device.address, serverReqId, payload))
     }
 
     private fun encodeResponseFrame(reqId: Long, status: Byte, payload: ByteArray): ByteArray {
@@ -272,6 +284,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
             cardValue = byteArrayOf()
             preparedWriteBuffers.clear()
             preparedWriteChars.clear()
+            pendingRequests.clear()
             s?.close()
             log.info("BleGattServer stopped")
         }

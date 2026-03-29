@@ -31,7 +31,9 @@ actual class LibbleAdvertiser actual constructor() {
         PeripheralManagerHolder.manager.addStateListener(stateListener)
     }
 
-    actual suspend fun start() {
+    // bleBeaconId is not needed on iOS: the OS-assigned CBPeripheral.identifier is already
+    // stable per app, so scanners can always identify iOS peripherals by their UUID.
+    actual suspend fun start(bleBeaconId: ByteArray) {
         if (!advertising.compareAndSet(expectedValue = false, newValue = true)) return
         withContext(Dispatchers.IO) {
             log.info("BleAdvertiser starting")

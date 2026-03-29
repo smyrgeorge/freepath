@@ -2,14 +2,15 @@ package io.github.smyrgeorge.freepath.state
 
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
 import io.github.smyrgeorge.freepath.Protocol
-import io.github.smyrgeorge.freepath.client.AppClient
-import io.github.smyrgeorge.freepath.client.model.success
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
+import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.database.ContactRoutingEntry
+import kotlin.io.encoding.Base64
+import kotlin.time.Clock
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
-import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.database.generated.ContactEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContactRoutingEntryRepositoryImpl
@@ -19,9 +20,10 @@ import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.LibbleModule
+import io.github.smyrgeorge.freepath.libnet.LibnetModule
+import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
-import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import io.github.smyrgeorge.sqlx4k.ConnectionPool
@@ -36,10 +38,9 @@ abstract class AbstractAppResources(
 
     lateinit var db: ISQLite private set
     lateinit var system: ActorRef private set
-    lateinit var client: AppClient private set
+    lateinit var client: LibnetClient private set
 
     lateinit var identity: Identity
-    lateinit var identityEntry: IdentityEntry
     lateinit var contactLookup: (String) -> Contact?
 
     val identityRepository: IdentityEntryRepository = IdentityEntryRepositoryImpl
@@ -48,39 +49,42 @@ abstract class AbstractAppResources(
     val contactRoutingEntryRepository: ContactRoutingEntryRepository = ContactRoutingEntryRepositoryImpl
 
     val libp2p: Libp2pModule = Libp2pModule().setEventHandler { event ->
-        log.info { "Libp2pEvent: $event" }
+        log.info { "LIBP2P Event: $event" }
         when (event) {
             is Libp2pEvent.PeerIdentified -> {
                 val cmd = Protocol.PeerIdentified(event.peerId)
                 system.tell(cmd)
             }
 
-            else -> Unit.success()
+            else -> Result.success(Unit)
         }.onFailure {
-            log.error { "Error while processing Libp2pEvent: $event" }
+            log.error { "Error while processing LIBP2P Event: $event" }
         }
     }
 
     val libble: LibbleModule = LibbleModule().setEventHandler { event ->
-        log.info { "LibbleEvent: $event" }
+        log.info { "LIBBLE Event: $event" }
         when (event) {
             is LibbleEvent.ContactExchange.Failed -> {
-                log.warn("LibbleEvent: exchange failed: ${event.reason}")
-                Unit.success()
+                log.warn("LIBBLE Event: exchange failed: ${event.reason}")
+                Result.success(Unit)
             }
 
-            else -> Unit.success()
+            else -> Result.success(Unit)
         }.onFailure {
-            log.error { "Error while processing LibbleEvent: $event" }
+            log.error { "Error while processing LIBBLE Event: $event" }
         }
     }
+
+    val libnet: LibnetModule = LibnetModule(libble, libp2p)
 
     fun initialize(system: ActorRef) {
         this.system = system
     }
 
-    fun initializeAppClient(state: AbstractAppState) {
-        this.client = AppClient(system, state, this)
+    fun initialize(identity: Identity, contactLookup: (String) -> Contact?) {
+        this.identity = identity
+        this.contactLookup = contactLookup
     }
 
     suspend fun initializeDatabase() {
@@ -90,8 +94,8 @@ abstract class AbstractAppResources(
                 minConnections = 1,
                 maxConnections = 1,
             ),
-        ).also {
-            it.migrate(
+        ).apply {
+            migrate(
                 files = migrations,
                 afterStatementExecution = { s, d -> log.info { "DB: Executed: $s ($d)" } },
                 afterFileMigration = { f, d -> log.info { "DB: Migrated: $f ($d)" } },
@@ -99,7 +103,7 @@ abstract class AbstractAppResources(
                 log.info { "DB: Failed reading from database: $e" }
                 launch {
                     delay(2.seconds)
-                    exitApplication(1)
+                    io.github.smyrgeorge.freepath.util.exitApplication(1)
                 }
             }
         }
@@ -109,30 +113,85 @@ abstract class AbstractAppResources(
         db.close().getOrThrow()
     }
 
-    suspend fun startLibp2p(
-        peerId: String,
-        sigKeyPrivate: ByteArray,
-        identityEntry: IdentityEntry,
-        contactLookup: (String) -> Contact?,
-    ) {
-        this.identity = identityEntry.identity
-        this.identityEntry = identityEntry
-        this.contactLookup = contactLookup
-        libp2p.start(peerId = peerId, sigKeyPrivate = sigKeyPrivate)
+    suspend fun startLibp2p() {
+        libp2p.start(peerId = identity.peerId, sigKeyPrivate = identity.sigKeyPrivate)
     }
 
     suspend fun stopLibp2p() {
         libp2p.stop()
     }
 
-    suspend fun startupLibble() {
+    suspend fun startLibble() {
         libble.start(
-            peripheralIdLookup = { contactRoutingEntryRepository.findOneByPeerId(db, it).getOrNull()?.blePeripheralId },
-            peerIdLookup = { contactRoutingEntryRepository.findOneByBlePeripheralId(db, it).getOrNull()?.peerId },
+            bleBeaconId = bleBeaconId(identity.peerIdRaw),
+            peripheralIdLookup = {
+                contactRoutingEntryRepository.findOneByPeerId(db, it)
+                    .getOrNull()?.blePeripheralId
+            },
+            peerIdLookup = {
+                contactRoutingEntryRepository.findOneByBlePeripheralId(db, it)
+                    .getOrNull()?.peerId
+            },
+            peerIdByRawBytesLookup = { beaconId ->
+                contactRepository.findAll(db).getOrNull()
+                    ?.firstOrNull { entry ->
+                        val sigKey = Base64.decode(entry.contact.sigKey)
+                        val contactPeerIdRaw = CryptoProvider.sha256(sigKey)
+                        bleBeaconId(contactPeerIdRaw).contentEquals(beaconId)
+                    }?.peerId
+            },
+            onNewPeripheralId = { peerId, peripheralId ->
+                val now = Clock.System.now()
+                val existing = contactRoutingEntryRepository.findOneByPeerId(db, peerId).getOrNull()
+                val entry = existing?.copy(blePeripheralId = peripheralId, bleUpdatedAt = now)
+                    ?: ContactRoutingEntry(peerId = peerId, blePeripheralId = peripheralId, bleUpdatedAt = now)
+                contactRoutingEntryRepository.save(db, entry).getOrThrow()
+            },
         )
+    }
+
+    companion object {
+        private val BLE_BEACON_DOMAIN = "freepath-ble-beacon".encodeToByteArray()
+
+        /**
+         * Derives a stable, purpose-specific 8-byte BLE beacon identifier from peerIdRaw.
+         * SHA-256(peerIdRaw ∥ "freepath-ble-beacon")[:8] — opaque and independent from peerId.
+         */
+        fun bleBeaconId(peerIdRaw: ByteArray): ByteArray =
+            CryptoProvider.sha256(peerIdRaw + BLE_BEACON_DOMAIN).copyOfRange(0, 8)
     }
 
     suspend fun stopLibble() {
         libble.stop()
+    }
+
+    fun startLibnet() {
+        libnet.start(
+            peerId = identity.peerId,
+            peerIdLookup = {
+                contactRoutingEntryRepository.findOneByBlePeripheralId(db, it)
+                    .getOrNull()?.peerId
+            },
+        )
+        client = LibnetClient(
+            identity = identity,
+            libnet = libnet,
+            contactLookup = contactLookup,
+            onChatMessageReceived = { msg ->
+                val cmd = Protocol.ChatMessageReceived(msg.senderId, msg.receiverId, msg)
+                system.tell(cmd).map { }
+            },
+            onContentReceived = { content ->
+                val cmd = Protocol.ContentReceived(content)
+                system.tell(cmd).map { }
+            },
+        ).apply {
+            start()
+        }
+    }
+
+    fun stopLibnet() {
+        client.stop()
+        libnet.stop()
     }
 }

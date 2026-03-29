@@ -12,6 +12,8 @@ data class Identity(
     /** X25519 private key (32 bytes) used for StatelessEnvelope decryption. */
     val encKeyPrivate: ByteArray,
 ) {
+    val peerId: String by lazy { ContactCodec.derivePeerId(sigKeyPublic) }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Identity) return false
