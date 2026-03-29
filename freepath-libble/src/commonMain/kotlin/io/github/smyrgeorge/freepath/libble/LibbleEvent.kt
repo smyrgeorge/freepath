@@ -27,12 +27,6 @@ sealed class LibbleEvent {
      */
     data class PeerLost(val peerId: String) : LibbleEvent()
 
-    /**
-     * A central wrote a request frame to the REQUEST characteristic on our GATT server.
-     * [peripheralId] is the OS-assigned BLE address/UUID of the remote central.
-     */
-    class RequestReceived(val peripheralId: String, val reqId: Long, val payload: ByteArray) : LibbleEvent()
-
     sealed class ContactExchange : LibbleEvent() {
         /** Exchange handshake has started. */
         data object Started : ContactExchange()
@@ -45,5 +39,36 @@ sealed class LibbleEvent {
 
         /** Exchange failed or was aborted. */
         data class Failed(val reason: String) : ContactExchange()
+    }
+
+    /**
+     * A central wrote a request frame to the REQUEST characteristic on our GATT server.
+     * [peripheralId] is the OS-assigned BLE address/UUID of the remote central.
+     */
+    class RequestReceived(val peripheralId: String, val reqId: Long, val payload: ByteArray) : LibbleEvent()
+
+    sealed class Response : LibbleEvent()
+
+    data class RequestFailed(
+        val reqId: Long,
+        val peripheralId: String,
+        val error: String
+    ) : Response()
+
+    data class ResponseReceived(
+        val reqId: Long,
+        val peripheralId: String,
+        val payload: ByteArray
+    ) : Response() {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other == null || this::class != other::class) return false
+            other as ResponseReceived
+            return reqId == other.reqId
+        }
+
+        override fun hashCode(): Int = reqId.hashCode()
+        override fun toString(): String =
+            "ResponseReceived(reqId=$reqId, peripheralId='$peripheralId', payload=${payload.size} bytes)"
     }
 }

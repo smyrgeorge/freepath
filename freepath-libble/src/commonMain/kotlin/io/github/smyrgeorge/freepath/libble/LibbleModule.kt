@@ -4,6 +4,7 @@ import com.juul.kable.Advertisement
 import com.juul.kable.Scanner
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.libble.BleConstants.FREEPATH_SERVICE_UUID
+import io.github.smyrgeorge.freepath.libble.LibbleEvent.Response
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeInitiator
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeResponder
 import io.github.smyrgeorge.freepath.libble.gatt.BleGattServer
@@ -44,7 +45,7 @@ class LibbleModule {
     private lateinit var peripheralIdLookup: suspend (peerId: String) -> String?
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val rpcManager = RpcManager<Result<ByteArray>>()
+    private val rpc = RpcManager<Response>()
 
     private val expiryJob: Job
     private val advertiser: LibbleAdvertiser = LibbleAdvertiser()
@@ -58,7 +59,7 @@ class LibbleModule {
     private val pool = BleConnectionPool(
         scope = scope,
         advertisementLookup = { peripheralsMutex.withLock { peripherals[it]?.advertisement } },
-        onResponseReceived = { _, bytes -> decodeAndRouteResponse(bytes) },
+        onResponseReceived = { peripheralId, bytes -> decodeAndRouteResponse(peripheralId, bytes) },
     )
 
     init {
@@ -140,11 +141,12 @@ class LibbleModule {
         return this
     }
 
-    suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray): Result<ByteArray> = runCatching {
+    suspend fun request(peerId: String, payload: ByteArray): Response =
+        rpc.request { sendRequest(peerId, it, payload) }
+
+    suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray) {
         val peripheralId = peripheralIdLookup(peerId) ?: error("No BLE peripheral ID found for peerId=$peerId")
-        rpcManager.request(reqId) {
-            pool.withConnection(peripheralId) { conn -> conn.writeRequest(reqId, payload) }
-        }.getOrThrow()
+        pool.withConnection(peripheralId) { conn -> conn.writeRequest(reqId, payload) }
     }
 
     /** Sends a success response to the central that sent the GATT request with [reqId]. */
@@ -230,14 +232,14 @@ class LibbleModule {
         log.info("BLE GATT server stopped")
     }
 
-    private fun decodeAndRouteResponse(bytes: ByteArray) {
+    private fun decodeAndRouteResponse(peripheralId: String, bytes: ByteArray) {
         if (bytes.size < 9) return
         val reqId = (0 until 8).fold(0L) { acc, i -> acc or ((bytes[i].toLong() and 0xFF) shl (i * 8)) }
         val status = bytes[8]
         val body = bytes.copyOfRange(9, bytes.size)
-        val result = if (status == 0x00.toByte()) Result.success(body)
-        else Result.failure(RuntimeException(body.decodeToString()))
-        scope.launch { rpcManager.response(reqId, result) }
+        val result = if (status == 0x00.toByte()) LibbleEvent.ResponseReceived(reqId, peripheralId, body)
+        else LibbleEvent.RequestFailed(reqId, peripheralId, body.decodeToString())
+        scope.launch { rpc.response(reqId, result) }
     }
 
     private suspend fun sendEvent(event: LibbleEvent) {

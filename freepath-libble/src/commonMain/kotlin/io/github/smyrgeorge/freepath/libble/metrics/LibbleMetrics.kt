@@ -40,7 +40,6 @@ class LibbleMetrics {
             is LibbleEvent.PeripheralExpired -> s.copy(discoveredPeripherals = s.discoveredPeripherals - event.peripheralId)
             is LibbleEvent.PeerIdentified -> s.copy(identifiedPeers = s.identifiedPeers + event.peerId)
             is LibbleEvent.PeerLost -> s.copy(identifiedPeers = s.identifiedPeers - event.peerId)
-            is LibbleEvent.ContactExchange -> s
-            is LibbleEvent.RequestReceived -> s
+            else -> s
         }
 }
