@@ -1,22 +1,17 @@
 package io.github.smyrgeorge.freepath.libp2p
 
-import io.github.smyrgeorge.freepath.libp2p.util.AbstractLibp2pModule
 import io.github.smyrgeorge.freepath.util.AndroidContextHolder
-import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.time.Duration.Companion.seconds
 
-actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds) {
+actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
 
     private val nodeHandle = AtomicLong(0)
     private val handlerId: Long = handlerCounter.incrementAndGet()
 
-    private var appHandler: (suspend (Libp2pEvent) -> Unit)? = null
     private var mdns: MdnsPeerDiscovery? = null
     private val mdnsStarted = AtomicBoolean(false)
 
@@ -25,7 +20,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         return this
     }
 
-    actual suspend fun start(
+    actual override suspend fun start(
         peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
@@ -47,7 +42,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         nodeHandle.set(handle)
     }
 
-    actual suspend fun stop() {
+    actual override suspend fun stop() {
         val h = nodeHandle.getAndSet(0L)
         if (h == 0L || h == STARTING) return
         requests.close()
@@ -72,53 +67,31 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         Libp2pJni.sendRequest(h, peerId, reqId, payload)
     }
 
-    actual suspend fun sendResponse(reqId: Long, payload: ByteArray) {
+    actual override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
         val h = nodeHandle.get()
         if (h <= 0L) return
         Libp2pJni.sendResponse(h, reqId, payload)
     }
 
-    actual suspend fun sendResponseFailed(reqId: Long, error: String) {
+    actual override suspend fun sendResponseFailed(reqId: Long, error: String) {
         val h = nodeHandle.get()
         if (h <= 0L) return
         Libp2pJni.sendResponseFailed(h, reqId, error)
     }
 
-    private fun dispatch(event: Libp2pEvent) {
-        onEvent(event)
-        metrics.onEvent(event)
-        scope.launch { runCatching { appHandler?.invoke(event) } }
-    }
-
-    private fun onEvent(event: Libp2pEvent) {
-        when (event) {
-            is Libp2pEvent.RequestReceived -> {
-                requests.trySend(event).onFailure {
-                    log.error { "Failed to send message to requests channel: $it" }
-                }
-            }
-
-            is Libp2pEvent.ResponseReceived -> launch { rpc.response(event.reqId, event) }
-            is Libp2pEvent.RequestFailed -> launch { rpc.response(event.reqId, event) }
-            else -> Unit
-        }
-
-        if (event !is Libp2pEvent.NewListenAddr) return
-        if (!event.addr.startsWith("/ip4/")) return
-        val port = event.addr.substringAfterLast("/tcp/").toIntOrNull() ?: return
-        if (port == 0) return
+    actual override fun onFirstListenAddr(port: Int) {
         if (!mdnsStarted.compareAndSet(false, true)) return
         val m = mdns ?: return
         scope.launch {
             m.start(
                 port = port,
-                onPeerDiscovered = { peerId, address ->
+                onPeerDiscovered = { nodeId, address ->
                     val multiaddr = lanAddressToMultiaddr(address) ?: return@start
                     scope.launch { dial(multiaddr) }
-                    dispatch(Libp2pEvent.MdnsPeerDiscovered(peerId, address))
+                    dispatch(Libp2pEvent.MdnsPeerDiscovered(nodeId, address))
                 },
-                onPeerRemoved = { peerId ->
-                    dispatch(Libp2pEvent.MdnsPeerExpired(peerId))
+                onPeerRemoved = { nodeId ->
+                    dispatch(Libp2pEvent.MdnsPeerExpired(nodeId))
                 },
             )
         }

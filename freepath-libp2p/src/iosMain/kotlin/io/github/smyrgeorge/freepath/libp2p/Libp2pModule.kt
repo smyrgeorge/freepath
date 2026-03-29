@@ -9,8 +9,6 @@ import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_send_response_failed
 import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_set_log_callback
 import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_start
 import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_stop
-import io.github.smyrgeorge.freepath.libp2p.util.AbstractLibp2pModule
-import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.StableRef
@@ -19,14 +17,12 @@ import kotlinx.cinterop.convert
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.AtomicReference
-import kotlin.time.Duration.Companion.seconds
 
-actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds) {
+actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
 
     init {
         libp2p_set_log_callback(Libp2pLogger.iosLogDispatcher)
@@ -39,7 +35,6 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
     // The AtomicReference holds the internal dispatcher; its address is pinned across the FFI.
     private val dispatcherRef = AtomicReference<((Libp2pEvent) -> Unit)?>(null)
 
-    private var appHandler: (suspend (Libp2pEvent) -> Unit)? = null
     private var mdns: MdnsPeerDiscovery? = null
 
     // null = not started, non-null = started (CAS from null → Unit)
@@ -50,7 +45,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         return this
     }
 
-    actual suspend fun start(
+    actual override suspend fun start(
         peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
@@ -81,7 +76,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         }
     }
 
-    actual suspend fun stop() {
+    actual override suspend fun stop() {
         mutex.withLock {
             val ptr = nodePtr ?: return
             nodePtr = null
@@ -116,7 +111,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         }
     }
 
-    actual suspend fun sendResponse(reqId: Long, payload: ByteArray) {
+    actual override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
         val ptr = mutex.withLock { nodePtr } ?: return
         payload.usePinned { pinned ->
             libp2p_send_response(
@@ -128,37 +123,13 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule(30.seconds
         }
     }
 
-    actual suspend fun sendResponseFailed(reqId: Long, error: String) {
+    actual override suspend fun sendResponseFailed(reqId: Long, error: String) {
         val ptr = mutex.withLock { nodePtr } ?: return
         libp2p_send_response_failed(node = ptr, req_id = reqId.toULong(), error = error)
     }
 
-    // ── Internal dispatcher ────────────────────────────────────────────────────
-
-    private fun dispatch(event: Libp2pEvent) {
-        onEvent(event)
-        metrics.onEvent(event)
-        scope.launch { runCatching { appHandler?.invoke(event) } }
-    }
-
-    private fun onEvent(event: Libp2pEvent) {
-        when (event) {
-            is Libp2pEvent.RequestReceived -> {
-                requests.trySend(event).onFailure {
-                    log.error { "Failed to send message to requests channel: $it" }
-                }
-            }
-
-            is Libp2pEvent.ResponseReceived -> launch { rpc.response(event.reqId, event) }
-            is Libp2pEvent.RequestFailed -> launch { rpc.response(event.reqId, event) }
-            else -> Unit
-        }
-
-        if (event !is Libp2pEvent.NewListenAddr) return
+    actual override fun onFirstListenAddr(port: Int) {
         // Only start mDNS once, using the first IPv4 listen address with a real port.
-        if (!event.addr.startsWith("/ip4/")) return
-        val port = event.addr.substringAfterLast("/tcp/").toIntOrNull() ?: return
-        if (port == 0) return
         if (!mdnsStarted.compareAndSet(null, Unit)) return
         val m = mdns ?: return
         scope.launch {
