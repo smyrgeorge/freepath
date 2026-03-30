@@ -21,6 +21,11 @@ object ContentCodec {
         return CryptoProvider.ed25519Sign(sigKeyPrivate, bytes)
     }
 
+    fun verify(envelope: Content, sigKeyPublic: String): Boolean {
+        val sigKeyPublic = Base64.decode(sigKeyPublic)
+        return verify(envelope, sigKeyPublic)
+    }
+
     fun verify(envelope: Content, sigKeyPublic: ByteArray): Boolean {
         val signatureBytes = Base64.decode(envelope.signature)
         val bytes = ProtobufCodec.protobuf.encodeToByteArray(toSignable(envelope))
@@ -32,13 +37,25 @@ object ContentCodec {
         authorId: String,
         sigKeyPrivate: ByteArray,
         expiresAt: Instant? = null,
+    ): Content = seal(
+        id = ContentBodyCodec.deriveId(body),
+        body = body,
+        authorId = authorId,
+        sigKeyPrivate = sigKeyPrivate,
+        expiresAt = expiresAt,
+    )
+
+    fun seal(
+        id: String,
+        body: ContentBody,
+        authorId: String,
+        sigKeyPrivate: ByteArray,
+        expiresAt: Instant? = null,
     ): Content {
-        val type = typeOf(body)
-        val id = ContentBodyCodec.deriveId(body)
         val placeholder = Content(
             id = id,
             schema = SCHEMA,
-            type = type,
+            type = typeOf(body),
             authorId = authorId,
             version = 1,
             expiresAt = expiresAt,

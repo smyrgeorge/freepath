@@ -7,6 +7,7 @@ import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.content.ContentBody
+import io.github.smyrgeorge.freepath.content.ContentCodec
 import io.github.smyrgeorge.freepath.content.ContentType
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
@@ -17,6 +18,7 @@ import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
+import io.github.smyrgeorge.freepath.database.ContentTrust
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
@@ -170,15 +172,13 @@ abstract class AbstractAppState(
             avatar = avatar?.takeIf { it.length <= ContentBody.Contact.MAX_AVATAR_SIZE },
             location = location?.takeIf { it.isNotBlank() },
         )
-        val envelope = Content(
+        val envelope = ContentCodec.seal(
             id = peerId,
-            type = ContentType.CONTACT,
-            authorId = peerId,
-            createdAt = Clock.System.now(),
-            signature = "self",
             body = body,
+            authorId = peerId,
+            sigKeyPrivate = identity.sigKeyPrivate,
         )
-        val entry = ContentEntry.from(envelope)
+        val entry = ContentEntry.from(envelope, trust = ContentTrust.VERIFIED)
         contactContentEntry = contentEntryRepository.insert(db, entry).getOrThrow()
         contactContent = envelope
         contactContentBody = body
@@ -264,11 +264,20 @@ abstract class AbstractAppState(
         // For contact content, always accept — the peer is the authoritative source for their own profile.
         if (!isContact && existing != null && existing.version >= content.version) return
 
-        ContentEntry.from(content, existing?.id ?: 0).also {
+        ContentEntry.from(content, existing?.id ?: 0, content.trust()).also {
             contentEntryRepository.save(db, it).getOrThrow()
         }
 
         if (isContact) loadContacts() else loadFeed()
+    }
+
+    private suspend fun Content.trust(): ContentTrust {
+        val contact = contactRepository.findOneByPeerId(db, authorId).getOrThrow()
+        return when {
+            contact == null -> ContentTrust.UNKNOWN
+            ContentCodec.verify(this, contact.contact.sigKey) -> ContentTrust.VERIFIED
+            else -> ContentTrust.FAILED
+        }
     }
 
     private suspend fun loadOwnContactContent() {

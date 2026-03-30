@@ -28,17 +28,23 @@ data class ContentEntry(
     val authorId: String,
     @Column(insert = false, update = false)
     val version: Int,
+    @Column(insert = false, update = false)
+    val signature: String,
+    val trust: ContentTrust = ContentTrust.UNKNOWN,
     @Converter(ContentConverter::class)
     val content: Content,
 ) : Auditable<Int> {
     companion object {
-        fun from(content: Content, id: Int = 0): ContentEntry = ContentEntry(
-            id = id,
-            contentId = content.id,
-            type = content.type,
-            authorId = content.authorId,
-            version = content.version,
-            content = content,
-        )
+        fun from(content: Content, id: Int = 0, trust: ContentTrust = ContentTrust.UNKNOWN): ContentEntry =
+            ContentEntry(
+                id = id,
+                contentId = content.id,
+                type = content.type,
+                authorId = content.authorId,
+                version = content.version,
+                signature = content.signature,
+                trust = trust,
+                content = content,
+            )
     }
 }
