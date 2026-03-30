@@ -5,10 +5,8 @@ import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.database.ContactRoutingEntry
-import kotlin.io.encoding.Base64
-import kotlin.time.Clock
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository
+import io.github.smyrgeorge.freepath.database.ContactRoutingEntry
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
@@ -29,6 +27,8 @@ import io.github.smyrgeorge.log4k.impl.extensions.launch
 import io.github.smyrgeorge.sqlx4k.ConnectionPool
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.delay
+import kotlin.io.encoding.Base64
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 abstract class AbstractAppResources(
@@ -122,6 +122,7 @@ abstract class AbstractAppResources(
     }
 
     suspend fun startLibble() {
+        if (!LIBBLE_ENABLED) return
         libble.start(
             bleBeaconId = bleBeaconId(identity.peerIdRaw),
             peripheralIdLookup = {
@@ -150,18 +151,8 @@ abstract class AbstractAppResources(
         )
     }
 
-    companion object {
-        private val BLE_BEACON_DOMAIN = "freepath-ble-beacon".encodeToByteArray()
-
-        /**
-         * Derives a stable, purpose-specific 8-byte BLE beacon identifier from peerIdRaw.
-         * SHA-256(peerIdRaw ∥ "freepath-ble-beacon")[:8] — opaque and independent from peerId.
-         */
-        fun bleBeaconId(peerIdRaw: ByteArray): ByteArray =
-            CryptoProvider.sha256(peerIdRaw + BLE_BEACON_DOMAIN).copyOfRange(0, 8)
-    }
-
     suspend fun stopLibble() {
+        if (!LIBBLE_ENABLED) return
         libble.stop()
     }
 
@@ -193,5 +184,17 @@ abstract class AbstractAppResources(
     fun stopLibnet() {
         client.stop()
         libnet.stop()
+    }
+
+    companion object {
+        internal const val LIBBLE_ENABLED = false
+        private val BLE_BEACON_DOMAIN = "freepath-ble-beacon".encodeToByteArray()
+
+        /**
+         * Derives a stable, purpose-specific 8-byte BLE beacon identifier from peerIdRaw.
+         * SHA-256(peerIdRaw ∥ "freepath-ble-beacon")[:8] — opaque and independent from peerId.
+         */
+        private fun bleBeaconId(peerIdRaw: ByteArray): ByteArray =
+            CryptoProvider.sha256(peerIdRaw + BLE_BEACON_DOMAIN).copyOfRange(0, 8)
     }
 }

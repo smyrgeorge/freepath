@@ -2,7 +2,6 @@ package io.github.smyrgeorge.freepath.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -38,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContentEntry
+import io.github.smyrgeorge.freepath.ui.components.AvatarSize
+import io.github.smyrgeorge.freepath.ui.components.FreepathAvatar
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
 import io.github.smyrgeorge.freepath.util.formatRelativeTime
 import io.github.smyrgeorge.freepath.util.toImageBitmap
@@ -49,14 +49,13 @@ fun PostDetailScreen(
     onBack: () -> Unit,
 ) {
     val contacts by AppState.contacts.collectAsState()
+    val contactContents by AppState.contactContents.collectAsState()
     val contact = contacts.firstOrNull { it.peerId == entry.authorId }
     val displayName = contact?.let { c ->
         c.name?.takeIf { it.isNotBlank() }
             ?: c.contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
     } ?: "${entry.authorId.take(4)}·${entry.authorId.takeLast(4)}"
     val avatarLabel = if (contact != null) displayName.first().uppercaseChar().toString() else "?"
-    val avatarBg = if (contact != null) MaterialTheme.colorScheme.secondaryContainer
-    else MaterialTheme.colorScheme.surfaceVariant
 
     Column(modifier = Modifier.fillMaxSize()) {
         FreepathTopBar(
@@ -92,32 +91,17 @@ fun PostDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .background(avatarBg, CircleShape)
-                        .border(1.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = avatarLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White,
-                    )
-                }
-                Column {
-                    Text(
-                        text = displayName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = trustLabel(contacts, entry.authorId),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                FreepathAvatar(
+                    label = avatarLabel,
+                    size = AvatarSize.Medium,
+                    avatar = contactContents[contact?.peerId]?.avatar,
+                )
+                Text(
+                    text = displayName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
