@@ -1,11 +1,13 @@
 package io.github.smyrgeorge.freepath.state
 
-import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.content.Content
+import io.github.smyrgeorge.freepath.content.ContentBody
+import io.github.smyrgeorge.freepath.content.ContentCodec
 import io.github.smyrgeorge.freepath.content.ContentType
 import io.github.smyrgeorge.freepath.content.ImageFormat
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
+import io.github.smyrgeorge.freepath.database.ContentTrust
 import io.github.smyrgeorge.freepath.util.generateCheckerboardPng
 import kotlin.io.encoding.Base64
 import kotlin.random.Random
@@ -13,9 +15,13 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 object RandomContentGenerator {
-    fun generateRandomContent(contacts: List<ContactEntry>): List<ContentEntry> {
+    fun generateRandomContent(
+        contacts: List<ContactEntry>,
+        selfPeerId: String,
+        selfSigKeyPrivate: ByteArray,
+    ): List<ContentEntry> {
         val now = Clock.System.now().toEpochMilliseconds()
-        return contacts.flatMap { contact ->
+        val contactEntries = contacts.flatMap { contact ->
             listOf(
                 ContentType.ARTICLE to randomArticleBody(),
                 ContentType.IMAGE to randomImageBody(),
@@ -33,6 +39,21 @@ object RandomContentGenerator {
                 ContentEntry.from(envelope)
             }
         }
+
+        val selfEntries = listOf(
+            randomArticleBody(),
+            randomImageBody(),
+        ).mapIndexed { i, body ->
+            val createdAt = now - ((i + 1) * 1_800_000L + Random.nextLong(0, 3_600_000L))
+            val envelope = ContentCodec.seal(
+                body = body,
+                authorId = selfPeerId,
+                sigKeyPrivate = selfSigKeyPrivate,
+            ).copy(createdAt = Instant.fromEpochMilliseconds(createdAt))
+            ContentEntry.from(envelope, trust = ContentTrust.VERIFIED)
+        }
+
+        return contactEntries + selfEntries
     }
 
     private fun randomArticleBody(): ContentBody.Article {

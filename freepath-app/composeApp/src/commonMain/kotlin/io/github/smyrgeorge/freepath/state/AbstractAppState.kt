@@ -151,7 +151,10 @@ abstract class AbstractAppState(
     suspend fun loadFeed(limit: Int = 50) {
         contentEntryRepository
             .findAllByLimitAndOffset(db, limit, 0)
-            .onSuccess { _feedEntries.value = it }
+            .onSuccess {
+                val feed = it.filter { c -> c.authorId != identityEntry.peerId }
+                _feedEntries.value = feed
+            }
     }
 
     fun cancelContactExchange() {
@@ -228,7 +231,11 @@ abstract class AbstractAppState(
 
     suspend fun generateRandomContent() {
         runCatching {
-            val entries = RandomContentGenerator.generateRandomContent(_contacts.value)
+            val entries = RandomContentGenerator.generateRandomContent(
+                contacts = _contacts.value,
+                selfPeerId = identityEntry.peerId,
+                selfSigKeyPrivate = identity.sigKeyPrivate,
+            )
             entries.forEach { contentEntryRepository.insert(db, it).getOrThrow() }
             log.info("[dev] Random content generated: ${entries.size} entries.")
             loadFeed()
