@@ -111,7 +111,7 @@ fun MeScreen(modifier: Modifier = Modifier) {
     var isRefreshingAvatar by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(peerId) {
-        val stored = AppState.contactContent.avatar
+        val stored = AppState.contactContentBody.avatar
         if (stored != null) {
             avatarBitmap = runCatching { Base64.decode(stored).toImageBitmap() }.getOrNull()
             return@LaunchedEffect

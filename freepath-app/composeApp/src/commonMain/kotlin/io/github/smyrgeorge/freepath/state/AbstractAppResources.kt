@@ -9,10 +9,12 @@ import io.github.smyrgeorge.freepath.database.ContactEntryRepository
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntry
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
+import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.database.generated.ContactEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContactRoutingEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContentEntryRepositoryImpl
+import io.github.smyrgeorge.freepath.database.generated.ContentSyncEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.IdentityEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
@@ -46,6 +48,7 @@ abstract class AbstractAppResources(
     val identityRepository: IdentityEntryRepository = IdentityEntryRepositoryImpl
     val contactRepository: ContactEntryRepository = ContactEntryRepositoryImpl
     val contentEntryRepository: ContentEntryRepository = ContentEntryRepositoryImpl
+    val contentSyncRepository: ContentSyncEntryRepository = ContentSyncEntryRepositoryImpl
     val contactRoutingEntryRepository: ContactRoutingEntryRepository = ContactRoutingEntryRepositoryImpl
 
     val libp2p: Libp2pModule = Libp2pModule().setEventHandler { event ->
@@ -171,10 +174,12 @@ abstract class AbstractAppResources(
             onChatMessageReceived = { msg ->
                 val cmd = Protocol.ChatMessageReceived(msg.senderId, msg.receiverId, msg)
                 system.tell(cmd).map { }
+                    .onFailure { log.error { "Failed to deliver chat message to the system actor: $it" } }
             },
             onContentReceived = { content ->
                 val cmd = Protocol.ContentReceived(content)
                 system.tell(cmd).map { }
+                    .onFailure { log.error { "Failed to deliver content to the system actor: $it" } }
             },
         ).apply {
             start()

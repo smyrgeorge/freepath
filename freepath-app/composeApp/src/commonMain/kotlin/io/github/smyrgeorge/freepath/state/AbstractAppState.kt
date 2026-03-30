@@ -16,6 +16,7 @@ import io.github.smyrgeorge.freepath.database.ContactRoutingEntry
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
+import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
@@ -42,6 +43,7 @@ abstract class AbstractAppState(
     private val identityRepository: IdentityEntryRepository = resources.identityRepository
     private val contactRepository: ContactEntryRepository = resources.contactRepository
     private val contentEntryRepository: ContentEntryRepository = resources.contentEntryRepository
+    private val contentSyncRepository: ContentSyncEntryRepository = resources.contentSyncRepository
     private val contactRoutingEntryRepository: ContactRoutingEntryRepository = resources.contactRoutingEntryRepository
 
     private val _contacts = MutableStateFlow<List<ContactEntry>>(emptyList())
@@ -87,8 +89,8 @@ abstract class AbstractAppState(
     lateinit var identityEntry: IdentityEntry
     lateinit var contact: Contact
     lateinit var contactEntry: ContactEntry
-    lateinit var contactContent: ContentBody.Contact
-    lateinit var contactContentEnvelope: Content
+    lateinit var contactContentBody: ContentBody.Contact
+    lateinit var contactContent: Content
     lateinit var contactContentEntry: ContentEntry
 
     suspend fun initialize() {
@@ -178,8 +180,8 @@ abstract class AbstractAppState(
         )
         val entry = ContentEntry.from(envelope)
         contactContentEntry = contentEntryRepository.insert(db, entry).getOrThrow()
-        contactContentEnvelope = envelope
-        contactContent = body
+        contactContent = envelope
+        contactContentBody = body
     }
 
     fun appendMessage(message: ChatMessage) {
@@ -203,6 +205,7 @@ abstract class AbstractAppState(
                 contactRepository.deleteAll(this).getOrThrow()
                 identityRepository.deleteAll(this).getOrThrow()
                 contentEntryRepository.deleteAll(this).getOrThrow()
+                contentSyncRepository.deleteAll(this).getOrThrow()
                 contactRoutingEntryRepository.deleteAll(this).getOrThrow()
             }
         }.onSuccess {
@@ -243,25 +246,25 @@ abstract class AbstractAppState(
     }
 
     suspend fun updateAvatar(avatar: String?) {
-        val updatedBody = contactContent.copy(avatar = avatar)
+        val updatedBody = contactContentBody.copy(avatar = avatar)
         val updatedEnvelope = contactContentEntry.content.copy(body = updatedBody)
         val updatedEntry = contactContentEntry.copy(content = updatedEnvelope)
         contactContentEntry = contentEntryRepository.update(db, updatedEntry).getOrThrow()
-        contactContentEnvelope = updatedEnvelope
-        contactContent = updatedBody
+        contactContent = updatedEnvelope
+        contactContentBody = updatedBody
     }
 
-    suspend fun receiveContent(envelope: Content) {
+    suspend fun receiveContent(content: Content) {
         // Contact content is keyed by authorId (peerId) in the DB, all other content by envelope.id.
-        val isContact = envelope.type == ContentType.CONTACT
-        val contentId = if (isContact) envelope.authorId else envelope.id
+        val isContact = content.type == ContentType.CONTACT
+        val contentId = if (isContact) content.authorId else content.id
 
         val existing = contentEntryRepository.findOneByContentId(db, contentId).getOrNull()
         // For non-contact content, skip if we already have this version or newer.
         // For contact content, always accept — the peer is the authoritative source for their own profile.
-        if (!isContact && existing != null && existing.version >= envelope.version) return
+        if (!isContact && existing != null && existing.version >= content.version) return
 
-        ContentEntry.from(envelope, existing?.id ?: 0).also {
+        ContentEntry.from(content, existing?.id ?: 0).also {
             contentEntryRepository.save(db, it).getOrThrow()
         }
 
@@ -271,8 +274,8 @@ abstract class AbstractAppState(
     private suspend fun loadOwnContactContent() {
         val entry = contentEntryRepository.findOneByContentId(db, identityEntry.peerId).getOrThrow() ?: return
         val body = entry.content.body as? ContentBody.Contact ?: return
-        contactContent = body
-        contactContentEnvelope = entry.content
+        contactContentBody = body
+        contactContent = entry.content
         contactContentEntry = entry
     }
 

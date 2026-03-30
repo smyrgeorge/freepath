@@ -3,17 +3,20 @@ package io.github.smyrgeorge.freepath
 import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.actor4k.system.registry.SimpleActorRegistry
 import io.github.smyrgeorge.actor4k.util.SimpleLoggerFactory
+import io.github.smyrgeorge.freepath.share.PeerActor
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 
 object AppHooks {
     fun onCreate() {
         val conf = ActorSystem.Conf(
-            systemCollectStatsEvery = 1.hours,
-            systemLogStatsEvery = 1.hours,
+            systemCollectStatsEvery = 1.hours, // Intentionally big (disabled)
+            systemLogStatsEvery = 1.hours, // Intentionally big (disabled)
             shutdownPollingInterval = 500.milliseconds,
+            actorExpiresAfter = 5.minutes,
         )
         val loggerFactory = SimpleLoggerFactory()
         val registry = SimpleActorRegistry(loggerFactory)
@@ -24,6 +27,9 @@ object AppHooks {
                     viewState = AppViewState,
                     resources = AppResources,
                 )
+            }
+            .factoryFor(PeerActor::class) { key ->
+                PeerActor(key = key, state = AppState, resources = AppResources)
             }
 
         ActorSystem

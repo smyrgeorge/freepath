@@ -2,8 +2,11 @@ package io.github.smyrgeorge.freepath
 
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.actor4k.actor.impl.BehaviorActor
+import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
+import io.github.smyrgeorge.freepath.share.PeerActor
+import io.github.smyrgeorge.freepath.share.PeerProtocol
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.state.AbstractAppState
 import io.github.smyrgeorge.freepath.state.AbstractViewState
@@ -124,8 +127,9 @@ class AppActor(
                 is Protocol.ChatMessageReceived -> state.appendMessage(m.msg)
                 is Protocol.ContentReceived -> state.receiveContent(m.envelope)
                 is Protocol.PeerIdentified -> {
-                    resources.client.send(state.contactContentEnvelope, m.peerId)
-                        .onFailure { log.warn("[PeerIdentified] Failed to push contact card to ${m.peerId}: ${it.message}") }
+                    ActorSystem.get(PeerActor::class, m.peerId).tell(PeerProtocol.Sync).onFailure {
+                        log.warn("[PeerIdentified] Failed to trigger sync for ${m.peerId}: ${it.message}")
+                    }
                 }
 
                 is Protocol.ResetData -> {
