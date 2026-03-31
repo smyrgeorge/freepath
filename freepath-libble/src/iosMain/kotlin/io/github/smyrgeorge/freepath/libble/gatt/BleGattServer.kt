@@ -36,12 +36,12 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.fetchAndIncrement
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
-actual class BleGattServer actual constructor() : BleGattServerPort {
+actual class BleGattServer actual constructor() {
 
     private val log = Logger.of(this::class)
 
-    private val _events = MutableSharedFlow<BleGattServerPort.Event>(extraBufferCapacity = 8)
-    actual override val events: SharedFlow<BleGattServerPort.Event> = _events
+    private val _events = MutableSharedFlow<BleGattServerEvent>(extraBufferCapacity = 8)
+    actual val events: SharedFlow<BleGattServerEvent> = _events
 
     private val started = AtomicBoolean(false)
 
@@ -97,21 +97,21 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         permissions = CBAttributePermissionsReadable,
     )
 
-    actual override suspend fun setEphemeralValue(bytes: ByteArray) {
+    actual suspend fun setEphemeralValue(bytes: ByteArray) {
         ephemeralValue = bytes
     }
 
-    actual override suspend fun setContactValue(bytes: ByteArray) {
+    actual suspend fun setContactValue(bytes: ByteArray) {
         cardValue = bytes
     }
 
-    actual override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
+    actual suspend fun sendResponse(reqId: Long, payload: ByteArray) {
         val (central, clientReqId) = lock.withLock { pendingCentrals.remove(reqId) } ?: return
         val frame = encodeResponseFrame(clientReqId, 0x00, payload)
         withContext(Dispatchers.IO) { notifyCentral(central, frame) }
     }
 
-    actual override suspend fun sendResponseFailed(reqId: Long, error: String) {
+    actual suspend fun sendResponseFailed(reqId: Long, error: String) {
         val (central, clientReqId) = lock.withLock { pendingCentrals.remove(reqId) } ?: return
         val frame = encodeResponseFrame(clientReqId, 0x01, error.encodeToByteArray())
         withContext(Dispatchers.IO) { notifyCentral(central, frame) }
@@ -134,7 +134,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         val payload = bytes.copyOfRange(8, bytes.size)
         val serverReqId = serverReqIdGen.fetchAndIncrement()
         lock.withLock { pendingCentrals[serverReqId] = Pair(central, clientReqId) }
-        _events.tryEmit(BleGattServerPort.Event.RequestReceived(central.identifier.UUIDString, serverReqId, payload))
+        _events.tryEmit(BleGattServerEvent.RequestReceived(central.identifier.UUIDString, serverReqId, payload))
     }
 
     private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
@@ -166,19 +166,19 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
 
                 ephemeralChar.UUID -> {
                     val bytes = req.value?.bytes?.readBytes(req.value!!.length.toInt()) ?: byteArrayOf()
-                    _events.tryEmit(BleGattServerPort.Event.EphemeralReceived(req.central.identifier.UUIDString, bytes))
+                    _events.tryEmit(BleGattServerEvent.EphemeralReceived(req.central.identifier.UUIDString, bytes))
                     manager.respondToRequest(req, CBATTErrorSuccess)
                 }
 
                 cardChar.UUID -> {
                     val bytes = req.value?.bytes?.readBytes(req.value!!.length.toInt()) ?: byteArrayOf()
-                    _events.tryEmit(BleGattServerPort.Event.CardReceived(bytes))
+                    _events.tryEmit(BleGattServerEvent.CardReceived(bytes))
                     manager.respondToRequest(req, CBATTErrorSuccess)
                 }
 
                 statusChar.UUID -> {
                     val status = req.value?.bytes?.readBytes(1)?.firstOrNull() ?: 0x02
-                    _events.tryEmit(BleGattServerPort.Event.StatusReceived(status))
+                    _events.tryEmit(BleGattServerEvent.StatusReceived(status))
                     manager.respondToRequest(req, CBATTErrorSuccess)
                 }
 
@@ -205,7 +205,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         PeripheralManagerHolder.manager.addWriteRequestsHandler(writeHandler)
     }
 
-    actual override suspend fun start() {
+    actual suspend fun start() {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
         withContext(Dispatchers.IO) {
             log.info("BleGattServer starting")
@@ -213,7 +213,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         }
     }
 
-    actual override suspend fun stop() {
+    actual suspend fun stop() {
         if (!started.compareAndSet(expectedValue = true, newValue = false)) return
         withContext(Dispatchers.IO) {
             ephemeralValue = byteArrayOf()

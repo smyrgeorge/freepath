@@ -27,12 +27,12 @@ import kotlin.concurrent.atomics.fetchAndIncrement
 
 @OptIn(ExperimentalAtomicApi::class)
 @SuppressLint("MissingPermission")
-actual class BleGattServer actual constructor() : BleGattServerPort {
+actual class BleGattServer actual constructor() {
 
     private val log = Logger.of(this::class)
 
-    private val _events = MutableSharedFlow<BleGattServerPort.Event>(extraBufferCapacity = 8)
-    actual override val events: SharedFlow<BleGattServerPort.Event> = _events
+    private val _events = MutableSharedFlow<BleGattServerEvent>(extraBufferCapacity = 8)
+    actual val events: SharedFlow<BleGattServerEvent> = _events
 
     private val started = AtomicBoolean(false)
 
@@ -59,21 +59,21 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
     @Volatile
     private var responseChar: BluetoothGattCharacteristic? = null
 
-    actual override suspend fun setEphemeralValue(bytes: ByteArray) {
+    actual suspend fun setEphemeralValue(bytes: ByteArray) {
         ephemeralValue = bytes
     }
 
-    actual override suspend fun setContactValue(bytes: ByteArray) {
+    actual suspend fun setContactValue(bytes: ByteArray) {
         cardValue = bytes
     }
 
-    actual override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
+    actual suspend fun sendResponse(reqId: Long, payload: ByteArray) {
         val (device, clientReqId) = pendingRequests.remove(reqId) ?: return
         val frame = encodeResponseFrame(clientReqId, 0x00, payload)
         withContext(Dispatchers.IO) { notifyDevice(device, frame) }
     }
 
-    actual override suspend fun sendResponseFailed(reqId: Long, error: String) {
+    actual suspend fun sendResponseFailed(reqId: Long, error: String) {
         val (device, clientReqId) = pendingRequests.remove(reqId) ?: return
         val frame = encodeResponseFrame(clientReqId, 0x01, error.encodeToByteArray())
         withContext(Dispatchers.IO) { notifyDevice(device, frame) }
@@ -189,7 +189,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         val payload = bytes.copyOfRange(8, bytes.size)
         val serverReqId = serverReqIdGen.fetchAndIncrement()
         pendingRequests[serverReqId] = Pair(device, clientReqId)
-        _events.tryEmit(BleGattServerPort.Event.RequestReceived(device.address, serverReqId, payload))
+        _events.tryEmit(BleGattServerEvent.RequestReceived(device.address, serverReqId, payload))
     }
 
     private fun encodeResponseFrame(reqId: Long, status: Byte, payload: ByteArray): ByteArray {
@@ -201,15 +201,15 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
 
     private fun emitWrite(device: BluetoothDevice, uuid: UUID, bytes: ByteArray) {
         val event = when (uuid) {
-            EPHEMERAL_JVM_UUID -> BleGattServerPort.Event.EphemeralReceived(device.address, bytes)
-            CARD_JVM_UUID -> BleGattServerPort.Event.CardReceived(bytes)
-            STATUS_JVM_UUID -> BleGattServerPort.Event.StatusReceived(bytes.firstOrNull() ?: 0x02)
+            EPHEMERAL_JVM_UUID -> BleGattServerEvent.EphemeralReceived(device.address, bytes)
+            CARD_JVM_UUID -> BleGattServerEvent.CardReceived(bytes)
+            STATUS_JVM_UUID -> BleGattServerEvent.StatusReceived(bytes.firstOrNull() ?: 0x02)
             else -> return
         }
         _events.tryEmit(event)
     }
 
-    actual override suspend fun start() {
+    actual suspend fun start() {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
         withContext(Dispatchers.IO) {
             val ctx = requireNotNull(AndroidContextHolder.applicationContext) {
@@ -274,7 +274,7 @@ actual class BleGattServer actual constructor() : BleGattServerPort {
         }
     }
 
-    actual override suspend fun stop() {
+    actual suspend fun stop() {
         if (!started.compareAndSet(expectedValue = true, newValue = false)) return
         withContext(Dispatchers.IO) {
             val s = server

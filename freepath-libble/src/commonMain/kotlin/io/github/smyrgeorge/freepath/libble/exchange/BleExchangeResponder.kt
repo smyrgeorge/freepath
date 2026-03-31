@@ -11,7 +11,8 @@ import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.constantT
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.decryptContact
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.deriveKeys
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.encryptContact
-import io.github.smyrgeorge.freepath.libble.gatt.BleGattServerPort
+import io.github.smyrgeorge.freepath.libble.gatt.BleGattServer
+import io.github.smyrgeorge.freepath.libble.gatt.BleGattServerEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
@@ -21,11 +22,11 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Drives the responder side of the secure BLE contact exchange (5-message protocol).
  *
- * Subscribes to [BleGattServerPort.events] and reacts to incoming writes from the initiator.
+ * Subscribes to [BleGattServer.events] and reacts to incoming writes from the initiator.
  * The GATT server must be running before [run] is called.
  */
 internal class BleExchangeResponder(
-    private val gattServer: BleGattServerPort,
+    private val gattServer: BleGattServer,
     private val pin: String,
 ) {
     init {
@@ -60,7 +61,7 @@ internal class BleExchangeResponder(
         // Step 1: Wait for initiator's ephemeral public key.
         val ephemeralEvent = withTimeout(STEP_TIMEOUT) {
             gattServer.events
-                .filterIsInstance<BleGattServerPort.Event.EphemeralReceived>()
+                .filterIsInstance<BleGattServerEvent.EphemeralReceived>()
                 .first()
         }
         val centralId = ephemeralEvent.centralId
@@ -76,7 +77,7 @@ internal class BleExchangeResponder(
         // Step 3: Wait for initiator's pinConfirm_I + encrypted card.
         val cardPayload = withTimeout(STEP_TIMEOUT) {
             gattServer.events
-                .filterIsInstance<BleGattServerPort.Event.CardReceived>()
+                .filterIsInstance<BleGattServerEvent.CardReceived>()
                 .first()
                 .bytes
         }
@@ -98,7 +99,7 @@ internal class BleExchangeResponder(
         // Step 5: Wait for initiator's STATUS write.
         val status = withTimeout(STEP_TIMEOUT) {
             gattServer.events
-                .filterIsInstance<BleGattServerPort.Event.StatusReceived>()
+                .filterIsInstance<BleGattServerEvent.StatusReceived>()
                 .first()
                 .status
         }

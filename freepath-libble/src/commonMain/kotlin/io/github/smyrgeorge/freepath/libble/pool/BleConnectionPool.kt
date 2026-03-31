@@ -1,10 +1,11 @@
 package io.github.smyrgeorge.freepath.libble.pool
 
 import com.juul.kable.Advertisement
-import com.juul.kable.Peripheral
+import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPool.Companion.IDLE_TIMEOUT
 import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPool.Companion.KEEPALIVE_INTERVAL
 import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPool.Companion.MAX_RECONNECT_ATTEMPTS
+import io.github.smyrgeorge.freepath.util.rpc.RpcManager
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -17,7 +18,6 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 
 /**
  * Manages persistent BLE connections for peripherals involved in active data exchanges.
@@ -34,17 +34,14 @@ import kotlin.uuid.ExperimentalUuidApi
  * Concurrent [withConnection] calls for the same peripheral are serialized via a per-entry
  * [Mutex]. Callers for different peripherals run concurrently.
  *
- * TODO: [withConnection] currently exposes the full [BleConnectionPort] (including lifecycle
+ * TODO: [withConnection] currently exposes the full [BleConnection] (including lifecycle
  * methods connect/disconnect/ping). Consider a narrower BleChannel interface (data ops only)
  * for the block parameter in the future.
  */
 internal class BleConnectionPool(
     private val scope: CoroutineScope,
+    private val rpc: RpcManager<LibbleEvent.Response>,
     private val advertisementLookup: suspend (peripheralId: String) -> Advertisement?,
-    // Called whenever a response notification arrives from a pooled connection.
-    private val onResponseReceived: (peripheralId: String, bytes: ByteArray) -> Unit = { _, _ -> },
-    // Injected for testability; defaults to creating a real Kable BleConnection.
-    private val connectionFactory: (Advertisement) -> BleConnectionPort = { adv -> BleConnection(Peripheral(adv)) },
 ) {
     private val log = Logger.of(this::class)
 
@@ -52,7 +49,7 @@ internal class BleConnectionPool(
     private val entries = mutableMapOf<String, PoolEntry>()
 
     private class PoolEntry(
-        var connection: BleConnectionPort,
+        var connection: BleConnection,
         val advertisement: Advertisement,
         var lastDataAt: Instant = Instant.DISTANT_PAST,
         var keepaliveJob: Job? = null,
@@ -66,7 +63,7 @@ internal class BleConnectionPool(
      * Execute [block] with a live connection to [peripheralId].
      *
      * If the peripheral is not yet in the pool, resolves its Advertisement via
-     * [advertisementLookup], creates a BleConnectionPort, connects, and starts the
+     * [advertisementLookup], creates a BleConnection, connects, and starts the
      * keepalive coroutine — all before running [block].
      *
      * Acquires a per-entry [Mutex] for the duration of [block] so concurrent callers for
@@ -75,7 +72,7 @@ internal class BleConnectionPool(
      * Throws [IllegalStateException] if the peripheral is unknown or was evicted while
      * waiting for the mutex.
      */
-    suspend fun <T> withConnection(peripheralId: String, block: suspend (BleConnectionPort) -> T): T {
+    suspend fun <T> withConnection(peripheralId: String, block: suspend (BleConnection) -> T): T {
         val entry = getOrCreate(peripheralId)
         return entry.withLock {
             // Re-check: the entry may have been evicted while we waited for the mutex.
@@ -117,17 +114,17 @@ internal class BleConnectionPool(
     private suspend fun getOrCreate(peripheralId: String): PoolEntry {
         mutex.withLock { entries[peripheralId] }?.let { return it }
 
-        val adv = advertisementLookup(peripheralId)
-            ?: throw IllegalStateException("Unknown peripheral: $peripheralId — not in discovery cache")
+        val advertisement = advertisementLookup(peripheralId)
+            ?: error("Unknown peripheral: $peripheralId — not in discovery cache")
 
-        val conn = connectionFactory(adv)
+        val conn = BleConnection.of(advertisement)
         try {
             conn.connect()
         } catch (e: Exception) {
             withContext(NonCancellable) { runCatching { conn.disconnect() } }
             throw e
         }
-        val newEntry = PoolEntry(connection = conn, advertisement = adv)
+        val newEntry = PoolEntry(connection = conn, advertisement = advertisement)
 
         // Insert under lock. If another coroutine beat us, discard our connection.
         val winner = mutex.withLock { entries.getOrPut(peripheralId) { newEntry } }
@@ -137,7 +134,7 @@ internal class BleConnectionPool(
         }
 
         newEntry.keepaliveJob = scope.launch { keepaliveLoop(peripheralId) }
-        newEntry.responseCollectorJob = scope.launch { collectResponses(peripheralId, conn) }
+        newEntry.responseCollectorJob = scope.launch { collect(peripheralId, conn) }
         log.debug("Pool: enrolled $peripheralId")
         return newEntry
     }
@@ -176,11 +173,11 @@ internal class BleConnectionPool(
                     var reconnected = false
                     for (attempt in 0 until MAX_RECONNECT_ATTEMPTS) {
                         delay(RECONNECT_BACKOFF_BASE * (1 shl attempt))
-                        val newConn = connectionFactory(entry.advertisement)
+                        val newConn = BleConnection.of(entry.advertisement)
                         if (runCatching { newConn.connect() }.isSuccess) {
                             entry.connection = newConn
                             entry.responseCollectorJob?.cancel()
-                            entry.responseCollectorJob = scope.launch { collectResponses(peripheralId, newConn) }
+                            entry.responseCollectorJob = scope.launch { collect(peripheralId, newConn) }
                             reconnected = true
                             log.debug("Pool: reconnected $peripheralId (attempt ${attempt + 1})")
                             break
@@ -202,10 +199,22 @@ internal class BleConnectionPool(
         }
     }
 
-    /** Collects response notifications from [conn] and routes them to [onResponseReceived]. */
-    private suspend fun collectResponses(peripheralId: String, conn: BleConnectionPort) {
+    private suspend fun collect(peripheralId: String, conn: BleConnection) {
+        fun decode(peripheralId: String, bytes: ByteArray) {
+            if (bytes.size < 9) return
+            val reqId = (0 until 8).fold(0L) { acc, i -> acc or ((bytes[i].toLong() and 0xFF) shl (i * 8)) }
+            val status = bytes[8]
+            val body = bytes.copyOfRange(9, bytes.size)
+
+            val result =
+                if (status == 0x00.toByte()) LibbleEvent.ResponseReceived(reqId, peripheralId, body)
+                else LibbleEvent.RequestFailed(reqId, senderId = peripheralId, error = body.decodeToString())
+
+            scope.launch { rpc.response(reqId, result) }
+        }
+
         runCatching {
-            conn.observeResponses().collect { bytes -> onResponseReceived(peripheralId, bytes) }
+            conn.observe().collect { bytes -> decode(peripheralId, bytes) }
         }
     }
 

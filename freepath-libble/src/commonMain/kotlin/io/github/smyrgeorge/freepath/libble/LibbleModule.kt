@@ -8,7 +8,7 @@ import io.github.smyrgeorge.freepath.libble.LibbleEvent.Response
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeInitiator
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeResponder
 import io.github.smyrgeorge.freepath.libble.gatt.BleGattServer
-import io.github.smyrgeorge.freepath.libble.gatt.BleGattServerPort
+import io.github.smyrgeorge.freepath.libble.gatt.BleGattServerEvent
 import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetrics
 import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPool
 import io.github.smyrgeorge.freepath.util.rpc.RpcManager
@@ -68,8 +68,8 @@ class LibbleModule {
 
     private val pool = BleConnectionPool(
         scope = scope,
+        rpc = rpc,
         advertisementLookup = { peripheralsMutex.withLock { peripherals[it]?.advertisement } },
-        onResponseReceived = { peripheralId, bytes -> decodeAndRouteResponse(peripheralId, bytes) },
     )
 
     init {
@@ -246,7 +246,7 @@ class LibbleModule {
         scope.launch {
             gattServer.events.collect { event ->
                 when (event) {
-                    is BleGattServerPort.Event.RequestReceived -> {
+                    is BleGattServerEvent.RequestReceived -> {
                         val req = LibbleEvent.RequestReceived(event.senderId, event.reqId, event.payload)
                         requests.trySend(req).onFailure {
                             log.error { "Failed to send message to requests channel: $it" }
@@ -265,16 +265,6 @@ class LibbleModule {
         if (!gattServerStarted.compareAndSet(expectedValue = true, newValue = false)) return
         gattServer.stop()
         log.info("BLE GATT server stopped")
-    }
-
-    private fun decodeAndRouteResponse(peripheralId: String, bytes: ByteArray) {
-        if (bytes.size < 9) return
-        val reqId = (0 until 8).fold(0L) { acc, i -> acc or ((bytes[i].toLong() and 0xFF) shl (i * 8)) }
-        val status = bytes[8]
-        val body = bytes.copyOfRange(9, bytes.size)
-        val result = if (status == 0x00.toByte()) LibbleEvent.ResponseReceived(reqId, peripheralId, body)
-        else LibbleEvent.RequestFailed(reqId, senderId = peripheralId, error = body.decodeToString())
-        scope.launch { rpc.response(reqId, result) }
     }
 
     private suspend fun sendEvent(event: LibbleEvent) {

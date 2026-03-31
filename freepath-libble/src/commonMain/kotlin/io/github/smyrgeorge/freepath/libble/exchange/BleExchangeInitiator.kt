@@ -13,7 +13,7 @@ import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.constantT
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.decryptContact
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.deriveKeys
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.encryptContact
-import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPort
+import io.github.smyrgeorge.freepath.libble.pool.BleConnection
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -22,7 +22,7 @@ import kotlinx.coroutines.CancellationException
  * The caller is responsible for connecting to the correct peripheral before calling [run].
  */
 internal class BleExchangeInitiator(
-    private val connection: BleConnectionPort,
+    private val connection: BleConnection,
     private val pin: String,
 ) {
     init {
