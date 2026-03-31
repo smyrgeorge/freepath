@@ -18,9 +18,6 @@
     <string name="security_note">Tus claves se almacenan solo en este dispositivo y nunca lo abandonan</string>
     <string name="nearby_title">Cerca</string>
     <string name="nearby_empty">Los dispositivos cercanos aparecerán aquí</string>
-    <string name="nearby_no_devices">Ningún dispositivo en rango</string>
-    <string name="nearby_one_device">1 dispositivo en rango</string>
-    <string name="nearby_n_devices">%d dispositivos en rango</string>
     <string name="nearby_status_connected">Conectado · LAN</string>
     <string name="nearby_status_stranger">Desconocido · Cerca</string>
     <string name="network_title">Mi Red</string>

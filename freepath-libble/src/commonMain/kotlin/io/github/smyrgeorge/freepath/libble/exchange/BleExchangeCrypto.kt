@@ -17,12 +17,15 @@ internal object BleExchangeCrypto {
     private val INFO_PIN = "freepath-ble-v2-pin".encodeToByteArray()
     private val INFO_PIN_CONFIRM_I = "freepath-ble-v2-pin-I".encodeToByteArray()
     private val INFO_PIN_CONFIRM_R = "freepath-ble-v2-pin-R".encodeToByteArray()
+    private val INFO_IDENTITY_SECRET = "freepath-ble-v2-identity".encodeToByteArray()
 
     class SessionKeys(
         val sessionKey: ByteArray,
         val sessionId: ByteArray,
         val pinConfirmI: ByteArray,
         val pinConfirmR: ByteArray,
+        /** Persistent shared secret for rotating BLE identity tokens. Both sides derive the same value. */
+        val identitySecret: ByteArray,
     )
 
     /**
@@ -46,7 +49,10 @@ internal object BleExchangeCrypto {
         val pinKey = CryptoProvider.hkdfSha256(sessionKey, pin.encodeToByteArray(), INFO_PIN, 32)
         val pinConfirmI = CryptoProvider.hkdfSha256(pinKey, sessionId, INFO_PIN_CONFIRM_I, 32)
         val pinConfirmR = CryptoProvider.hkdfSha256(pinKey, sessionId, INFO_PIN_CONFIRM_R, 32)
-        return SessionKeys(sessionKey, sessionId, pinConfirmI, pinConfirmR)
+        // Derive a persistent identity secret (independent of PIN) for rotating BLE advertisement tokens.
+        // Both sides derive the same value from the same ephemeral DH shared secret.
+        val identitySecret = CryptoProvider.hkdfSha256(sharedSecret, iEphPub + rEphPub, INFO_IDENTITY_SECRET, 32)
+        return SessionKeys(sessionKey, sessionId, pinConfirmI, pinConfirmR, identitySecret)
     }
 
     /** Returns `nonce (12 bytes) || ciphertext+tag` for [contact]. */

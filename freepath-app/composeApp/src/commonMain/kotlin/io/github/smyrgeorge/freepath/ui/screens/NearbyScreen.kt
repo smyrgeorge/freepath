@@ -44,9 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.smyrgeorge.composeapp.generated.resources.Res
-import io.github.smyrgeorge.composeapp.generated.resources.nearby_n_devices
-import io.github.smyrgeorge.composeapp.generated.resources.nearby_no_devices
-import io.github.smyrgeorge.composeapp.generated.resources.nearby_one_device
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
@@ -94,7 +91,6 @@ fun NearbyScreen(
         .filterKeys { it !in bleMetrics.identifiedPeripherals }
         .values.toList()
 
-    val totalNearby = identifiedContacts.size + unidentifiedLanPeers.size + unidentifiedBlePeripherals.size
     val scope = rememberCoroutineScope()
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -141,19 +137,18 @@ fun NearbyScreen(
             )
         }
 
-        Text(
-            text = when (totalNearby) {
-                0 -> stringResource(Res.string.nearby_no_devices)
-                1 -> stringResource(Res.string.nearby_one_device)
-                else -> stringResource(Res.string.nearby_n_devices, totalNearby)
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        )
+        val ownTokenHex = bleMetrics.advertisedTokenHex
+        if (ownTokenHex != null) {
+            Text(
+                text = "You appear as #${ownTokenHex.abbrev()}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -431,7 +426,15 @@ private fun LanUnknownPeerCard(peerId: String) {
 @Composable
 private fun BlePeerCard(peer: LibbleEvent.PeripheralDiscovered) {
     val scope = rememberCoroutineScope()
-    val displayName = peer.peripheralName ?: peer.name ?: (peer.peripheralId.take(8) + "…")
+    // Use the identity token as the display suffix — it's the same on all platforms
+    // since it's derived from the advertiser's shared secret.
+    // Falls back to the OS-assigned peripheralId if no token is available (pre-exchange devices).
+    val tokenHex = peer.identityTokenHex
+    val displayName = if (tokenHex != null) {
+        "#${tokenHex.abbrev()}"
+    } else {
+        "#${peer.peripheralId.replace(":", "").replace("-", "").abbrev().lowercase()}"
+    }
 
     Box(
         modifier = Modifier
@@ -461,20 +464,30 @@ private fun BlePeerCard(peer: LibbleEvent.PeripheralDiscovered) {
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
             }
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = displayName,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Text(
-                    text = "${peer.rssi} dBm",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = BluetoothIcon,
+                        contentDescription = "BLE",
+                        modifier = Modifier.size(12.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "${peer.rssi} dBm",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            Spacer(modifier = Modifier.weight(1f))
             FreepathButton(
                 onClick = {
                     scope.launch {
@@ -492,15 +505,6 @@ private fun BlePeerCard(peer: LibbleEvent.PeripheralDiscovered) {
                 )
             }
         }
-        Icon(
-            imageVector = BluetoothIcon,
-            contentDescription = "BLE",
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 7.dp, end = 10.dp)
-                .size(15.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

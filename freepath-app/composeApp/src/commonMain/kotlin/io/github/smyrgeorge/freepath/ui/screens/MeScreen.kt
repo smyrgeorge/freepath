@@ -292,10 +292,15 @@ private fun LibbleMetricsPanel(metrics: LibbleMetricsSnapshot) {
         )
         FreepathDivider()
         MetricRow(
+            label = "Appears as",
+            value = metrics.advertisedTokenHex?.let { "#${it.abbrev()}" } ?: none,
+        )
+        MetricRow(
             label = stringResource(Res.string.dev_libble_discovered_peripherals),
             value = metrics.discoveredPeripherals.takeIf { it.isNotEmpty() }
                 ?.values?.joinToString("\n") { p ->
-                    val label = p.peripheralName ?: p.name ?: p.peripheralId.abbrev()
+                    val friendlyName = p.name?.takeUnless { it.startsWith("fp:") }
+                    val label = p.peripheralName ?: friendlyName ?: p.peripheralId.abbrev()
                     val tx = p.txPower?.let { " | $txPowerLabel: ${it}dBm" } ?: ""
                     val connectable = p.isConnectable?.let { " | $connectableLabel: $it" } ?: ""
                     "$label ${p.peripheralId.abbrev()} (rssi: ${p.rssi}dBm$tx$connectable)"

@@ -20,7 +20,9 @@ data class ContactRoutingEntry(
     val peerId: String,
     /** BLE peripheral ID assigned by the OS (stable UUID per app on iOS; randomized MAC on Android — may change on restart). Stored as TEXT. */
     val blePeripheralId: String? = null,
-    /** When the BLE route was last confirmed (i.e. last successful exchange). */
+    /** When the BLE route was last confirmed (i.e. last successful exchange or token match). */
     @Converter(InstantConverter::class)
     val bleUpdatedAt: Instant? = null,
+    /** Shared secret derived during BLE contact exchange, used for rotating identity token computation. Base64-encoded 32 bytes. */
+    val bleIdentitySecret: String? = null,
 ) : Auditable<Int>

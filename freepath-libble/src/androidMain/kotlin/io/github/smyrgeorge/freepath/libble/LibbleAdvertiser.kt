@@ -32,13 +32,16 @@ actual class LibbleAdvertiser actual constructor() {
 
         override fun onStartFailure(errorCode: Int) {
             log.error("BleAdvertiser start failed: errorCode=$errorCode")
+            advertising.store(false)
         }
     }
 
-    actual suspend fun start(bleBeaconId: ByteArray) {
+    actual suspend fun start(psm: Int, identityToken: ByteArray?) {
         if (!advertising.compareAndSet(expectedValue = false, newValue = true)) return
 
         withContext(Dispatchers.IO) {
+            log.info("BleAdvertiser starting (psm=$psm, token=${identityToken != null})")
+
             val ctx = requireNotNull(AndroidContextHolder.applicationContext) {
                 "BleAdvertiser: AndroidContextHolder.applicationContext must be set before start()"
             }
@@ -46,7 +49,7 @@ actual class LibbleAdvertiser actual constructor() {
             val bt = ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
             val leAdvertiser = bt.adapter?.bluetoothLeAdvertiser
             if (leAdvertiser == null) {
-                log.warn("BleAdvertiser: BluetoothLeAdvertiser not available (BLE advertising unsupported?)")
+                log.warn("BleAdvertiser: BluetoothLeAdvertiser not available")
                 advertising.store(false)
                 return@withContext
             }
@@ -54,10 +57,22 @@ actual class LibbleAdvertiser actual constructor() {
 
             val settings = AdvertiseSettings.Builder().build()
             val serviceUuid = ParcelUuid(UUID.fromString(FREEPATH_SERVICE_UUID.toString()))
-            val data = AdvertiseData.Builder()
+            // The 128-bit service UUID + service data together exceed the 31-byte legacy BLE
+            // advertisement limit. Split them: service UUID in the advertisement (required for
+            // Kable scanner filter), PSM service data in the scan response (also 31 bytes max,
+            // received by scanning centrals and merged into ScanRecord by Android).
+            val advertiseData = AdvertiseData.Builder()
                 .addServiceUuid(serviceUuid)
+                .setIncludeDeviceName(false)
                 .build()
-            leAdvertiser.startAdvertising(settings, data, callback)
+            // Service data: [PSM 2 bytes LE] [identity token 8 bytes (optional)]
+            val psmBytes = byteArrayOf((psm and 0xFF).toByte(), ((psm shr 8) and 0xFF).toByte())
+            val serviceDataBytes = if (identityToken != null) psmBytes + identityToken else psmBytes
+            val scanResponse = AdvertiseData.Builder()
+                .addServiceData(serviceUuid, serviceDataBytes)
+                .setIncludeDeviceName(false)
+                .build()
+            leAdvertiser.startAdvertising(settings, advertiseData, scanResponse, callback)
         }
     }
 

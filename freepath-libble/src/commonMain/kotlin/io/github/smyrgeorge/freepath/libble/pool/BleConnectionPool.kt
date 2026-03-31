@@ -1,88 +1,70 @@
 package io.github.smyrgeorge.freepath.libble.pool
 
-import com.juul.kable.Advertisement
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
-import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPool.Companion.IDLE_TIMEOUT
-import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPool.Companion.KEEPALIVE_INTERVAL
-import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPool.Companion.MAX_RECONNECT_ATTEMPTS
 import io.github.smyrgeorge.freepath.util.rpc.RpcManager
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
-/**
- * Manages persistent BLE connections for peripherals involved in active data exchanges.
- *
- * A peripheral enters the pool the first time [withConnection] is called for it.
- * A keepalive coroutine (one per entry) pings the connection every [KEEPALIVE_INTERVAL].
- * If idle for [IDLE_TIMEOUT] the entry is evicted silently.
- * On ping failure the pool retries up to [MAX_RECONNECT_ATTEMPTS] times with exponential
- * backoff before evicting silently.
- *
- * All events (PeripheralDiscovered, PeripheralExpired) remain owned by the scanner in
- * LibbleModule. Pool eviction emits no events.
- *
- * Concurrent [withConnection] calls for the same peripheral are serialized via a per-entry
- * [Mutex]. Callers for different peripherals run concurrently.
- *
- * TODO: [withConnection] currently exposes the full [BleConnection] (including lifecycle
- * methods connect/disconnect/ping). Consider a narrower BleChannel interface (data ops only)
- * for the block parameter in the future.
- */
 internal class BleConnectionPool(
     private val scope: CoroutineScope,
     private val rpc: RpcManager<LibbleEvent.Response>,
-    private val advertisementLookup: suspend (peripheralId: String) -> Advertisement?,
+    private val psmLookup: suspend (peripheralId: String) -> Int?,
+    private val onRequestReceived: suspend (peripheralId: String, reqId: Long, payload: ByteArray, senderPeerId: String) -> Unit,
+    private val onPeerRemoved: suspend (peerId: String) -> Unit,
 ) {
     private val log = Logger.of(this::class)
-
     private val mutex = Mutex()
     private val entries = mutableMapOf<String, PoolEntry>()
 
     private class PoolEntry(
-        var connection: BleConnection,
-        val advertisement: Advertisement,
-        var lastDataAt: Instant = Instant.DISTANT_PAST,
+        val channel: BleL2capChannel,
+        val exchangeFrames: Channel<ByteArray> = Channel(Channel.BUFFERED),
+        val pongChannel: Channel<Unit> = Channel(Channel.BUFFERED),
         var keepaliveJob: Job? = null,
-        var responseCollectorJob: Job? = null,
+        var receiveLoopJob: Job? = null,
+        /** The peerId of the remote peer, set when the first REQUEST frame identifies the sender. */
+        var peerId: String? = null,
     ) {
-        private val mutex: Mutex = Mutex()
-        suspend inline fun <T> withLock(block: suspend () -> T): T = mutex.withLock { block() }
+        private val entryMutex: Mutex = Mutex()
+        suspend inline fun <T> withLock(block: suspend () -> T): T = entryMutex.withLock { block() }
     }
 
-    /**
-     * Execute [block] with a live connection to [peripheralId].
-     *
-     * If the peripheral is not yet in the pool, resolves its Advertisement via
-     * [advertisementLookup], creates a BleConnection, connects, and starts the
-     * keepalive coroutine — all before running [block].
-     *
-     * Acquires a per-entry [Mutex] for the duration of [block] so concurrent callers for
-     * the same peripheral are serialized. Callers for different peripherals run concurrently.
-     *
-     * Throws [IllegalStateException] if the peripheral is unknown or was evicted while
-     * waiting for the mutex.
-     */
-    suspend fun <T> withConnection(peripheralId: String, block: suspend (BleConnection) -> T): T {
+    suspend fun <T> withConnection(
+        peripheralId: String,
+        block: suspend (channel: BleL2capChannel, exchangeFrames: Channel<ByteArray>) -> T,
+    ): T {
         val entry = getOrCreate(peripheralId)
         return entry.withLock {
-            // Re-check: the entry may have been evicted while we waited for the mutex.
-            check(mutex.withLock { entries[peripheralId] } != null) {
+            check(mutex.withLock { entries[peripheralId] === entry }) {
                 "Peripheral $peripheralId evicted from pool"
             }
-            val result = block(entry.connection)
-            mutex.withLock { entries[peripheralId]?.lastDataAt = Clock.System.now() }
-            result
+            block(entry.channel, entry.exchangeFrames)
         }
+    }
+
+    suspend fun registerInbound(channel: BleL2capChannel): Channel<ByteArray> {
+        val peripheralId = channel.peripheralId
+        val entry = PoolEntry(channel = channel)
+        val winner = mutex.withLock { entries.getOrPut(peripheralId) { entry } }
+        if (winner !== entry) {
+            withContext(NonCancellable) { runCatching { channel.close() } }
+            return winner.exchangeFrames
+        }
+        startLoops(peripheralId, winner, channel)
+        log.debug("Pool: enrolled $peripheralId (inbound)")
+        return winner.exchangeFrames
     }
 
     /** Close all pool entries. Called from LibbleModule.stop(). */
@@ -91,144 +73,167 @@ internal class BleConnectionPool(
     }
 
     /**
-     * Remove a peripheral from the pool: cancel its keepalive and response-collector coroutines,
-     * then disconnect. Idempotent — safe to call if the peripheral is not in the pool.
-     * Called by LibbleModule when an advertisement expires or [close] is called.
+     * Remove a peripheral from the pool: cancel its jobs and close the channel.
+     * Idempotent. Does NOT acquire entryMutex — safe to call from keepaliveLoop.
      */
     suspend fun remove(peripheralId: String) {
         val entry = mutex.withLock { entries.remove(peripheralId) } ?: return
         entry.keepaliveJob?.cancel()
-        entry.responseCollectorJob?.cancel()
-        withContext(NonCancellable) { runCatching { entry.connection.disconnect() } }
-        log.debug("Pool: removed $peripheralId")
+        entry.receiveLoopJob?.cancel()
+        withContext(NonCancellable) { runCatching { entry.channel.close() } }
+        log.debug("Pool: removed $peripheralId (peerId=${entry.peerId})")
+        entry.peerId?.let { onPeerRemoved(it) }
     }
 
     /**
-     * Return an existing pool entry, or create one if none exists.
-     *
-     * The BLE connect() call happens outside [mutex] to avoid blocking the map
-     * for the duration of a slow BLE operation. A double-check with getOrPut handles
-     * the rare race where two coroutines both reach this point for the same peripheral:
-     * the winner's entry is kept and the loser's connection is immediately disconnected.
+     * Find the peripheralId of an existing pool entry associated with [peerId].
+     * This allows reusing an inbound channel instead of opening a second connection
+     * (critical on iOS where CBCentral.identifier ≠ CBPeripheral.identifier).
      */
+    suspend fun findEntryForPeer(peerId: String): String? =
+        mutex.withLock { entries.entries.firstOrNull { it.value.peerId == peerId }?.key }
+
+    /** Tag a pool entry with the remote peer's [peerId] for bidirectional channel reuse. */
+    suspend fun setPeerIdForEntry(peripheralId: String, peerId: String) {
+        mutex.withLock { entries[peripheralId]?.peerId = peerId }
+    }
+
     private suspend fun getOrCreate(peripheralId: String): PoolEntry {
         mutex.withLock { entries[peripheralId] }?.let { return it }
 
-        val advertisement = advertisementLookup(peripheralId)
-            ?: error("Unknown peripheral: $peripheralId — not in discovery cache")
-
-        val conn = BleConnection.of(advertisement)
-        try {
-            conn.connect()
-        } catch (e: Exception) {
-            withContext(NonCancellable) { runCatching { conn.disconnect() } }
-            throw e
+        // On iOS the PSM arrives via advertisement local name which may not appear on every
+        // advertisement delivery for a cached peripheral. Retry for up to PSM_WAIT_TIMEOUT.
+        var psm: Int? = null
+        val deadline = Clock.System.now() + PSM_WAIT_TIMEOUT
+        while (psm == null && Clock.System.now() < deadline) {
+            psm = psmLookup(peripheralId)
+            if (psm == null) {
+                log.info("Pool: PSM not yet available for $peripheralId, retrying…")
+                delay(PSM_RETRY_INTERVAL)
+            }
         }
-        val newEntry = PoolEntry(connection = conn, advertisement = advertisement)
+        psm ?: error("Unknown peripheral: $peripheralId — PSM not available after $PSM_WAIT_TIMEOUT")
+        log.info("Pool: resolved PSM=$psm for $peripheralId, connecting L2CAP")
+        val channel = BleL2capChannel.connect(peripheralId, psm)
+        val entry = PoolEntry(channel = channel)
 
-        // Insert under lock. If another coroutine beat us, discard our connection.
-        val winner = mutex.withLock { entries.getOrPut(peripheralId) { newEntry } }
-        if (winner !== newEntry) {
-            withContext(NonCancellable) { runCatching { conn.disconnect() } }
+        val winner = mutex.withLock { entries.getOrPut(peripheralId) { entry } }
+        if (winner !== entry) {
+            withContext(NonCancellable) { runCatching { channel.close() } }
             return winner
         }
-
-        newEntry.keepaliveJob = scope.launch { keepaliveLoop(peripheralId) }
-        newEntry.responseCollectorJob = scope.launch { collect(peripheralId, conn) }
-        log.debug("Pool: enrolled $peripheralId")
-        return newEntry
+        startLoops(peripheralId, winner, channel)
+        log.debug("Pool: enrolled $peripheralId (outbound)")
+        return winner
     }
 
-    /**
-     * Keepalive loop for a single pool entry.
-     *
-     * Runs until either:
-     * - The entry is removed externally (remove() cancels keepaliveJob).
-     * - The entry is idle for [IDLE_TIMEOUT] (silent eviction).
-     * - Reconnect attempts are exhausted (silent eviction).
-     *
-     * Holds PoolEntry.mutex while pinging and reconnecting so [withConnection] callers
-     * for the same peripheral suspend during reconnect rather than racing on a broken connection.
-     *
-     * Map removal happens inside PoolEntry.mutex so that any [withConnection] caller
-     * that was waiting on the mutex will see the entry is gone after acquiring the lock.
-     */
+    private fun startLoops(peripheralId: String, entry: PoolEntry, channel: BleL2capChannel) {
+        entry.receiveLoopJob = scope.launch { receiveLoop(peripheralId, channel) }
+        entry.keepaliveJob = scope.launch { keepaliveLoop(peripheralId) }
+    }
+
+    private suspend fun receiveLoop(peripheralId: String, channel: BleL2capChannel) {
+        log.debug("Pool: receiveLoop started for $peripheralId")
+        runCatching {
+            channel.incoming.collect { frame ->
+                val entry = mutex.withLock { entries[peripheralId] } ?: return@collect
+                when (frame.type) {
+                    BleFrameType.PING -> runCatching { channel.send(BleFrameType.PONG, byteArrayOf()) }
+                    BleFrameType.PONG -> entry.pongChannel.trySend(Unit)
+                    BleFrameType.EXCHANGE -> entry.exchangeFrames.trySend(frame.payload)
+                    BleFrameType.REQUEST -> routeRequest(peripheralId, frame.payload)
+                    BleFrameType.RESPONSE -> routeResponse(peripheralId, frame.payload)
+                }
+            }
+        }.onFailure { e ->
+            log.debug("Pool: receiveLoop ended for $peripheralId: ${e.message}")
+        }
+        // Channel dead (EOF/error/remote disconnected) — evict immediately.
+        log.info("Pool: receiveLoop completed for $peripheralId — evicting")
+        remove(peripheralId)
+    }
+
+    /** Parse 8-byte LE reqId from the start of a payload. Returns null if too short. */
+    private fun parseReqId(payload: ByteArray): Long? {
+        if (payload.size < 8) return null
+        return (0 until 8).fold(0L) { acc, i -> acc or ((payload[i].toLong() and 0xFF) shl (i * 8)) }
+    }
+
+    private suspend fun routeRequest(peripheralId: String, payload: ByteArray) {
+        // Frame: [8-byte LE reqId] [1-byte peerIdLen] [peerId bytes] [body]
+        val reqId = parseReqId(payload) ?: run {
+            log.warn("Pool: REQUEST from $peripheralId too short to parse reqId (${payload.size} bytes)")
+            return
+        }
+        if (payload.size < 9) return
+        val peerIdLen = payload[8].toInt() and 0xFF
+        if (payload.size < 9 + peerIdLen) return
+        val senderPeerId = payload.copyOfRange(9, 9 + peerIdLen).decodeToString()
+        val body = payload.copyOfRange(9 + peerIdLen, payload.size)
+        // Tag the pool entry with the sender's peerId so that future outbound requests
+        // to this peer can reuse the same channel (avoids opening a second BLE connection).
+        mutex.withLock { entries[peripheralId]?.peerId = senderPeerId }
+        log.debug("Pool: REQUEST received from $peripheralId (peerId=$senderPeerId, reqId=$reqId, ${body.size} bytes)")
+        onRequestReceived(peripheralId, reqId, body, senderPeerId)
+    }
+
+    private fun routeResponse(peripheralId: String, payload: ByteArray) {
+        // Frame: [8-byte LE reqId] [1-byte status] [body or error]
+        val reqId = parseReqId(payload) ?: run {
+            log.warn("Pool: RESPONSE from $peripheralId too short to parse reqId (${payload.size} bytes)")
+            return
+        }
+        if (payload.size < 9) return
+        val status = payload[8]
+        val body = payload.copyOfRange(9, payload.size)
+        val ok = status == 0x00.toByte()
+        log.debug("Pool: RESPONSE received from $peripheralId (reqId=$reqId, ok=$ok, ${body.size} bytes)")
+        val result = if (ok) LibbleEvent.ResponseReceived(reqId, peripheralId, body)
+        else LibbleEvent.RequestFailed(reqId, senderId = peripheralId, error = body.decodeToString())
+        scope.launch { rpc.response(reqId, result) }
+    }
+
     private suspend fun keepaliveLoop(peripheralId: String) {
         while (true) {
             delay(KEEPALIVE_INTERVAL)
             val entry = mutex.withLock { entries[peripheralId] } ?: return
 
-            var evict = false
-            entry.withLock {
-                val pingOk = runCatching { entry.connection.ping() }.isSuccess
-                if (pingOk) {
-                    if (Clock.System.now() - entry.lastDataAt > IDLE_TIMEOUT) {
-                        log.debug("Pool: idle timeout for $peripheralId")
-                        mutex.withLock { entries.remove(peripheralId) }
-                        evict = true
-                    }
-                } else {
-                    log.debug("Pool: ping failed for $peripheralId, reconnecting")
-                    withContext(NonCancellable) { runCatching { entry.connection.disconnect() } }
-                    var reconnected = false
-                    for (attempt in 0 until MAX_RECONNECT_ATTEMPTS) {
-                        delay(RECONNECT_BACKOFF_BASE * (1 shl attempt))
-                        val newConn = BleConnection.of(entry.advertisement)
-                        if (runCatching { newConn.connect() }.isSuccess) {
-                            entry.connection = newConn
-                            entry.responseCollectorJob?.cancel()
-                            entry.responseCollectorJob = scope.launch { collect(peripheralId, newConn) }
-                            reconnected = true
-                            log.debug("Pool: reconnected $peripheralId (attempt ${attempt + 1})")
-                            break
-                        }
-                    }
-                    if (!reconnected) {
-                        log.debug("Pool: exhausted reconnect attempts for $peripheralId")
-                        mutex.withLock { entries.remove(peripheralId) }
-                        evict = true
-                    }
-                }
+            // Drain stale PONGs from a previous cycle.
+            while (entry.pongChannel.tryReceive().isSuccess) { /* discard */
             }
 
-            if (evict) {
-                entry.responseCollectorJob?.cancel()
-                withContext(NonCancellable) { runCatching { entry.connection.disconnect() } }
+            // Try sending PING — if write throws, socket is dead.
+            val pingSent = runCatching {
+                entry.channel.send(BleFrameType.PING, byteArrayOf())
+            }.isSuccess
+
+            if (!pingSent) {
+                log.info("Pool: ping write failed for $peripheralId — evicting")
+                remove(peripheralId)
+                return
+            }
+
+            // Wait for PONG.
+            val pongReceived = runCatching {
+                withTimeout(PONG_TIMEOUT) { entry.pongChannel.receive() }
+            }.isSuccess
+
+            if (!pongReceived) {
+                log.info("Pool: pong timeout for $peripheralId — evicting")
+                remove(peripheralId)
                 return
             }
         }
     }
 
-    private suspend fun collect(peripheralId: String, conn: BleConnection) {
-        fun decode(peripheralId: String, bytes: ByteArray) {
-            if (bytes.size < 9) return
-            val reqId = (0 until 8).fold(0L) { acc, i -> acc or ((bytes[i].toLong() and 0xFF) shl (i * 8)) }
-            val status = bytes[8]
-            val body = bytes.copyOfRange(9, bytes.size)
-
-            val result =
-                if (status == 0x00.toByte()) LibbleEvent.ResponseReceived(reqId, peripheralId, body)
-                else LibbleEvent.RequestFailed(reqId, senderId = peripheralId, error = body.decodeToString())
-
-            scope.launch { rpc.response(reqId, result) }
-        }
-
-        runCatching {
-            conn.observe().collect { bytes -> decode(peripheralId, bytes) }
-        }
-    }
-
     companion object {
-        /** Drop a pooled connection after this much idle time (no data exchange). */
-        private val IDLE_TIMEOUT = 30.seconds
-
-        /** Maximum number of reconnect attempts before evicting a peripheral. */
-        private const val MAX_RECONNECT_ATTEMPTS = 3
-
-        /** Base delay for exponential backoff: attempt 0 = 2s, 1 = 4s, 2 = 8s. */
-        private val RECONNECT_BACKOFF_BASE = 2.seconds
-
-        /** How often the keepalive coroutine pings a pooled connection. */
-        private val KEEPALIVE_INTERVAL = 5.seconds
+        // PING is 5 bytes on the wire (4-byte header + 1-byte type, empty payload).
+        // At 1 ping/second per connection this is negligible bandwidth, but may need
+        // increasing if battery drain becomes an issue with many simultaneous connections.
+        // Worst-case disconnect detection: KEEPALIVE_INTERVAL + PONG_TIMEOUT = 3 seconds.
+        private val KEEPALIVE_INTERVAL = 1.seconds
+        private val PONG_TIMEOUT = 2.seconds
+        private val PSM_WAIT_TIMEOUT = 10.seconds
+        private val PSM_RETRY_INTERVAL = 500.milliseconds
     }
 }

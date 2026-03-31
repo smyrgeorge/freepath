@@ -65,7 +65,7 @@ fun ChatScreen(
 ) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
-    val nearbyPeers by AppState.identifiedLanPeers.collectAsState()
+    val nearbyPeers by AppState.nearbyIdentifiedContacts.collectAsState()
     val chats by AppState.chats.collectAsState()
     val messages = chats[contact.peerId] ?: emptyList()
     val listState = rememberLazyListState()

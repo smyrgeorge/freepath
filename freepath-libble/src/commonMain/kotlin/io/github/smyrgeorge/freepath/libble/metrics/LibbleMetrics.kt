@@ -4,6 +4,7 @@ import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,8 +31,13 @@ class LibbleMetrics {
         channel.trySend(event)
     }
 
+    fun updateAdvertisedToken(tokenHex: String?) {
+        _state.value = _state.value.copy(advertisedTokenHex = tokenHex)
+    }
+
     fun close() {
         channel.close()
+        scope.cancel()
     }
 
     private fun reduce(s: LibbleMetricsSnapshot, event: LibbleEvent): LibbleMetricsSnapshot =

@@ -1,18 +1,18 @@
 package io.github.smyrgeorge.freepath.libble
 
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
+@OptIn(ExperimentalAtomicApi::class)
 actual class LibbleAdvertiser actual constructor() {
 
     private val advertising = AtomicBoolean(false)
 
-    actual suspend fun start(bleBeaconId: ByteArray) {
-        if (!advertising.compareAndSet(false, true)) return
-        // Intentionally left blank.
+    actual suspend fun start(psm: Int, identityToken: ByteArray?) {
+        if (!advertising.compareAndSet(expectedValue = false, newValue = true)) return
     }
 
     actual suspend fun stop() {
-        if (!advertising.compareAndSet(true, false)) return
-        // Intentionally left blank.
+        if (!advertising.compareAndSet(expectedValue = true, newValue = false)) return
     }
 }

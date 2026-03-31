@@ -4,9 +4,7 @@ import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository
-import io.github.smyrgeorge.freepath.database.ContactRoutingEntry
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
@@ -29,8 +27,6 @@ import io.github.smyrgeorge.log4k.impl.extensions.launch
 import io.github.smyrgeorge.sqlx4k.ConnectionPool
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.delay
-import kotlin.io.encoding.Base64
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 abstract class AbstractAppResources(
@@ -127,29 +123,26 @@ abstract class AbstractAppResources(
     suspend fun startLibble() {
         if (!LIBBLE_ENABLED) return
         libble.start(
-            bleBeaconId = bleBeaconId(identity.peerIdRaw),
+            localPeerId = identity.peerId,
             peripheralIdLookup = {
                 contactRoutingRepository.findOneByPeerId(db, it)
                     .getOrNull()?.blePeripheralId
             },
-            peerIdLookup = {
-                contactRoutingRepository.findOneByBlePeripheralId(db, it)
-                    .getOrNull()?.peerId
+            contactSecretsLookup = {
+                contactRoutingRepository.findAllByIdentitySecretNotNull(db)
+                    .getOrDefault(emptyList())
+                    .mapNotNull { entry ->
+                        entry.bleIdentitySecret?.let { b64 ->
+                            runCatching { entry.peerId to kotlin.io.encoding.Base64.decode(b64) }.getOrNull()
+                        }
+                    }.toMap()
             },
-            peerIdByRawBytesLookup = { beaconId ->
-                contactRepository.findAll(db).getOrNull()
-                    ?.firstOrNull { entry ->
-                        val sigKey = Base64.decode(entry.contact.sigKey)
-                        val contactPeerIdRaw = CryptoProvider.sha256(sigKey)
-                        bleBeaconId(contactPeerIdRaw).contentEquals(beaconId)
-                    }?.peerId
-            },
-            onNewPeripheralId = { peerId, peripheralId ->
-                val now = Clock.System.now()
+            onPeripheralIdentified = { peerId, peripheralId ->
+                val now = kotlin.time.Clock.System.now()
                 val existing = contactRoutingRepository.findOneByPeerId(db, peerId).getOrNull()
-                val entry = existing?.copy(blePeripheralId = peripheralId, bleUpdatedAt = now)
-                    ?: ContactRoutingEntry(peerId = peerId, blePeripheralId = peripheralId, bleUpdatedAt = now)
-                contactRoutingRepository.save(db, entry).getOrThrow()
+                if (existing != null && existing.blePeripheralId != peripheralId) {
+                    contactRoutingRepository.save(db, existing.copy(blePeripheralId = peripheralId, bleUpdatedAt = now))
+                }
             },
         )
     }
@@ -162,10 +155,6 @@ abstract class AbstractAppResources(
     fun startLibnet() {
         libnet.start(
             peerId = identity.peerId,
-            peerIdLookup = {
-                contactRoutingRepository.findOneByBlePeripheralId(db, it)
-                    .getOrNull()?.peerId
-            },
         )
         client = LibnetClient(
             identity = identity,
@@ -192,14 +181,6 @@ abstract class AbstractAppResources(
     }
 
     companion object {
-        internal const val LIBBLE_ENABLED = false
-        private val BLE_BEACON_DOMAIN = "freepath-ble-beacon".encodeToByteArray()
-
-        /**
-         * Derives a stable, purpose-specific 8-byte BLE beacon identifier from peerIdRaw.
-         * SHA-256(peerIdRaw ∥ "freepath-ble-beacon")[:8] — opaque and independent from peerId.
-         */
-        private fun bleBeaconId(peerIdRaw: ByteArray): ByteArray =
-            CryptoProvider.sha256(peerIdRaw + BLE_BEACON_DOMAIN).copyOfRange(0, 8)
+        internal const val LIBBLE_ENABLED = true
     }
 }

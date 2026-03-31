@@ -2,6 +2,7 @@ package io.github.smyrgeorge.freepath.libnet
 
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.LibbleModule
+import io.github.smyrgeorge.freepath.libnet.LibnetModule.Companion.PREFER_BLE
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
 import io.github.smyrgeorge.log4k.Logger
@@ -39,7 +40,6 @@ class LibnetModule(
 
     fun start(
         peerId: String,
-        peerIdLookup: suspend (peripheralId: String) -> String?,
     ) {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
         scope.launch {
@@ -56,11 +56,12 @@ class LibnetModule(
         }
         scope.launch {
             libble.requests.consumeAsFlow().collect { req ->
-                val senderId = peerIdLookup(req.senderId) ?: return@collect
+                // req.senderId is already the sender's peerId (embedded in the REQUEST frame header),
+                // not an OS-level peripheralId — no lookup needed.
                 pendingMutex.withLock {
                     pendingRequests[req.reqId] = Transport.LIBBLE
                     _requests.trySend(
-                        NetRequest(senderId, peerId, req.reqId, req.payload, Transport.LIBBLE)
+                        NetRequest(req.senderId, peerId, req.reqId, req.payload, Transport.LIBBLE)
                     ).onFailure {
                         log.error { "Failed to send message to requests channel: $it" }
                     }
@@ -76,19 +77,33 @@ class LibnetModule(
 
     /**
      * Routes an outgoing request to the best available transport.
-     * LAN is preferred; BLE is used if the peer is not currently reachable via LAN.
+     * By default LAN (libp2p) is preferred; set [PREFER_BLE] to true to prioritize BLE.
+     * Fails fast if the peer is not reachable on any transport.
      */
     suspend fun request(peerId: String, payload: ByteArray): Result<ByteArray> = runCatching {
-        val snapshot = libp2p.metrics.value.value
-        if (peerId in snapshot.identifiedPeers) {
-            when (val r = libp2p.request(REQUEST_TIMEOUT, peerId, payload)) {
-                is Libp2pEvent.ResponseReceived -> r.payload
-                is Libp2pEvent.RequestFailed -> error(r.error)
+        val onLan = peerId in libp2p.metrics.value.value.identifiedPeers
+        val onBle = peerId in libble.metrics.value.value.identifiedPeers
+        val useBle = if (PREFER_BLE) onBle || !onLan else !onLan && onBle
+
+        when {
+            useBle && onBle -> {
+                log.debug("request: routing to BLE for peerId=$peerId")
+                when (val r = libble.request(REQUEST_TIMEOUT, peerId, payload)) {
+                    is LibbleEvent.ResponseReceived -> r.payload
+                    is LibbleEvent.RequestFailed -> error(r.error)
+                }
             }
-        } else {
-            when (val r = libble.request(REQUEST_TIMEOUT, peerId, payload)) {
-                is LibbleEvent.ResponseReceived -> r.payload
-                is LibbleEvent.RequestFailed -> error(r.error)
+
+            onLan -> {
+                log.debug("request: routing to LAN for peerId=$peerId")
+                when (val r = libp2p.request(REQUEST_TIMEOUT, peerId, payload)) {
+                    is Libp2pEvent.ResponseReceived -> r.payload
+                    is Libp2pEvent.RequestFailed -> error(r.error)
+                }
+            }
+
+            else -> {
+                error("Peer $peerId is not reachable on any transport (LAN or BLE)")
             }
         }
     }
@@ -102,6 +117,7 @@ class LibnetModule(
             log.warn("sendResponse: unknown reqId=$reqId — already responded or timed out")
             return
         }
+        log.debug("sendResponse: reqId=$reqId via $transport (${payload.size} bytes)")
         when (transport) {
             Transport.LIBP2P -> libp2p.sendResponse(reqId, payload)
             Transport.LIBBLE -> libble.sendResponse(reqId, payload)
@@ -117,6 +133,7 @@ class LibnetModule(
             log.warn("sendResponseFailed: unknown reqId=$reqId — already responded or timed out")
             return
         }
+        log.debug("sendResponseFailed: reqId=$reqId via $transport error=$error")
         when (transport) {
             Transport.LIBP2P -> libp2p.sendResponseFailed(reqId, error)
             Transport.LIBBLE -> libble.sendResponseFailed(reqId, error)
@@ -125,5 +142,8 @@ class LibnetModule(
 
     companion object {
         private val REQUEST_TIMEOUT = 30.seconds
+
+        /** Set to true to prefer BLE over LAN for outbound requests. For debugging only. */
+        private const val PREFER_BLE = false
     }
 }

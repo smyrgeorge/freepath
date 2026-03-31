@@ -18,9 +18,6 @@
     <string name="security_note">Your keys are stored only on this device and never leave it</string>
     <string name="nearby_title">Nearby</string>
     <string name="nearby_empty">Nearby devices will appear here</string>
-    <string name="nearby_no_devices">No devices within range</string>
-    <string name="nearby_one_device">1 device within range</string>
-    <string name="nearby_n_devices">%d devices within range</string>
     <string name="nearby_status_connected">Connected · LAN</string>
     <string name="nearby_status_stranger">Stranger · Nearby</string>
     <string name="network_title">My Network</string>

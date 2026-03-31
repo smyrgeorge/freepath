@@ -30,7 +30,12 @@
       "Bash(./gradlew :freepath-libnet:help)",
       "Bash(./gradlew :freepath-libnet:compileKotlinJvm 2>&1)",
       "Bash(./gradlew :freepath-libnet:build)",
-      "Bash(./gradlew :freepath-libnet:build :freepath-libble:build)"
+      "Bash(./gradlew :freepath-libnet:build :freepath-libble:build)",
+      "Bash(./gradlew :freepath-libble:tasks)",
+      "Bash(./gradlew :freepath-libble:tasks --all)",
+      "Bash(./gradlew :freepath-libble:compileAndroidMain)",
+      "Bash(./gradlew :freepath-libble:compileDebugKotlinAndroid)",
+      "Bash(./gradlew :freepath-libble:compileKotlinIosSimulatorArm64)"
     ]
   }
 }

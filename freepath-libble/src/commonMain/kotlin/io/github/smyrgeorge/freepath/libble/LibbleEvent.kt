@@ -12,6 +12,8 @@ sealed class LibbleEvent {
         val rssi: Int,
         val txPower: Int?,
         val isConnectable: Boolean?,
+        /** Hex-encoded identity token extracted from the advertisement (16 hex chars), or null. */
+        val identityTokenHex: String? = null,
     ) : LibbleEvent()
 
     data class PeripheralExpired(val peripheralId: String) : LibbleEvent()
@@ -35,7 +37,7 @@ sealed class LibbleEvent {
         data object PinConfirmed : ContactExchange()
 
         /** Exchange completed successfully. */
-        data class Completed(val contact: Contact) : ContactExchange()
+        class Completed(val contact: Contact, val identitySecret: ByteArray) : ContactExchange()
 
         /** Exchange failed or was aborted. */
         data class Failed(val reason: String) : ContactExchange()
