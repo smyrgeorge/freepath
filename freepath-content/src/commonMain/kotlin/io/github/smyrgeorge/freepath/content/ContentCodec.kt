@@ -37,23 +37,9 @@ object ContentCodec {
         authorId: String,
         sigKeyPrivate: ByteArray,
         expiresAt: Instant? = null,
-    ): Content = seal(
-        id = ContentBodyCodec.deriveId(body),
-        body = body,
-        authorId = authorId,
-        sigKeyPrivate = sigKeyPrivate,
-        expiresAt = expiresAt,
-    )
-
-    fun seal(
-        id: String,
-        body: ContentBody,
-        authorId: String,
-        sigKeyPrivate: ByteArray,
-        expiresAt: Instant? = null,
     ): Content {
         val placeholder = Content(
-            id = id,
+            id = ContentBodyCodec.deriveId(body),
             schema = SCHEMA,
             type = typeOf(body),
             authorId = authorId,

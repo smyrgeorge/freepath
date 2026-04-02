@@ -52,8 +52,10 @@ import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import io.github.smyrgeorge.composeapp.generated.resources.Res
 import io.github.smyrgeorge.composeapp.generated.resources.dev_delete_content
 import io.github.smyrgeorge.composeapp.generated.resources.dev_delete_content_subtitle
-import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_content
-import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_content_subtitle
+import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_contact_content
+import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_contact_content_subtitle
+import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_self_content
+import io.github.smyrgeorge.composeapp.generated.resources.dev_generate_self_content_subtitle
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_connectable
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_discovered_peripherals
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_identified_peers
@@ -177,7 +179,7 @@ private fun DeveloperSection() {
         Libp2pMetricsPanel(metrics = libp2pMetrics, selfPeerId = AppState.contact.peerId)
         LibbleMetricsPanel(metrics = libbleMetrics)
         FreepathButton(
-            onClick = { scope.launch { AppState.generateRandomContent() } },
+            onClick = { scope.launch { AppState.generateRandomSelfContent() } },
             modifier = Modifier.fillMaxWidth(),
             variant = ButtonVariant.Outline,
         ) {
@@ -186,13 +188,35 @@ private fun DeveloperSection() {
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = stringResource(Res.string.dev_generate_content),
+                    text = stringResource(Res.string.dev_generate_self_content),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = stringResource(Res.string.dev_generate_content_subtitle),
+                    text = stringResource(Res.string.dev_generate_self_content_subtitle),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        FreepathButton(
+            onClick = { scope.launch { AppState.generateRandomContactContent() } },
+            modifier = Modifier.fillMaxWidth(),
+            variant = ButtonVariant.Outline,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.dev_generate_contact_content),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(Res.string.dev_generate_contact_content_subtitle),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

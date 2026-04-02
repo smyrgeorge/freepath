@@ -15,13 +15,30 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 object RandomContentGenerator {
-    fun generateRandomContent(
-        contacts: List<ContactEntry>,
+    fun generateSelfContent(
         selfPeerId: String,
         selfSigKeyPrivate: ByteArray,
     ): List<ContentEntry> {
         val now = Clock.System.now().toEpochMilliseconds()
-        val contactEntries = contacts.flatMap { contact ->
+        return listOf(
+            randomArticleBody(),
+            randomImageBody(),
+        ).mapIndexed { i, body ->
+            val createdAt = now - ((i + 1) * 1_800_000L + Random.nextLong(0, 3_600_000L))
+            val envelope = ContentCodec.seal(
+                body = body,
+                authorId = selfPeerId,
+                sigKeyPrivate = selfSigKeyPrivate,
+            ).copy(createdAt = Instant.fromEpochMilliseconds(createdAt))
+            ContentEntry.from(envelope, trust = ContentTrust.VERIFIED)
+        }
+    }
+
+    fun generateContactContent(
+        contacts: List<ContactEntry>,
+    ): List<ContentEntry> {
+        val now = Clock.System.now().toEpochMilliseconds()
+        return contacts.flatMap { contact ->
             listOf(
                 ContentType.ARTICLE to randomArticleBody(),
                 ContentType.IMAGE to randomImageBody(),
@@ -39,21 +56,6 @@ object RandomContentGenerator {
                 ContentEntry.from(envelope)
             }
         }
-
-        val selfEntries = listOf(
-            randomArticleBody(),
-            randomImageBody(),
-        ).mapIndexed { i, body ->
-            val createdAt = now - ((i + 1) * 1_800_000L + Random.nextLong(0, 3_600_000L))
-            val envelope = ContentCodec.seal(
-                body = body,
-                authorId = selfPeerId,
-                sigKeyPrivate = selfSigKeyPrivate,
-            ).copy(createdAt = Instant.fromEpochMilliseconds(createdAt))
-            ContentEntry.from(envelope, trust = ContentTrust.VERIFIED)
-        }
-
-        return contactEntries + selfEntries
     }
 
     private fun randomArticleBody(): ContentBody.Article {

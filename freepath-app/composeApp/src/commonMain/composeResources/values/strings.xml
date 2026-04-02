@@ -44,8 +44,10 @@
     <string name="network_paste_link">Paste from clipboard</string>
     <string name="network_invalid_link">Invalid link — not a Freepath contact URL</string>
     <string name="dev_section_title">Developer</string>
-    <string name="dev_generate_content">Generate random content</string>
-    <string name="dev_generate_content_subtitle">Seed feed with articles and images from contacts</string>
+    <string name="dev_generate_self_content">Generate self content</string>
+    <string name="dev_generate_self_content_subtitle">Seed feed with your own articles and images</string>
+    <string name="dev_generate_contact_content">Generate contact content</string>
+    <string name="dev_generate_contact_content_subtitle">Seed feed with articles and images from contacts</string>
     <string name="dev_delete_content">Delete all content</string>
     <string name="dev_delete_content_subtitle">Clear all feed entries</string>
     <string name="dev_delete_content_confirm_title">Delete all content?</string>

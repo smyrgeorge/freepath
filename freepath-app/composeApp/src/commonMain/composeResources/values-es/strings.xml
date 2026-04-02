@@ -44,8 +44,10 @@
     <string name="network_paste_link">Pegar desde portapapeles</string>
     <string name="network_invalid_link">Enlace inválido — no es una URL de contacto Freepath</string>
     <string name="dev_section_title">Desarrollador</string>
-    <string name="dev_generate_content">Generar contenido aleatorio</string>
-    <string name="dev_generate_content_subtitle">Poblar el feed con artículos e imágenes de contactos</string>
+    <string name="dev_generate_self_content">Generar contenido propio</string>
+    <string name="dev_generate_self_content_subtitle">Poblar el feed con tus propios artículos e imágenes</string>
+    <string name="dev_generate_contact_content">Generar contenido de contactos</string>
+    <string name="dev_generate_contact_content_subtitle">Poblar el feed con artículos e imágenes de contactos</string>
     <string name="dev_delete_content">Eliminar todo el contenido</string>
     <string name="dev_delete_content_subtitle">Borrar todas las entradas del feed</string>
     <string name="dev_delete_content_confirm_title">¿Eliminar todo el contenido?</string>

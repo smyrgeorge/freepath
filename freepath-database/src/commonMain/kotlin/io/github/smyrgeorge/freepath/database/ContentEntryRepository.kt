@@ -10,6 +10,9 @@ interface ContentEntryRepository : AuditableRepository<ContentEntry> {
     @Query("SELECT * FROM content WHERE content_id = :contentId")
     suspend fun findOneByContentId(context: QueryExecutor, contentId: String): Result<ContentEntry?>
 
+    @Query("SELECT * FROM content WHERE author_id = :authorId AND type = 'CONTACT' ORDER BY id DESC LIMIT 1")
+    suspend fun findOneByAuthorIdAndTypeContact(context: QueryExecutor, authorId: String): Result<ContentEntry?>
+
     @Query("SELECT * FROM content WHERE type NOT IN ('CONTACT') ORDER BY id DESC LIMIT :limit OFFSET :offset")
     suspend fun findAllByLimitAndOffset(context: QueryExecutor, limit: Int, offset: Int): Result<List<ContentEntry>>
 

@@ -176,7 +176,6 @@ abstract class AbstractAppState(
             location = location?.takeIf { it.isNotBlank() },
         )
         val envelope = ContentCodec.seal(
-            id = peerId,
             body = body,
             authorId = peerId,
             sigKeyPrivate = identity.sigKeyPrivate,
@@ -229,18 +228,30 @@ abstract class AbstractAppState(
             log.error("[dev] Failed to delete content: $it")
         }.isSuccess
 
-    suspend fun generateRandomContent() {
+    suspend fun generateRandomSelfContent() {
         runCatching {
-            val entries = RandomContentGenerator.generateRandomContent(
-                contacts = _contacts.value,
+            val entries = RandomContentGenerator.generateSelfContent(
                 selfPeerId = identityEntry.peerId,
                 selfSigKeyPrivate = identity.sigKeyPrivate,
             )
             entries.forEach { contentEntryRepository.insert(db, it).getOrThrow() }
-            log.info("[dev] Random content generated: ${entries.size} entries.")
+            log.info("[dev] Random self content generated: ${entries.size} entries.")
             loadFeed()
         }.onFailure {
-            log.error("[dev] Failed to generate content: $it")
+            log.error("[dev] Failed to generate self content: $it")
+        }
+    }
+
+    suspend fun generateRandomContactContent() {
+        runCatching {
+            val entries = RandomContentGenerator.generateContactContent(
+                contacts = _contacts.value,
+            )
+            entries.forEach { contentEntryRepository.insert(db, it).getOrThrow() }
+            log.info("[dev] Random contact content generated: ${entries.size} entries.")
+            loadFeed()
+        }.onFailure {
+            log.error("[dev] Failed to generate contact content: $it")
         }
     }
 
@@ -288,7 +299,10 @@ abstract class AbstractAppState(
     }
 
     private suspend fun loadOwnContactContent() {
-        val entry = contentEntryRepository.findOneByContentId(db, identityEntry.peerId).getOrThrow() ?: return
+        val entry = contentEntryRepository
+            .findOneByAuthorIdAndTypeContact(db, identityEntry.peerId)
+            .getOrNull() ?: return
+
         val body = entry.content.body as? ContentBody.Contact ?: return
         contactContentBody = body
         contactContent = entry.content
