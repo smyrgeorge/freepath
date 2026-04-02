@@ -44,9 +44,9 @@ abstract class AbstractAppState(
     private val db: ISQLite by lazy { resources.db }
     private val identityRepository: IdentityEntryRepository = resources.identityRepository
     private val contactRepository: ContactEntryRepository = resources.contactRepository
-    private val contentEntryRepository: ContentEntryRepository = resources.contentEntryRepository
+    private val contentRepository: ContentEntryRepository = resources.contentRepository
     private val contentSyncRepository: ContentSyncEntryRepository = resources.contentSyncRepository
-    private val contactRoutingEntryRepository: ContactRoutingEntryRepository = resources.contactRoutingEntryRepository
+    private val contactRoutingRepository: ContactRoutingEntryRepository = resources.contactRoutingRepository
 
     private val _contacts = MutableStateFlow<List<ContactEntry>>(emptyList())
     val contacts: StateFlow<List<ContactEntry>> = _contacts.asStateFlow()
@@ -123,10 +123,10 @@ abstract class AbstractAppState(
             acceptContact(this, contact)
             val peerId = contact.peerId
             val now = Clock.System.now()
-            val existing = contactRoutingEntryRepository.findOneByPeerId(this, peerId).getOrNull()
+            val existing = contactRoutingRepository.findOneByPeerId(this, peerId).getOrNull()
             val entry = existing?.copy(blePeripheralId = peripheralId, bleUpdatedAt = now)
                 ?: ContactRoutingEntry(peerId = peerId, blePeripheralId = peripheralId, bleUpdatedAt = now)
-            contactRoutingEntryRepository.save(this, entry).getOrThrow()
+            contactRoutingRepository.save(this, entry).getOrThrow()
         }
     }
 
@@ -142,14 +142,14 @@ abstract class AbstractAppState(
         val list = contactRepository.findAll(db).getOrThrow().filter { it.peerId != ownPeerId }
         _contacts.value = list
         _contactContents.value = list.mapNotNull { entry ->
-            val body = contentEntryRepository.findOneByContentId(db, entry.peerId).getOrNull()
+            val body = contentRepository.findOneByContentId(db, entry.peerId).getOrNull()
                 ?.content?.body as? ContentBody.Contact ?: return@mapNotNull null
             entry.peerId to body
         }.toMap()
     }
 
     suspend fun loadFeed(limit: Int = 50) {
-        contentEntryRepository
+        contentRepository
             .findAllByLimitAndOffset(db, limit, 0)
             .onSuccess {
                 val feed = it.filter { c -> c.authorId != identityEntry.peerId }
@@ -181,7 +181,7 @@ abstract class AbstractAppState(
             sigKeyPrivate = identity.sigKeyPrivate,
         )
         val entry = ContentEntry.from(envelope, trust = ContentTrust.VERIFIED)
-        contactContentEntry = contentEntryRepository.insert(db, entry).getOrThrow()
+        contactContentEntry = contentRepository.insert(db, entry).getOrThrow()
         contactContent = envelope
         contactContentBody = body
     }
@@ -206,9 +206,9 @@ abstract class AbstractAppState(
             db.transaction {
                 contactRepository.deleteAll(this).getOrThrow()
                 identityRepository.deleteAll(this).getOrThrow()
-                contentEntryRepository.deleteAll(this).getOrThrow()
+                contentRepository.deleteAll(this).getOrThrow()
                 contentSyncRepository.deleteAll(this).getOrThrow()
-                contactRoutingEntryRepository.deleteAll(this).getOrThrow()
+                contactRoutingRepository.deleteAll(this).getOrThrow()
             }
         }.onSuccess {
             log.info("[dev] All data deleted.")
@@ -221,7 +221,7 @@ abstract class AbstractAppState(
 
     suspend fun deleteAllContent(): Boolean =
         runCatching {
-            contentEntryRepository.deleteAll(db).getOrThrow()
+            contentRepository.deleteAll(db).getOrThrow()
             _feedEntries.value = emptyList()
             log.info("[dev] All content deleted.")
         }.onFailure {
@@ -234,7 +234,7 @@ abstract class AbstractAppState(
                 selfPeerId = identityEntry.peerId,
                 selfSigKeyPrivate = identity.sigKeyPrivate,
             )
-            entries.forEach { contentEntryRepository.insert(db, it).getOrThrow() }
+            entries.forEach { contentRepository.insert(db, it).getOrThrow() }
             log.info("[dev] Random self content generated: ${entries.size} entries.")
             loadFeed()
         }.onFailure {
@@ -247,7 +247,7 @@ abstract class AbstractAppState(
             val entries = RandomContentGenerator.generateContactContent(
                 contacts = _contacts.value,
             )
-            entries.forEach { contentEntryRepository.insert(db, it).getOrThrow() }
+            entries.forEach { contentRepository.insert(db, it).getOrThrow() }
             log.info("[dev] Random contact content generated: ${entries.size} entries.")
             loadFeed()
         }.onFailure {
@@ -267,7 +267,7 @@ abstract class AbstractAppState(
         val updatedBody = contactContentBody.copy(avatar = avatar)
         val updatedEnvelope = contactContentEntry.content.copy(body = updatedBody)
         val updatedEntry = contactContentEntry.copy(content = updatedEnvelope)
-        contactContentEntry = contentEntryRepository.update(db, updatedEntry).getOrThrow()
+        contactContentEntry = contentRepository.update(db, updatedEntry).getOrThrow()
         contactContent = updatedEnvelope
         contactContentBody = updatedBody
     }
@@ -277,13 +277,13 @@ abstract class AbstractAppState(
         val isContact = content.type == ContentType.CONTACT
         val contentId = if (isContact) content.authorId else content.id
 
-        val existing = contentEntryRepository.findOneByContentId(db, contentId).getOrNull()
+        val existing = contentRepository.findOneByContentId(db, contentId).getOrNull()
         // For non-contact content, skip if we already have this version or newer.
         // For contact content, always accept — the peer is the authoritative source for their own profile.
         if (!isContact && existing != null && existing.version >= content.version) return
 
         ContentEntry.from(content, existing?.id ?: 0, content.trust()).also {
-            contentEntryRepository.save(db, it).getOrThrow()
+            contentRepository.save(db, it).getOrThrow()
         }
 
         if (isContact) loadContacts() else loadFeed()
@@ -299,7 +299,7 @@ abstract class AbstractAppState(
     }
 
     private suspend fun loadOwnContactContent() {
-        val entry = contentEntryRepository
+        val entry = contentRepository
             .findOneByAuthorIdAndTypeContact(db, identityEntry.peerId)
             .getOrNull() ?: return
 

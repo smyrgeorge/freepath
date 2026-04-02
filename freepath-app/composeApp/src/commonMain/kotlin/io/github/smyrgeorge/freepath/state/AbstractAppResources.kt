@@ -47,9 +47,9 @@ abstract class AbstractAppResources(
 
     val identityRepository: IdentityEntryRepository = IdentityEntryRepositoryImpl
     val contactRepository: ContactEntryRepository = ContactEntryRepositoryImpl
-    val contentEntryRepository: ContentEntryRepository = ContentEntryRepositoryImpl
+    val contentRepository: ContentEntryRepository = ContentEntryRepositoryImpl
     val contentSyncRepository: ContentSyncEntryRepository = ContentSyncEntryRepositoryImpl
-    val contactRoutingEntryRepository: ContactRoutingEntryRepository = ContactRoutingEntryRepositoryImpl
+    val contactRoutingRepository: ContactRoutingEntryRepository = ContactRoutingEntryRepositoryImpl
 
     val libp2p: Libp2pModule = Libp2pModule().setEventHandler { event ->
         log.info { "LIBP2P Event: $event" }
@@ -129,11 +129,11 @@ abstract class AbstractAppResources(
         libble.start(
             bleBeaconId = bleBeaconId(identity.peerIdRaw),
             peripheralIdLookup = {
-                contactRoutingEntryRepository.findOneByPeerId(db, it)
+                contactRoutingRepository.findOneByPeerId(db, it)
                     .getOrNull()?.blePeripheralId
             },
             peerIdLookup = {
-                contactRoutingEntryRepository.findOneByBlePeripheralId(db, it)
+                contactRoutingRepository.findOneByBlePeripheralId(db, it)
                     .getOrNull()?.peerId
             },
             peerIdByRawBytesLookup = { beaconId ->
@@ -146,10 +146,10 @@ abstract class AbstractAppResources(
             },
             onNewPeripheralId = { peerId, peripheralId ->
                 val now = Clock.System.now()
-                val existing = contactRoutingEntryRepository.findOneByPeerId(db, peerId).getOrNull()
+                val existing = contactRoutingRepository.findOneByPeerId(db, peerId).getOrNull()
                 val entry = existing?.copy(blePeripheralId = peripheralId, bleUpdatedAt = now)
                     ?: ContactRoutingEntry(peerId = peerId, blePeripheralId = peripheralId, bleUpdatedAt = now)
-                contactRoutingEntryRepository.save(db, entry).getOrThrow()
+                contactRoutingRepository.save(db, entry).getOrThrow()
             },
         )
     }
@@ -163,7 +163,7 @@ abstract class AbstractAppResources(
         libnet.start(
             peerId = identity.peerId,
             peerIdLookup = {
-                contactRoutingEntryRepository.findOneByBlePeripheralId(db, it)
+                contactRoutingRepository.findOneByBlePeripheralId(db, it)
                     .getOrNull()?.peerId
             },
         )

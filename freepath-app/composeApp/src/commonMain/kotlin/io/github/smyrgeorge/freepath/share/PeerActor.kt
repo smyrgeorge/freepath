@@ -3,6 +3,7 @@ package io.github.smyrgeorge.freepath.share
 import io.github.smyrgeorge.actor4k.actor.Actor
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.freepath.content.Content
+import io.github.smyrgeorge.freepath.database.ContactEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentSyncEntry
 import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
@@ -24,8 +25,16 @@ class PeerActor(
     private val db: ISQLite = resources.db
     private val client: LibnetClient = resources.client
     private val contactContent: Content = state.contactContent
-    private val contentRepository: ContentEntryRepository = resources.contentEntryRepository
+    private val contactRepository: ContactEntryRepository = resources.contactRepository
+    private val contentRepository: ContentEntryRepository = resources.contentRepository
     private val syncRepository: ContentSyncEntryRepository = resources.contentSyncRepository
+
+    override suspend fun onBeforeActivate() {
+        val contact = contactRepository.findOneByPeerId(db, peerId).getOrNull()
+        if (contact == null) {
+            terminate()
+        }
+    }
 
     override suspend fun onReceive(m: PeerProtocol): Behavior<PeerProtocol.Response> {
         when (m) {
