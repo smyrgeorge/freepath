@@ -142,7 +142,7 @@ abstract class AbstractAppState(
         val list = contactRepository.findAll(db).getOrThrow().filter { it.peerId != ownPeerId }
         _contacts.value = list
         _contactContents.value = list.mapNotNull { entry ->
-            val body = contentRepository.findOneByContentId(db, entry.peerId).getOrNull()
+            val body = contentRepository.findOneByAuthorIdAndTypeContact(db, entry.peerId).getOrNull()
                 ?.content?.body as? ContentBody.Contact ?: return@mapNotNull null
             entry.peerId to body
         }.toMap()
