@@ -42,16 +42,20 @@ fun FreepathButton(
     enabled: Boolean = true,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val backgroundColor = when (variant) {
-        ButtonVariant.Primary -> MaterialTheme.colorScheme.primary
-        ButtonVariant.Outline -> Color.Transparent
-        ButtonVariant.Destructive -> MaterialTheme.colorScheme.error
+    val backgroundColor = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+        variant == ButtonVariant.Primary -> MaterialTheme.colorScheme.primary
+        variant == ButtonVariant.Outline -> Color.Transparent
+        variant == ButtonVariant.Destructive -> MaterialTheme.colorScheme.error
+        else -> Color.Transparent
     }
 
-    val contentColor = when (variant) {
-        ButtonVariant.Primary -> MaterialTheme.colorScheme.onPrimary
-        ButtonVariant.Outline -> MaterialTheme.colorScheme.onSurface
-        ButtonVariant.Destructive -> MaterialTheme.colorScheme.onError
+    val contentColor = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        variant == ButtonVariant.Primary -> MaterialTheme.colorScheme.onPrimary
+        variant == ButtonVariant.Outline -> MaterialTheme.colorScheme.onSurface
+        variant == ButtonVariant.Destructive -> MaterialTheme.colorScheme.onError
+        else -> MaterialTheme.colorScheme.onSurface
     }
 
     val height = when (size) {
@@ -72,8 +76,10 @@ fun FreepathButton(
             .widthIn(min = 48.dp)
             .clip(shape)
             .then(
-                if (variant == ButtonVariant.Outline) {
+                if (variant == ButtonVariant.Outline && enabled) {
                     Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
+                } else if (variant == ButtonVariant.Outline && !enabled) {
+                    Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), shape)
                 } else {
                     Modifier
                 }

@@ -30,6 +30,7 @@ import io.github.smyrgeorge.freepath.ui.components.ResetDataOverlay
 import io.github.smyrgeorge.freepath.ui.components.TabItem
 import io.github.smyrgeorge.freepath.ui.screens.AddContactDrawerOverlay
 import io.github.smyrgeorge.freepath.ui.screens.ChatScreen
+import io.github.smyrgeorge.freepath.ui.screens.ComposePostScreen
 import io.github.smyrgeorge.freepath.ui.screens.ContactDrawerOverlay
 import io.github.smyrgeorge.freepath.ui.screens.FeedScreen
 import io.github.smyrgeorge.freepath.ui.screens.MeScreen
@@ -40,7 +41,7 @@ import io.github.smyrgeorge.freepath.ui.screens.PostDetailScreen
 import io.github.smyrgeorge.freepath.ui.screens.SplashScreen
 import io.github.smyrgeorge.freepath.ui.theme.FreepathTheme
 
-private enum class Screen { Splash, Onboarding, Nearby, Network, Feed, Me, Chat, PostDetail }
+private enum class Screen { Splash, Onboarding, Nearby, Network, Feed, Me, Chat, PostDetail, ComposePost }
 
 private val APP_TABS = listOf(
     TabItem(icon = "☰", label = "Feed"),
@@ -108,7 +109,8 @@ fun App() {
                             onPostClick = { entry ->
                                 selectedFeedEntry = entry
                                 screen = Screen.PostDetail
-                            }
+                            },
+                            onComposeClick = { screen = Screen.ComposePost },
                         )
 
                         Screen.PostDetail -> selectedFeedEntry?.let { entry ->
@@ -120,6 +122,11 @@ fun App() {
                                 },
                             )
                         }
+
+                        Screen.ComposePost -> ComposePostScreen(
+                            onBack = { screen = Screen.Feed },
+                            onPublished = { screen = Screen.Feed },
+                        )
 
                         Screen.Chat -> chatContact?.let { entry ->
                             ChatScreen(

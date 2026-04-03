@@ -5,6 +5,7 @@ import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.content.Content
+import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContactEntry
 
 sealed interface Protocol : ActorProtocol {
@@ -40,6 +41,7 @@ sealed interface Protocol : ActorProtocol {
 
     // Content
     data class ContentReceived(val envelope: Content) : Message<Ok>()
+    data class PublishContent(val body: ContentBody) : Message<Ok>()
 
     // Network events
     data class PeerIdentified(val peerId: String) : Message<Ok>()

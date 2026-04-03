@@ -289,6 +289,18 @@ abstract class AbstractAppState(
         if (isContact) loadContacts() else loadFeed()
     }
 
+    suspend fun publishContent(body: ContentBody) {
+        val envelope = ContentCodec.seal(
+            body = body,
+            authorId = identityEntry.peerId,
+            sigKeyPrivate = identity.sigKeyPrivate,
+        )
+        val entry = ContentEntry.from(envelope, trust = ContentTrust.VERIFIED)
+        contentRepository.insert(db, entry).getOrThrow()
+        log.info("[publishContent] Published content: ${envelope.id}")
+        loadFeed()
+    }
+
     private suspend fun Content.trust(): ContentTrust {
         val contact = contactRepository.findOneByPeerId(db, authorId).getOrThrow()
         return when {

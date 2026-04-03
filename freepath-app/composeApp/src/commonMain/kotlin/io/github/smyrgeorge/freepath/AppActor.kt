@@ -126,6 +126,7 @@ class AppActor(
 
                 is Protocol.ChatMessageReceived -> state.appendMessage(m.msg)
                 is Protocol.ContentReceived -> state.receiveContent(m.envelope)
+                is Protocol.PublishContent -> state.publishContent(m.body)
                 is Protocol.PeerIdentified -> {
                     ActorSystem.get(PeerActor::class, m.peerId).tell(PeerProtocol.Sync).onFailure {
                         log.warn("[PeerIdentified] Failed to trigger sync for ${m.peerId}: ${it.message}")

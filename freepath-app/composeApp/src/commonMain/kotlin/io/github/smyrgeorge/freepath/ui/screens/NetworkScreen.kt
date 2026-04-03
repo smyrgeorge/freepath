@@ -850,7 +850,7 @@ private fun AddButton() {
     ) {
         Text(
             text = "+",
-            modifier = Modifier.offset(y = (-1).dp),
+            modifier = Modifier.offset(y = (-1.5).dp),
             style = TextStyle(
                 fontSize = 20.sp,
                 lineHeight = 20.sp,
