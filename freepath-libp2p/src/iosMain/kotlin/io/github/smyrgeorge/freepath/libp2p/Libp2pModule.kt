@@ -20,6 +20,7 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlin.concurrent.AtomicReference
 
 actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
@@ -56,14 +57,16 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
             dispatcherRef.value = ::dispatch
             val ref = StableRef.create(dispatcherRef)
             val ptr = sigKeyPrivate.usePinned { pinned ->
-                libp2p_start(
-                    node_id = peerId,
-                    sig_key_private = pinned.addressOf(0).reinterpret(),
-                    sig_key_len = sigKeyPrivate.size.convert(),
-                    listen_addr = listenAddrs,
-                    event_callback = ref.asCPointer(),
-                    event_fun = Libp2pCallback.eventDispatcher,
-                )
+                withContext(dispatcher) {
+                    libp2p_start(
+                        node_id = peerId,
+                        sig_key_private = pinned.addressOf(0).reinterpret(),
+                        sig_key_len = sigKeyPrivate.size.convert(),
+                        listen_addr = listenAddrs,
+                        event_callback = ref.asCPointer(),
+                        event_fun = Libp2pCallback.eventDispatcher,
+                    )
+                }
             }
             if (ptr == null) {
                 ref.dispose()
@@ -89,43 +92,47 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
             handlerRef = null
             dispatcherRef.value = null
             metrics.close()
-            libp2p_stop(ptr)
+            withContext(dispatcher) { libp2p_stop(ptr) }
         }
     }
 
     actual override suspend fun dial(multiaddr: String) {
         val ptr = mutex.withLock { nodePtr } ?: return
-        libp2p_dial(ptr, multiaddr)
+        withContext(dispatcher) { libp2p_dial(ptr, multiaddr) }
     }
 
     actual override suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray) {
         val ptr = mutex.withLock { nodePtr } ?: return
         payload.usePinned { pinned ->
-            libp2p_send_request(
-                node = ptr,
-                peer_id = peerId,
-                req_id = reqId.toULong(),
-                payload = if (payload.isEmpty()) null else pinned.addressOf(0).reinterpret(),
-                payload_len = payload.size.convert(),
-            )
+            withContext(dispatcher) {
+                libp2p_send_request(
+                    node = ptr,
+                    peer_id = peerId,
+                    req_id = reqId.toULong(),
+                    payload = if (payload.isEmpty()) null else pinned.addressOf(0).reinterpret(),
+                    payload_len = payload.size.convert(),
+                )
+            }
         }
     }
 
     actual override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
         val ptr = mutex.withLock { nodePtr } ?: return
         payload.usePinned { pinned ->
-            libp2p_send_response(
-                node = ptr,
-                req_id = reqId.toULong(),
-                payload = if (payload.isEmpty()) null else pinned.addressOf(0).reinterpret(),
-                payload_len = payload.size.convert(),
-            )
+            withContext(dispatcher) {
+                libp2p_send_response(
+                    node = ptr,
+                    req_id = reqId.toULong(),
+                    payload = if (payload.isEmpty()) null else pinned.addressOf(0).reinterpret(),
+                    payload_len = payload.size.convert(),
+                )
+            }
         }
     }
 
     actual override suspend fun sendResponseFailed(reqId: Long, error: String) {
         val ptr = mutex.withLock { nodePtr } ?: return
-        libp2p_send_response_failed(node = ptr, req_id = reqId.toULong(), error = error)
+        withContext(dispatcher) { libp2p_send_response_failed(node = ptr, req_id = reqId.toULong(), error = error) }
     }
 
     actual override fun onFirstListenAddr(port: Int) {

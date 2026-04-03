@@ -22,7 +22,8 @@ abstract class AbstractLibp2pModule(
     private val log = Logger.of(this::class)
     private val rpc = RpcManager<Libp2pEvent.Response>(requestTimeout)
 
-    val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    val dispatcher = Dispatchers.IO
+    val scope = CoroutineScope(dispatcher + SupervisorJob())
     val requests: Channel<Libp2pEvent.RequestReceived> = Channel(
         capacity = 1000,
         onBufferOverflow = BufferOverflow.DROP_LATEST
