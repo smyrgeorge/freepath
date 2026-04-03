@@ -19,6 +19,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.scale
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -36,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.Protocol
+import io.github.smyrgeorge.freepath.content.Author
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.content.ContentType
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize
@@ -58,6 +61,7 @@ fun ComposePostScreen(
     var selectedType by remember { mutableStateOf(ContentType.ARTICLE) }
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
+    var includeAuthor by remember { mutableStateOf(false) }
     var publishing by remember { mutableStateOf(false) }
 
     val peerId = remember { AppState.identityEntry.peerId }
@@ -79,10 +83,21 @@ fun ComposePostScreen(
     fun publish() {
         if (!canPublish || publishing) return
         publishing = true
+        val author = if (includeAuthor) {
+            val contact = AppState.contact
+            val contactContent = runCatching { AppState.contactContentBody }.getOrNull()
+            Author(
+                name = contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") },
+                bio = contactContent?.bio,
+                avatar = contactContent?.avatar,
+                location = contactContent?.location,
+            )
+        } else null
         val contentBody = when (selectedType) {
             ContentType.ARTICLE -> ContentBody.Article(
                 title = title.trim().take(ContentBody.Article.MAX_TITLE_LENGTH),
                 body = body.trim(),
+                author = author,
             )
 
             else -> return // IMAGE not yet implemented
@@ -171,6 +186,35 @@ fun ComposePostScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ── Attach profile toggle (shared across all content types) ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Attach my profile",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Switch(
+                    checked = includeAuthor,
+                    onCheckedChange = { includeAuthor = it },
+                    modifier = Modifier.scale(0.75f),
+                )
+            }
+            Text(
+                text = "Your name, bio, avatar, and location will be embedded in this post so recipients can see who wrote it.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         // ── Bottom bar: type selector + Publish ──────────────────────────

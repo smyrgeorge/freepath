@@ -31,6 +31,7 @@ class ContentBodyCodecTest {
             format = ImageFormat.PNG,
             width = 64,
             height = 64,
+            caption = null,
         )
         val decoded = ProtobufCodec.protobuf.decodeFromByteArray<ContentBody>(
             ProtobufCodec.protobuf.encodeToByteArray(body)
@@ -40,7 +41,7 @@ class ContentBodyCodecTest {
 
     @Test
     fun contentBody_contact_encodeDecode_roundTrip() {
-        val body: ContentBody = ContentBody.Contact(bio = "Hello")
+        val body: ContentBody = ContentBody.Contact(bio = "Hello", avatar = null, location = null)
         val decoded = ProtobufCodec.protobuf.decodeFromByteArray<ContentBody>(
             ProtobufCodec.protobuf.encodeToByteArray(body)
         )
