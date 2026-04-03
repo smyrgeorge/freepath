@@ -48,6 +48,8 @@ android-targetSdk = "36"
 uiTooling = "1.10.6"
 customview-poolingcontainer = "1.1.0"
 androidx-emoji2 = "1.6.0"
+# https://github.com/mikepenz/multiplatform-markdown-renderer
+markdown-renderer = "0.39.2"
 
 [libraries]
 gradle-kotlin-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -93,6 +95,8 @@ androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "uiTooling" }
 androidx-customview-poolingcontainer = { group = "androidx.customview", name = "customview-poolingcontainer", version.ref = "customview-poolingcontainer" }
 androidx-emoji2 = { group = "androidx.emoji2", name = "emoji2", version.ref = "androidx-emoji2" }
+markdown-renderer = { module = "com.mikepenz:multiplatform-markdown-renderer", version.ref = "markdown-renderer" }
+markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdown-renderer" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

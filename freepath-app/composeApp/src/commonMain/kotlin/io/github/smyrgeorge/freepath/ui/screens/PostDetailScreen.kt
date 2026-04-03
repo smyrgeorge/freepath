@@ -33,6 +33,9 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.m3.markdownTypography
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContentEntry
@@ -110,14 +113,33 @@ fun PostDetailScreen(
 
             // Content body
             val body = entry.content.body
-            if (body is ContentBody.Image) {
-                DetailImage(body)
-            } else {
-                Text(
-                    text = body.fullText(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+            when (body) {
+                is ContentBody.Image -> DetailImage(body)
+                is ContentBody.Article -> {
+                    Text(
+                        text = body.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Markdown(
+                        content = body.body,
+                        colors = markdownColor(
+                            text = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        typography = markdownTypography(
+                            paragraph = MaterialTheme.typography.bodyMedium,
+                        ),
+                    )
+                }
+                else -> {
+                    Text(
+                        text = body.fullText(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

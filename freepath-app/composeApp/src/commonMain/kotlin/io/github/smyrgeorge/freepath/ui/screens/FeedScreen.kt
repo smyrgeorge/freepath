@@ -57,8 +57,25 @@ fun trustLabel(contacts: List<ContactEntry>, authorId: String): String =
 
 private const val BODY_SNIPPET_MAX = 120
 
+/** Regex that matches common Markdown syntax tokens. */
+private val markdownSyntax = Regex(
+    """(\*{1,3}|_{1,3}|~{2}|`{1,3}|#{1,6}\s|>\s?|!\[|]\([^)]*\)|\[|\]|^-{3,}$|^\|.*\|$|^[-|:\s]+$)""",
+    RegexOption.MULTILINE,
+)
+
+/** Strip Markdown formatting, take the first 3 non-blank lines, and join them into a single snippet. */
+private fun stripMarkdownPreview(raw: String): String {
+    val plain = markdownSyntax.replace(raw, "")
+    val lines = plain.lines()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .take(3)
+        .joinToString(" ")
+    return if (lines.length > BODY_SNIPPET_MAX) "${lines.take(BODY_SNIPPET_MAX)}…" else lines
+}
+
 fun ContentBody.bodySnippet(): String? = when (this) {
-    is ContentBody.Article -> body.let { if (it.length > BODY_SNIPPET_MAX) "${it.take(BODY_SNIPPET_MAX)}…" else it }
+    is ContentBody.Article -> stripMarkdownPreview(body)
     is ContentBody.Image -> caption
     is ContentBody.Contact -> null
 }
