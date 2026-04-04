@@ -8,7 +8,6 @@ import io.github.smyrgeorge.freepath.libnet.LibnetModule
 import io.github.smyrgeorge.freepath.libnet.NetRequest
 import io.github.smyrgeorge.freepath.libnet.client.codec.LibnetClientCodec
 import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
-import io.github.smyrgeorge.freepath.libnet.client.model.failure
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 class LibnetClient(
     private val identity: Identity,
@@ -39,13 +39,13 @@ class LibnetClient(
     suspend fun send(message: ChatMessage): Result<Unit> {
         val receiver = receiverContact(message.receiverId).getOrElse { return Result.failure(it) }
         val payload = seal(receiver, TYPE_CHAT, message.encodeToByteArray())
-        return libnet.request(message.receiverId, payload).map { }
+        return libnet.request(Random.nextLong(), message.receiverId, payload).map { }
     }
 
     suspend fun send(content: Content, receiverId: String): Result<Unit> {
         val receiver = receiverContact(receiverId).getOrElse { return Result.failure(it) }
         val payload = seal(receiver, TYPE_CONTENT, ContentCodec.encode(content))
-        return libnet.request(receiverId, payload).map { }
+        return libnet.request(Random.nextLong(), receiverId, payload).map { }
     }
 
     private fun receiverContact(peerId: String): Result<Contact> =
@@ -117,5 +117,7 @@ class LibnetClient(
     companion object {
         const val TYPE_CHAT: Byte = 1
         const val TYPE_CONTENT: Byte = 2
+
+        private fun <T> failure(reason: String): Result<T> = Result.failure(IllegalStateException(reason))
     }
 }

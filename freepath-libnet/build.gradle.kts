@@ -40,5 +40,10 @@ kotlin {
                 implementation(libs.log4k)
             }
         }
+        commonTest {
+            dependencies {
+                implementation(libs.kotlin.test)
+            }
+        }
     }
 }
