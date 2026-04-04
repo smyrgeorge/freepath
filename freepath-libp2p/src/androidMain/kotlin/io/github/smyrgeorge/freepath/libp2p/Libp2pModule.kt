@@ -39,7 +39,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
             nodeHandle.set(null)
             eventHandlers.remove(handlerId)
             mdns = null
-            throw Libp2pException("libp2p_start returned null — check stderr")
+            error("libp2p_start returned null — check stderr")
         }
         nodeHandle.set(handle)
     }

@@ -14,8 +14,6 @@ object StatelessEnvelopeCodec {
     const val SCHEMA = 1
     private val HKDF_INFO_PREFIX = "freepath-stateless-v1".encodeToByteArray()
 
-    class EnvelopeException(message: String) : Exception(message)
-
     fun seal(
         sender: Identity,
         receiverIdRaw: ByteArray,
@@ -58,23 +56,23 @@ object StatelessEnvelopeCodec {
         contactLookup: (peerId: String) -> Contact?,
     ): ByteArray {
         if (envelope.schema != SCHEMA)
-            throw EnvelopeException("Unsupported schema: ${envelope.schema}")
+            error("Unsupported schema: ${envelope.schema}")
         if (envelope.fragmentCount < 1)
-            throw EnvelopeException("Invalid fragmentCount: ${envelope.fragmentCount}")
+            error("Invalid fragmentCount: ${envelope.fragmentCount}")
         if (envelope.fragmentIndex < 0 || envelope.fragmentIndex >= envelope.fragmentCount)
-            throw EnvelopeException("fragmentIndex ${envelope.fragmentIndex} out of range for fragmentCount ${envelope.fragmentCount}")
+            error("fragmentIndex ${envelope.fragmentIndex} out of range for fragmentCount ${envelope.fragmentCount}")
 
         val receiverIdRaw = runCatching { Base58.decode(envelope.receiverId) }
-            .getOrElse { throw EnvelopeException("Invalid receiverId encoding") }
+            .getOrElse { error("Invalid receiverId encoding") }
         if (!receiverIdRaw.contentEquals(receiver.peerIdRaw))
-            throw EnvelopeException("Envelope receiverId does not match local peerId")
+            error("Envelope receiverId does not match local peerId")
 
         val contact = contactLookup(envelope.senderId)
-            ?: throw EnvelopeException("Unknown sender peerId")
+            ?: error("Unknown sender peerId")
         val senderIdRaw = CryptoProvider.sha256(contact.sigKeyPublic)
 
         val nonce = envelope.nonce
-        if (nonce.size != 12) throw EnvelopeException("Nonce must be 12 bytes, got ${nonce.size}")
+        if (nonce.size != 12) error("Nonce must be 12 bytes, got ${nonce.size}")
         val ciphertext = envelope.payload
         val signature = envelope.signature
 
@@ -89,12 +87,12 @@ object StatelessEnvelopeCodec {
         )
         val sigInput = sigInput(aad, ciphertext)
         if (!CryptoProvider.ed25519Verify(contact.sigKeyPublic, sigInput, signature))
-            throw EnvelopeException("Signature verification failed")
+            error("Signature verification failed")
 
         val key = deriveKey(receiver.encKeyPrivate, contact.encKeyPublic, senderIdRaw, receiverIdRaw)
         return runCatching {
             CryptoProvider.chacha20Poly1305Decrypt(key, nonce, ciphertext, aad)
-        }.getOrElse { throw EnvelopeException("AEAD decryption failed") }
+        }.getOrElse { error("AEAD decryption failed") }
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -115,7 +113,7 @@ object StatelessEnvelopeCodec {
     ): ByteArray {
         val sharedSecret = CryptoProvider.x25519DH(localEncPriv, peerEncPub)
         if (sharedSecret.all { it == 0.toByte() })
-            throw EnvelopeException("X25519 produced low-order point (all-zero shared secret)")
+            error("X25519 produced low-order point (all-zero shared secret)")
         val info = HKDF_INFO_PREFIX + senderIdRaw + receiverIdRaw
         return CryptoProvider.hkdfSha256(ikm = sharedSecret, salt = ByteArray(32), info = info, outputLen = 32)
     }

@@ -72,7 +72,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
                 ref.dispose()
                 dispatcherRef.value = null
                 mdns = null
-                throw Libp2pException("libp2p_start returned null")
+                error("libp2p_start returned null")
             }
             handlerRef = ref
             nodePtr = ptr
