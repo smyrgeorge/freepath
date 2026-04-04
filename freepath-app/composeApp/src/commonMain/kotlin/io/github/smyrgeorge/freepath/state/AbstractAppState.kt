@@ -110,7 +110,6 @@ abstract class AbstractAppState(
 
     suspend fun acceptContact(res: Protocol.BleContactExchangeSucceeded) {
         val contact = res.contact
-        val peripheralId = res.peripheralId
         val identitySecretB64 = Base64.encode(res.identitySecret)
         db.transaction {
             acceptContact(this, contact)
@@ -118,14 +117,12 @@ abstract class AbstractAppState(
             val now = Clock.System.now()
             val existing = contactRoutingRepository.findOneByPeerId(this, peerId).getOrNull()
             val entry = existing?.copy(
-                blePeripheralId = peripheralId,
                 bleUpdatedAt = now,
-                bleIdentitySecret = identitySecretB64
+                bleIdentitySecret = identitySecretB64,
             ) ?: ContactRoutingEntry(
                 peerId = peerId,
-                blePeripheralId = peripheralId,
                 bleUpdatedAt = now,
-                bleIdentitySecret = identitySecretB64
+                bleIdentitySecret = identitySecretB64,
             )
             contactRoutingRepository.save(this, entry).getOrThrow()
         }

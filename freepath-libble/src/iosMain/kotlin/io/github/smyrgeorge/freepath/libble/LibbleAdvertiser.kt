@@ -1,6 +1,7 @@
 package io.github.smyrgeorge.freepath.libble
 
 import io.github.smyrgeorge.freepath.libble.BleConstants.FREEPATH_SERVICE_UUID
+import io.github.smyrgeorge.freepath.libble.BleConstants.toHex
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -59,7 +60,7 @@ actual class LibbleAdvertiser actual constructor() {
         // Format: "fp:PPPP" or "fp:PPPP:TTTTTTTTTTTTTTTT" (token as 16 hex chars)
         val psmHex = psm.toString(16).padStart(4, '0')
         val localName = if (token != null) {
-            val tokenHex = token.joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+            val tokenHex = token.toHex()
             "fp:$psmHex:$tokenHex"
         } else {
             "fp:$psmHex"

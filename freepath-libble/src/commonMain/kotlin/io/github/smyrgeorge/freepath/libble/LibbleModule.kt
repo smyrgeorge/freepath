@@ -3,12 +3,14 @@ package io.github.smyrgeorge.freepath.libble
 import com.juul.kable.Scanner
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.libble.BleConstants.FREEPATH_SERVICE_UUID
+import io.github.smyrgeorge.freepath.libble.BleConstants.fromHex
+import io.github.smyrgeorge.freepath.libble.BleConstants.toHex
 import io.github.smyrgeorge.freepath.libble.LibbleEvent.Response
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeInitiator
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeResponder
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeResult
-import io.github.smyrgeorge.freepath.libble.l2cap.BleL2capServer
 import io.github.smyrgeorge.freepath.libble.identity.BleIdentityToken
+import io.github.smyrgeorge.freepath.libble.l2cap.BleL2capServer
 import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetrics
 import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPool
 import io.github.smyrgeorge.freepath.libble.pool.BleFrameType
@@ -54,13 +56,9 @@ class LibbleModule {
 
     private lateinit var localPeerId: String
     private lateinit var localPeerIdBytes: ByteArray
-    private lateinit var peripheralIdLookup: suspend (peerId: String) -> String?
 
     /** Returns peerId → identitySecret (Base64-decoded 32 bytes) for all contacts with a BLE identity secret. */
     private lateinit var contactSecretsLookup: suspend () -> Map<String, ByteArray>
-
-    /** Called when a token-matched peripheral is identified — updates blePeripheralId in the routing table. */
-    private lateinit var onPeripheralIdentified: suspend (peerId: String, peripheralId: String) -> Unit
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val rpc = RpcManager<Response>()
@@ -113,24 +111,18 @@ class LibbleModule {
     )
 
     /**
-     * @param peripheralIdLookup resolves a known peerId to the BLE peripheral ID (from routing table).
      * @param contactSecretsLookup returns all contacts' identity secrets: peerId → 32-byte secret.
      *        The same map is used for both scanning (match incoming tokens) and advertising (rotate
      *        through secrets so each contact can identify this device in turn).
-     * @param onPeripheralIdentified called when a scanned token matches a known contact — updates the routing table's blePeripheralId.
      */
     suspend fun start(
         localPeerId: String,
-        peripheralIdLookup: suspend (peerId: String) -> String?,
         contactSecretsLookup: suspend () -> Map<String, ByteArray>,
-        onPeripheralIdentified: suspend (peerId: String, peripheralId: String) -> Unit,
     ) {
         if (!started.compareAndSet(expectedValue = false, newValue = true)) return
         this.localPeerId = localPeerId
         this.localPeerIdBytes = localPeerId.encodeToByteArray()
-        this.peripheralIdLookup = peripheralIdLookup
         this.contactSecretsLookup = contactSecretsLookup
-        this.onPeripheralIdentified = onPeripheralIdentified
         expiryJob = doEvery(1.seconds) {
             val now = Clock.System.now()
             val expired = mutableListOf<Pair<String, PeripheralEntry>>()
@@ -183,7 +175,7 @@ class LibbleModule {
                 // Tag the entry now that it exists, so future lookups by peerId can find it.
                 pool.setPeerIdForEntry(targetId, peerId)
                 // Frame: [8-byte LE reqId] [1-byte peerIdLen] [peerId bytes] [payload]
-                val frame = ByteArray(8) { i -> (reqId shr (i * 8)).toByte() } +
+                val frame = encodeReqId(reqId) +
                         byteArrayOf(localPeerIdBytes.size.toByte()) + localPeerIdBytes + payload
                 channel.send(BleFrameType.REQUEST, frame)
             }
@@ -210,13 +202,10 @@ class LibbleModule {
      */
     private suspend fun resolvePeripheralIdFallback(peerId: String, excludeId: String): String {
         val cachedMatch = peripheralsMutex.withLock {
-            peripherals.entries.firstOrNull { (id, entry) ->
-                id != excludeId && entry.matchedPeerId == peerId
-            }?.key
+            peripherals.entries.firstOrNull { (id, entry) -> id != excludeId && entry.matchedPeerId == peerId }?.key
         }
         if (cachedMatch != null) {
             log.info("resolvePeripheralIdFallback: matched peerId=$peerId → $cachedMatch")
-            onPeripheralIdentified(peerId, cachedMatch)
             return cachedMatch
         }
 
@@ -233,12 +222,7 @@ class LibbleModule {
         }
         if (tokenMatch != null) {
             log.info("resolvePeripheralIdFallback: token matched peerId=$peerId → $tokenMatch")
-            peripheralsMutex.withLock {
-                peripherals[tokenMatch]?.let { entry ->
-                    peripherals[tokenMatch] = entry.copy(matchedPeerId = peerId)
-                }
-            }
-            onPeripheralIdentified(peerId, tokenMatch)
+            tagPeripheral(tokenMatch, peerId)
             return tokenMatch
         }
 
@@ -246,22 +230,20 @@ class LibbleModule {
     }
 
     suspend fun sendResponse(reqId: Long, payload: ByteArray) {
-        val peripheralId = reqIdMutex.withLock { reqIdToPeripheralId.remove(reqId) }
-            ?: error("No peripheral found for reqId=$reqId")
+        val peripheralId = consumeReqId(reqId)
         log.debug("sendResponse: reqId=$reqId → peripheralId=$peripheralId (${payload.size} bytes)")
         pool.withConnection(peripheralId) { channel, _ ->
-            val frame = ByteArray(8) { i -> (reqId shr (i * 8)).toByte() } + byteArrayOf(0x00) + payload
+            val frame = encodeReqId(reqId) + byteArrayOf(0x00) + payload
             channel.send(BleFrameType.RESPONSE, frame)
         }
     }
 
     suspend fun sendResponseFailed(reqId: Long, error: String) {
-        val peripheralId = reqIdMutex.withLock { reqIdToPeripheralId.remove(reqId) }
-            ?: error("No peripheral found for reqId=$reqId")
+        val peripheralId = consumeReqId(reqId)
         log.warn("sendResponseFailed: reqId=$reqId → peripheralId=$peripheralId error=$error")
         pool.withConnection(peripheralId) { channel, _ ->
             val errorBytes = error.encodeToByteArray()
-            val frame = ByteArray(8) { i -> (reqId shr (i * 8)).toByte() } + byteArrayOf(0x01) + errorBytes
+            val frame = encodeReqId(reqId) + byteArrayOf(0x01) + errorBytes
             channel.send(BleFrameType.RESPONSE, frame)
         }
     }
@@ -282,24 +264,17 @@ class LibbleModule {
             return it
         }
 
-        // Tier 1: routing table has a current peripheral ID.
-        peripheralIdLookup(peerId)?.let { return it }
-
-        // Tier 2: check if the scan loop already matched a peripheral to this peer.
+        // Tier 1: check if the scan loop already matched a peripheral to this peer.
         val cachedMatch = peripheralsMutex.withLock {
-            peripherals.entries.firstOrNull { (_, entry) ->
-                entry.matchedPeerId == peerId
-            }?.key
+            peripherals.entries.firstOrNull { (_, entry) -> entry.matchedPeerId == peerId }?.key
         }
         if (cachedMatch != null) {
             log.info("resolvePeripheralId: found cached match peerId=$peerId → $cachedMatch")
-            onPeripheralIdentified(peerId, cachedMatch)
             return cachedMatch
         }
 
-        // Tier 3: try to match unmatched peripheral tokens against this peer's secret.
-        val secret = contactSecretsLookup()[peerId]
-            ?: error("No BLE peripheral ID or identity secret found for peerId=$peerId")
+        // Tier 2: try to match unmatched peripheral tokens against this peer's secret.
+        val secret = contactSecretsLookup()[peerId] ?: error("No identity secret found for peerId=$peerId")
 
         val now = Clock.System.now().toEpochMilliseconds()
         val tokenMatch = peripheralsMutex.withLock {
@@ -311,12 +286,7 @@ class LibbleModule {
         }
         if (tokenMatch != null) {
             log.info("resolvePeripheralId: token fallback matched peerId=$peerId → $tokenMatch")
-            peripheralsMutex.withLock {
-                peripherals[tokenMatch]?.let { entry ->
-                    peripherals[tokenMatch] = entry.copy(matchedPeerId = peerId)
-                }
-            }
-            onPeripheralIdentified(peerId, tokenMatch)
+            tagPeripheral(tokenMatch, peerId)
             return tokenMatch
         }
 
@@ -352,7 +322,7 @@ class LibbleModule {
         // Rotate through secrets so each contact gets a chance to identify this device.
         val secret = secrets[(epoch % secrets.size).toInt()]
         val token = BleIdentityToken.compute(secret, now)
-        val hex = token.joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+        val hex = token.toHex()
         metrics.updateAdvertisedToken(hex)
         return token
     }
@@ -466,8 +436,7 @@ class LibbleModule {
                 val match = advertisement.name?.let { AD_PATTERN.find(it) }
                 psm = match?.groupValues?.get(1)?.toIntOrNull(16)
                 match?.groupValues?.get(2)?.takeIf { it.isNotEmpty() }?.let { hex ->
-                    identityToken = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                        .takeIf { it.size == BleIdentityToken.TOKEN_LEN }
+                    identityToken = hex.fromHex().takeIf { it.size == BleIdentityToken.TOKEN_LEN }
                 }
             }
 
@@ -483,7 +452,7 @@ class LibbleModule {
                 matchedPeerId = BleIdentityToken.match(identityToken!!, cachedSecrets, now)
             }
 
-            val tokenHex = identityToken?.joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+            val tokenHex = identityToken?.toHex()
             val event = LibbleEvent.PeripheralDiscovered(
                 discoveredAt = Clock.System.now(),
                 peripheralId = peripheralId,
@@ -503,8 +472,10 @@ class LibbleModule {
                 val effectiveMatch = matchedPeerId ?: previousMatch
                 val effectiveToken = identityToken ?: existing?.identityToken
                 peripherals[peripheralId] = PeripheralEntry(
-                    event = event, psm = effectivePsm,
-                    matchedPeerId = effectiveMatch, identityToken = effectiveToken,
+                    event = event,
+                    psm = effectivePsm,
+                    matchedPeerId = effectiveMatch,
+                    identityToken = effectiveToken,
                 )
                 if (effectivePsm != null) psmCache[peripheralId] = effectivePsm
                 isFirstMatch = matchedPeerId != null && previousMatch == null
@@ -514,8 +485,6 @@ class LibbleModule {
                 sendEvent(event)
             }
             if (isFirstMatch && matchedPeerId != null) {
-                // Update routing table with the current peripheralId for this peer.
-                onPeripheralIdentified(matchedPeerId, peripheralId)
                 sendEvent(LibbleEvent.PeerIdentified(matchedPeerId, peripheralId))
             }
         }
@@ -524,6 +493,20 @@ class LibbleModule {
     private suspend fun sendEvent(event: LibbleEvent) {
         metrics.onEvent(event)
         handler?.let { h -> runCatching { h(event) } }
+    }
+
+    /** Remove and return the peripheralId associated with [reqId], or throw. */
+    private suspend fun consumeReqId(reqId: Long): String =
+        reqIdMutex.withLock { reqIdToPeripheralId.remove(reqId) }
+            ?: error("No peripheral found for reqId=$reqId")
+
+    /** Tag a peripheral as matched to [peerId] in the in-memory map. */
+    private suspend fun tagPeripheral(peripheralId: String, peerId: String) {
+        peripheralsMutex.withLock {
+            peripherals[peripheralId]?.let {
+                peripherals[peripheralId] = it.copy(matchedPeerId = peerId)
+            }
+        }
     }
 
     private data class PeripheralEntry(
@@ -553,5 +536,8 @@ class LibbleModule {
         // Matches "fp:PPPP" or "fp:PPPP:TTTTTTTTTTTTTTTT" anywhere in the advertisement name.
         // Group 1: PSM hex (1-4 digits). Group 2: optional token hex (16 hex chars = 8 bytes).
         private val AD_PATTERN = Regex("fp:([0-9a-fA-F]{1,4})(?::([0-9a-fA-F]{16}))?")
+
+        /** Encode a reqId as 8-byte little-endian. */
+        private fun encodeReqId(reqId: Long): ByteArray = ByteArray(8) { i -> (reqId shr (i * 8)).toByte() }
     }
 }

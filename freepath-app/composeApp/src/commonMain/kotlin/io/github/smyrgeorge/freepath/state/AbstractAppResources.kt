@@ -127,10 +127,6 @@ abstract class AbstractAppResources(
         if (!LIBBLE_ENABLED) return
         libble.start(
             localPeerId = identity.peerId,
-            peripheralIdLookup = {
-                contactRoutingRepository.findOneByPeerId(db, it)
-                    .getOrNull()?.blePeripheralId
-            },
             contactSecretsLookup = {
                 contactRoutingRepository.findAllByIdentitySecretNotNull(db)
                     .getOrDefault(emptyList())
@@ -139,13 +135,6 @@ abstract class AbstractAppResources(
                             runCatching { entry.peerId to Base64.decode(b64) }.getOrNull()
                         }
                     }.toMap()
-            },
-            onPeripheralIdentified = { peerId, peripheralId ->
-                val now = Clock.System.now()
-                val existing = contactRoutingRepository.findOneByPeerId(db, peerId).getOrNull()
-                if (existing != null && existing.blePeripheralId != peripheralId) {
-                    contactRoutingRepository.save(db, existing.copy(blePeripheralId = peripheralId, bleUpdatedAt = now))
-                }
             },
         )
     }

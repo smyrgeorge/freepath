@@ -10,9 +10,6 @@ interface ContactRoutingEntryRepository : AuditableRepository<ContactRoutingEntr
     @Query("SELECT * FROM contact_routing WHERE peer_id = :peerId")
     suspend fun findOneByPeerId(context: QueryExecutor, peerId: String): Result<ContactRoutingEntry?>
 
-    @Query("SELECT * FROM contact_routing WHERE ble_peripheral_id = :blePeripheralId")
-    suspend fun findOneByBlePeripheralId(context: QueryExecutor, blePeripheralId: String): Result<ContactRoutingEntry?>
-
     @Query("SELECT * FROM contact_routing WHERE ble_identity_secret IS NOT NULL AND 1=:dummy")
     suspend fun findAllByIdentitySecretNotNull(context: QueryExecutor, dummy: Int = 1): Result<List<ContactRoutingEntry>>
 
