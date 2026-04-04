@@ -30,7 +30,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
@@ -59,13 +58,6 @@ abstract class AbstractAppState(
 
     private val _feedEntries = MutableStateFlow<List<ContentEntry>>(emptyList())
     val feedEntries: StateFlow<List<ContentEntry>> = _feedEntries.asStateFlow()
-
-    val identifiedLanPeers: StateFlow<Map<String, ConnectionSource>> =
-        resources.libp2p.metrics.value.map {
-            it.identifiedPeers
-                .filter { peerId -> peerId != identityEntry.peerId }
-                .associateWith { ConnectionSource.LAN }
-        }.stateIn(emptyMap())
 
     /**
      * Unified view of contacts reachable via any transport, keyed by peerId.
@@ -119,14 +111,22 @@ abstract class AbstractAppState(
     suspend fun acceptContact(res: Protocol.BleContactExchangeSucceeded) {
         val contact = res.contact
         val peripheralId = res.peripheralId
-        val identitySecretB64 = kotlin.io.encoding.Base64.encode(res.identitySecret)
+        val identitySecretB64 = Base64.encode(res.identitySecret)
         db.transaction {
             acceptContact(this, contact)
             val peerId = contact.peerId
             val now = Clock.System.now()
             val existing = contactRoutingRepository.findOneByPeerId(this, peerId).getOrNull()
-            val entry = existing?.copy(blePeripheralId = peripheralId, bleUpdatedAt = now, bleIdentitySecret = identitySecretB64)
-                ?: ContactRoutingEntry(peerId = peerId, blePeripheralId = peripheralId, bleUpdatedAt = now, bleIdentitySecret = identitySecretB64)
+            val entry = existing?.copy(
+                blePeripheralId = peripheralId,
+                bleUpdatedAt = now,
+                bleIdentitySecret = identitySecretB64
+            ) ?: ContactRoutingEntry(
+                peerId = peerId,
+                blePeripheralId = peripheralId,
+                bleUpdatedAt = now,
+                bleIdentitySecret = identitySecretB64
+            )
             contactRoutingRepository.save(this, entry).getOrThrow()
         }
     }

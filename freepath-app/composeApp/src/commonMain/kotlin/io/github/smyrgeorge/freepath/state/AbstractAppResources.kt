@@ -22,11 +22,14 @@ import io.github.smyrgeorge.freepath.libnet.LibnetModule
 import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
+import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import io.github.smyrgeorge.sqlx4k.ConnectionPool
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.delay
+import kotlin.io.encoding.Base64
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 abstract class AbstractAppResources(
@@ -102,7 +105,7 @@ abstract class AbstractAppResources(
                 log.info { "DB: Failed reading from database: $e" }
                 launch {
                     delay(2.seconds)
-                    io.github.smyrgeorge.freepath.util.exitApplication(1)
+                    exitApplication(1)
                 }
             }
         }
@@ -133,12 +136,12 @@ abstract class AbstractAppResources(
                     .getOrDefault(emptyList())
                     .mapNotNull { entry ->
                         entry.bleIdentitySecret?.let { b64 ->
-                            runCatching { entry.peerId to kotlin.io.encoding.Base64.decode(b64) }.getOrNull()
+                            runCatching { entry.peerId to Base64.decode(b64) }.getOrNull()
                         }
                     }.toMap()
             },
             onPeripheralIdentified = { peerId, peripheralId ->
-                val now = kotlin.time.Clock.System.now()
+                val now = Clock.System.now()
                 val existing = contactRoutingRepository.findOneByPeerId(db, peerId).getOrNull()
                 if (existing != null && existing.blePeripheralId != peripheralId) {
                     contactRoutingRepository.save(db, existing.copy(blePeripheralId = peripheralId, bleUpdatedAt = now))
