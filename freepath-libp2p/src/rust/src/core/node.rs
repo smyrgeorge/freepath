@@ -31,6 +31,58 @@ pub struct Behaviour {
     pub messaging: request_response::Behaviour<FreepathCodec>,
 }
 
+/// All mutable state owned exclusively by the swarm task.
+/// Kept task-local so no Mutex is needed — nothing outside the task touches these.
+struct NodeState {
+    /// libp2p OutboundRequestId → caller-supplied req_id.
+    outbound: HashMap<request_response::OutboundRequestId, u64>,
+    /// req_id → ResponseChannel for incoming requests waiting for a response.
+    inbound: HashMap<u64, request_response::ResponseChannel<Vec<u8>>>,
+    /// InboundRequestId → req_id, used to clean up on InboundFailure.
+    inbound_ids: HashMap<request_response::InboundRequestId, u64>,
+    /// req_id → InboundRequestId, used for O(1) cleanup when sending a response.
+    inbound_req_ids: HashMap<u64, request_response::InboundRequestId>,
+    /// Monotonically increasing counter for assigning req_ids to incoming requests.
+    req_counter: u64,
+}
+
+impl NodeState {
+    fn new() -> Self {
+        Self {
+            outbound: HashMap::new(),
+            inbound: HashMap::new(),
+            inbound_ids: HashMap::new(),
+            inbound_req_ids: HashMap::new(),
+            req_counter: 0,
+        }
+    }
+
+    /// Remove all inbound tracking for a req_id. Call when sending any response.
+    fn remove_inbound(
+        &mut self,
+        req_id: u64,
+    ) -> Option<request_response::ResponseChannel<Vec<u8>>> {
+        if let Some(inbound_id) = self.inbound_req_ids.remove(&req_id) {
+            self.inbound_ids.remove(&inbound_id);
+        }
+        self.inbound.remove(&req_id)
+    }
+
+    /// Remove all inbound tracking for an InboundRequestId. Call on InboundFailure.
+    fn remove_inbound_by_id(
+        &mut self,
+        inbound_id: &request_response::InboundRequestId,
+    ) -> Option<u64> {
+        if let Some(req_id) = self.inbound_ids.remove(inbound_id) {
+            self.inbound.remove(&req_id);
+            self.inbound_req_ids.remove(&req_id);
+            Some(req_id)
+        } else {
+            None
+        }
+    }
+}
+
 pub fn start_node(
     node_id: &str,
     sig_key_private_bytes: &[u8],
@@ -81,189 +133,65 @@ pub fn start_node(
             dns_config.add_name_server(ns.clone());
         }
 
-        let mut swarm = SwarmBuilder::with_existing_identity(keypair)
-            .with_tokio()
-            .with_tcp(
-                tcp::Config::default(),
-                noise::Config::new,
-                yamux::Config::default,
-            )
-            .unwrap()
-            .with_quic()
-            .with_dns_config(dns_config, libp2p_dns::ResolverOpts::default())
-            .with_behaviour(|key| {
-                Ok(Behaviour {
-                    identify: identify::Behaviour::new(
-                        identify::Config::new("/freepath/1.0.0".into(), key.public())
-                            .with_agent_version(format!("freepath/{peer_id}")),
-                    ),
-                    ping: ping::Behaviour::default(),
-                    messaging: request_response::Behaviour::with_codec(
-                        FreepathCodec,
-                        std::iter::once((FreepathProtocol, request_response::ProtocolSupport::Full)),
-                        request_response::Config::default(),
-                    ),
-                })
-            })
-            .unwrap()
-            .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(60)))
-            .build();
+        let swarm_result = (|| -> Result<_, Box<dyn std::error::Error + Send + Sync>> {
+            Ok(SwarmBuilder::with_existing_identity(keypair)
+                .with_tokio()
+                .with_tcp(
+                    tcp::Config::default(),
+                    noise::Config::new,
+                    yamux::Config::default,
+                )?
+                .with_quic()
+                .with_dns_config(dns_config, libp2p_dns::ResolverOpts::default())
+                .with_behaviour(|key| {
+                    Ok(Behaviour {
+                        identify: identify::Behaviour::new(
+                            identify::Config::new("/freepath/1.0.0".into(), key.public())
+                                .with_agent_version(format!("freepath/{peer_id}")),
+                        ),
+                        ping: ping::Behaviour::default(),
+                        messaging: request_response::Behaviour::with_codec(
+                            FreepathCodec,
+                            std::iter::once((
+                                FreepathProtocol,
+                                request_response::ProtocolSupport::Full,
+                            )),
+                            request_response::Config::default(),
+                        ),
+                    })
+                })?
+                .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(60)))
+                .build())
+        })();
+
+        let mut swarm = match swarm_result {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("failed to build swarm: {e:?}");
+                return;
+            }
+        };
 
         for addr in listen_addrs {
-            swarm
-                .listen_on(addr.clone())
-                .unwrap_or_else(|e| panic!("listen_on({addr}) failed: {e:?}"));
+            if let Err(e) = swarm.listen_on(addr.clone()) {
+                log::error!("listen_on({addr}) failed: {e:?}");
+                return;
+            }
         }
 
         let local_peer_id = swarm.local_peer_id().to_string();
-
-        // Tracks outgoing requests: libp2p OutboundRequestId → caller-supplied req_id.
-        let mut outbound: HashMap<request_response::OutboundRequestId, u64> = HashMap::new();
-        // Tracks incoming requests waiting for a response: req_id → ResponseChannel.
-        let mut inbound: HashMap<u64, request_response::ResponseChannel<Vec<u8>>> = HashMap::new();
-        // Monotonically increasing counter for assigning req_ids to incoming requests.
-        let mut inbound_req_counter: u64 = 0;
+        let mut state = NodeState::new();
 
         loop {
             tokio::select! {
                 event = futures::StreamExt::next(&mut swarm) => {
-                    match event {
-                        Some(SwarmEvent::Behaviour(BehaviourEvent::Messaging(
-                            request_response::Event::Message {
-                                peer,
-                                message: request_response::Message::Request { request, channel, .. },
-                                ..
-                            }
-                        ))) => {
-                            // The first byte is a type discriminator written by the sender:
-                            //   0x01 = RPC request (hold channel, caller must send response)
-                            match request.first().copied() {
-                                Some(0x01) => {
-                                    // RPC request: assign a req_id and hold the channel.
-                                    inbound_req_counter += 1;
-                                    let req_id = inbound_req_counter;
-                                    inbound.insert(req_id, channel);
-                                    let payload = request[1..].to_vec();
-                                    let raw = RawLibP2pEvent::request_received(req_id, peer.to_string(), local_peer_id.clone(), payload);
-                                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
-                                }
-                                _ => {
-                                    // Unknown or missing discriminator — auto-ack and discard.
-                                    log::warn!("received message with unknown type discriminator from {peer}; discarding");
-                                    let _ = swarm.behaviour_mut().messaging.send_response(channel, vec![]);
-                                }
-                            }
-                        }
-                        Some(SwarmEvent::Behaviour(BehaviourEvent::Messaging(
-                            request_response::Event::Message {
-                                peer,
-                                message: request_response::Message::Response { request_id, response },
-                                ..
-                            }
-                        ))) => {
-                            if let Some(req_id) = outbound.remove(&request_id) {
-                                // Response discriminator:
-                                //   0x00 = success  → ResponseReceived
-                                //   0x01 = failure  → RequestFailed (error message in payload)
-                                let raw = match response.first().copied() {
-                                    Some(0x01) => {
-                                        let error = String::from_utf8_lossy(&response[1..]).into_owned();
-                                        RawLibP2pEvent::request_failed(req_id, local_peer_id.clone(), peer.to_string(), error)
-                                    }
-                                    _ => {
-                                        // 0x00 = explicit success; anything else treated as success for compatibility.
-                                        let payload = if response.is_empty() { vec![] } else { response[1..].to_vec() };
-                                        RawLibP2pEvent::response_received(req_id, local_peer_id.clone(), peer.to_string(), payload)
-                                    }
-                                };
-                                unsafe { (event_cb.fun)(event_cb.ptr, raw) }
-                            }
-                        }
-                        Some(SwarmEvent::Behaviour(BehaviourEvent::Messaging(
-                            request_response::Event::OutboundFailure { peer, request_id, error, .. }
-                        ))) => {
-                            if let Some(req_id) = outbound.remove(&request_id) {
-                                let raw = RawLibP2pEvent::request_failed(req_id, local_peer_id.clone(), peer.to_string(), error.to_string());
-                                unsafe { (event_cb.fun)(event_cb.ptr, raw) }
-                            }
-                        }
-                        Some(ev) => handle_event(ev, &event_cb),
-                        None => break,
+                    if handle_swarm_event(event, &mut swarm, &mut state, &local_peer_id, &event_cb) {
+                        break;
                     }
                 }
                 Some(cmd) = cmd_rx.recv() => {
-                    match cmd {
-                        SwarmCommand::Stop => break,
-                        SwarmCommand::Dial(addr_str) => {
-                            match addr_str.parse::<Multiaddr>() {
-                                Ok(addr) => {
-                                    // Skip dialing our own listen addresses — the Kotlin layer
-                                    // may discover and forward our own addr via mDNS before
-                                    // we can filter it out on the Kotlin side.
-                                    if swarm.listeners().any(|l| l == &addr) {
-                                        log::debug!("dial '{addr_str}': skipping own listen address");
-                                    } else if let Err(e) = swarm.dial(addr) {
-                                        log::warn!("dial '{addr_str}' failed: {e:?}");
-                                    }
-                                }
-                                Err(e) => log::warn!("dial: invalid multiaddr '{addr_str}': {e}"),
-                            }
-                        }
-                        SwarmCommand::SendRequest { peer_id, req_id, payload } => {
-                            match peer_id.parse::<libp2p::PeerId>() {
-                                Ok(pid) => {
-                                    // Prefix with 0x01 so the receiver knows this is an RPC request.
-                                    let mut framed = Vec::with_capacity(1 + payload.len());
-                                    framed.push(0x01);
-                                    framed.extend_from_slice(&payload);
-                                    let outbound_id = swarm
-                                        .behaviour_mut()
-                                        .messaging
-                                        .send_request(&pid, framed);
-                                    outbound.insert(outbound_id, req_id);
-                                }
-                                Err(e) => {
-                                    log::warn!("send_request: invalid PeerId '{peer_id}': {e}");
-                                    let raw = RawLibP2pEvent::request_failed(req_id, local_peer_id.clone(), peer_id.clone(), e.to_string());
-                                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
-                                }
-                            }
-                        }
-                        SwarmCommand::SendResponse { req_id, payload } => {
-                            if let Some(channel) = inbound.remove(&req_id) {
-                                // Prefix with 0x00 so the receiver knows this is a success response.
-                                let mut framed = Vec::with_capacity(1 + payload.len());
-                                framed.push(0x00);
-                                framed.extend_from_slice(&payload);
-                                if let Err(e) = swarm
-                                    .behaviour_mut()
-                                    .messaging
-                                    .send_response(channel, framed)
-                                {
-                                    log::warn!("send_response req_id={req_id}: {e:?}");
-                                }
-                            } else {
-                                log::warn!("send_response: unknown req_id={req_id}");
-                            }
-                        }
-                        SwarmCommand::SendResponseFailed { req_id, error } => {
-                            if let Some(channel) = inbound.remove(&req_id) {
-                                // Prefix with 0x01 so the receiver fires RequestFailed instead of ResponseReceived.
-                                let err_bytes = error.into_bytes();
-                                let mut framed = Vec::with_capacity(1 + err_bytes.len());
-                                framed.push(0x01);
-                                framed.extend_from_slice(&err_bytes);
-                                if let Err(e) = swarm
-                                    .behaviour_mut()
-                                    .messaging
-                                    .send_response(channel, framed)
-                                {
-                                    log::warn!("send_response_failed req_id={req_id}: {e:?}");
-                                }
-                            } else {
-                                log::warn!("send_response_failed: unknown req_id={req_id}");
-                            }
-                        }
+                    if handle_command(cmd, &mut swarm, &mut state, &local_peer_id, &event_cb) {
+                        break;
                     }
                 }
             }
@@ -274,6 +202,175 @@ pub fn start_node(
     Ok(node)
 }
 
+/// Drains all in-flight outbound requests, firing `request_failed` for each.
+/// Call on both graceful Stop and unexpected swarm stream termination.
+fn drain_outbound(state: &mut NodeState, local_peer_id: &str, event_cb: &EventCallback) {
+    for (_, req_id) in state.outbound.drain() {
+        let raw = RawLibP2pEvent::request_failed(
+            req_id,
+            local_peer_id.to_owned(),
+            String::new(),
+            "node stopped".to_owned(),
+        );
+        unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+    }
+}
+
+/// Returns `true` if the swarm loop should stop.
+fn handle_swarm_event(
+    event: Option<SwarmEvent<BehaviourEvent>>,
+    swarm: &mut libp2p::Swarm<Behaviour>,
+    state: &mut NodeState,
+    local_peer_id: &str,
+    event_cb: &EventCallback,
+) -> bool {
+    match event {
+        Some(SwarmEvent::Behaviour(BehaviourEvent::Messaging(ev))) => {
+            handle_messaging(ev, swarm, state, local_peer_id, event_cb);
+            false
+        }
+        // Only fire peer_disconnected when the last connection to the peer is gone.
+        // libp2p can have multiple connections per peer; ConnectionClosed fires per-connection.
+        Some(SwarmEvent::ConnectionClosed { peer_id, .. }) => {
+            if !swarm.is_connected(&peer_id) {
+                let raw = RawLibP2pEvent::peer_disconnected(peer_id.to_string());
+                unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+            }
+            false
+        }
+        Some(ev) => {
+            handle_event(ev, event_cb);
+            false
+        }
+        None => {
+            // Swarm stream ended unexpectedly — drain in-flight outbound callers
+            // so they fail immediately instead of hanging forever.
+            drain_outbound(state, local_peer_id, event_cb);
+            true
+        }
+    }
+}
+
+fn handle_messaging(
+    ev: request_response::Event<Vec<u8>, Vec<u8>>,
+    swarm: &mut libp2p::Swarm<Behaviour>,
+    state: &mut NodeState,
+    local_peer_id: &str,
+    event_cb: &EventCallback,
+) {
+    match ev {
+        request_response::Event::Message {
+            peer,
+            message:
+                request_response::Message::Request {
+                    request_id,
+                    request,
+                    channel,
+                    ..
+                },
+            ..
+        } => {
+            // The first byte is a type discriminator written by the sender:
+            //   0x01 = RPC request (hold channel, caller must send response)
+            match request.first().copied() {
+                Some(0x01) => {
+                    // RPC request: assign a req_id and hold the channel.
+                    state.req_counter += 1;
+                    let req_id = state.req_counter;
+                    state.inbound.insert(req_id, channel);
+                    state.inbound_ids.insert(request_id, req_id);
+                    state.inbound_req_ids.insert(req_id, request_id);
+                    let payload = request[1..].to_vec();
+                    let raw = RawLibP2pEvent::request_received(
+                        req_id,
+                        peer.to_string(),
+                        local_peer_id.to_owned(),
+                        payload,
+                    );
+                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+                }
+                _ => {
+                    // Unknown or missing discriminator — auto-ack and discard.
+                    log::warn!(
+                        "received message with unknown type discriminator from {peer}; discarding"
+                    );
+                    let _ = swarm
+                        .behaviour_mut()
+                        .messaging
+                        .send_response(channel, vec![]);
+                }
+            }
+        }
+        request_response::Event::Message {
+            peer,
+            message:
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                },
+            ..
+        } => {
+            if let Some(req_id) = state.outbound.remove(&request_id) {
+                // Response discriminator:
+                //   0x00 = success  → ResponseReceived
+                //   0x01 = failure  → RequestFailed (error message in payload)
+                let raw = match response.first().copied() {
+                    Some(0x01) => {
+                        let error = String::from_utf8_lossy(&response[1..]).into_owned();
+                        RawLibP2pEvent::request_failed(
+                            req_id,
+                            local_peer_id.to_owned(),
+                            peer.to_string(),
+                            error,
+                        )
+                    }
+                    _ => {
+                        // 0x00 = explicit success; anything else treated as success for compatibility.
+                        let payload = if response.is_empty() {
+                            vec![]
+                        } else {
+                            response[1..].to_vec()
+                        };
+                        RawLibP2pEvent::response_received(
+                            req_id,
+                            local_peer_id.to_owned(),
+                            peer.to_string(),
+                            payload,
+                        )
+                    }
+                };
+                unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+            }
+        }
+        request_response::Event::InboundFailure {
+            request_id, error, ..
+        } => {
+            if let Some(req_id) = state.remove_inbound_by_id(&request_id) {
+                log::warn!(
+                    "inbound request req_id={req_id} failed before response was sent: {error}"
+                );
+            }
+        }
+        request_response::Event::OutboundFailure {
+            peer,
+            request_id,
+            error,
+            ..
+        } => {
+            if let Some(req_id) = state.outbound.remove(&request_id) {
+                let raw = RawLibP2pEvent::request_failed(
+                    req_id,
+                    local_peer_id.to_owned(),
+                    peer.to_string(),
+                    error.to_string(),
+                );
+                unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+            }
+        }
+        _ => {}
+    }
+}
+
 fn handle_event(ev: SwarmEvent<BehaviourEvent>, event_cb: &EventCallback) {
     match ev {
         SwarmEvent::ConnectionEstablished {
@@ -281,10 +378,6 @@ fn handle_event(ev: SwarmEvent<BehaviourEvent>, event_cb: &EventCallback) {
         } => {
             let addr = endpoint.get_remote_address().to_string();
             let raw = RawLibP2pEvent::peer_connected(peer_id.to_string(), addr);
-            unsafe { (event_cb.fun)(event_cb.ptr, raw) }
-        }
-        SwarmEvent::ConnectionClosed { peer_id, .. } => {
-            let raw = RawLibP2pEvent::peer_disconnected(peer_id.to_string());
             unsafe { (event_cb.fun)(event_cb.ptr, raw) }
         }
         SwarmEvent::NewListenAddr { address, .. } => {
@@ -329,5 +422,103 @@ fn handle_event(ev: SwarmEvent<BehaviourEvent>, event_cb: &EventCallback) {
             }
         }
         _ => {}
+    }
+}
+
+/// Returns `true` if the swarm loop should stop.
+fn handle_command(
+    cmd: SwarmCommand,
+    swarm: &mut libp2p::Swarm<Behaviour>,
+    state: &mut NodeState,
+    local_peer_id: &str,
+    event_cb: &EventCallback,
+) -> bool {
+    match cmd {
+        SwarmCommand::Stop => {
+            // Notify all in-flight outbound callers so they fail immediately
+            // instead of waiting for their timeout.
+            drain_outbound(state, local_peer_id, event_cb);
+            true
+        }
+        SwarmCommand::Dial(addr_str) => {
+            match addr_str.parse::<Multiaddr>() {
+                Ok(addr) => {
+                    // Skip dialing our own listen addresses — the Kotlin layer
+                    // may discover and forward our own addr via mDNS before
+                    // we can filter it out on the Kotlin side.
+                    if swarm.listeners().any(|l| l == &addr) {
+                        log::debug!("dial '{addr_str}': skipping own listen address");
+                    } else if let Err(e) = swarm.dial(addr) {
+                        log::warn!("dial '{addr_str}' failed: {e:?}");
+                    }
+                }
+                Err(e) => log::warn!("dial: invalid multiaddr '{addr_str}': {e}"),
+            }
+            false
+        }
+        SwarmCommand::SendRequest {
+            peer_id,
+            req_id,
+            payload,
+        } => {
+            match peer_id.parse::<libp2p::PeerId>() {
+                Ok(pid) => {
+                    // Prefix with 0x01 so the receiver knows this is an RPC request.
+                    let mut framed = Vec::with_capacity(1 + payload.len());
+                    framed.push(0x01);
+                    framed.extend_from_slice(&payload);
+                    let outbound_id = swarm.behaviour_mut().messaging.send_request(&pid, framed);
+                    state.outbound.insert(outbound_id, req_id);
+                }
+                Err(e) => {
+                    log::warn!("send_request: invalid PeerId '{peer_id}': {e}");
+                    let raw = RawLibP2pEvent::request_failed(
+                        req_id,
+                        local_peer_id.to_owned(),
+                        peer_id,
+                        e.to_string(),
+                    );
+                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+                }
+            }
+            false
+        }
+        SwarmCommand::SendResponse { req_id, payload } => {
+            if let Some(channel) = state.remove_inbound(req_id) {
+                // Prefix with 0x00 so the receiver knows this is a success response.
+                let mut framed = Vec::with_capacity(1 + payload.len());
+                framed.push(0x00);
+                framed.extend_from_slice(&payload);
+                if let Err(e) = swarm
+                    .behaviour_mut()
+                    .messaging
+                    .send_response(channel, framed)
+                {
+                    log::warn!("send_response req_id={req_id}: {e:?}");
+                }
+            } else {
+                log::warn!("send_response: unknown req_id={req_id}");
+            }
+            false
+        }
+        SwarmCommand::SendResponseFailed { req_id, error } => {
+            if let Some(channel) = state.remove_inbound(req_id) {
+                // Prefix with 0x01 so the receiver fires RequestFailed instead of ResponseReceived.
+                let err_bytes = error.into_bytes();
+                let mut framed = Vec::with_capacity(1 + err_bytes.len());
+                framed.push(0x01);
+                framed.extend_from_slice(&err_bytes);
+                if let Err(e) = swarm
+                    .behaviour_mut()
+                    .messaging
+                    .send_response(channel, framed)
+                {
+                    log::warn!("send_response_failed req_id={req_id}: {e:?}");
+                }
+            } else {
+                log::warn!("send_response_failed: unknown req_id={req_id}");
+            }
+            false
+        }
     }
 }
