@@ -36,16 +36,29 @@ class LibnetClient(
         scope.cancel()
     }
 
-    suspend fun send(message: ChatMessage): Result<Unit> {
+    suspend fun send(
+        message: ChatMessage,
+        reqId: Long = Random.nextLong(),
+        onFrameSent: (reqId: Long, frameIndex: Int, frameCount: Int) -> Unit = { reqId, frameIndex, frameCount ->
+            log.debug { "Sent frame ${frameIndex + 1} of $frameCount for reqId=$reqId" }
+        },
+    ): Result<Unit> {
         val receiver = receiverContact(message.receiverId).getOrElse { return Result.failure(it) }
         val payload = seal(receiver, TYPE_CHAT, message.encodeToByteArray())
-        return libnet.request(Random.nextLong(), message.receiverId, payload).map { }
+        return libnet.request(reqId, message.receiverId, payload, onFrameSent).map { }
     }
 
-    suspend fun send(content: Content, receiverId: String): Result<Unit> {
+    suspend fun send(
+        content: Content,
+        receiverId: String,
+        reqId: Long = Random.nextLong(),
+        onFrameSent: (reqId: Long, frameIndex: Int, frameCount: Int) -> Unit = { reqId, frameIndex, frameCount ->
+            log.debug { "Sent frame ${frameIndex + 1} of $frameCount for reqId=$reqId" }
+        },
+    ): Result<Unit> {
         val receiver = receiverContact(receiverId).getOrElse { return Result.failure(it) }
         val payload = seal(receiver, TYPE_CONTENT, ContentCodec.encode(content))
-        return libnet.request(Random.nextLong(), receiverId, payload).map { }
+        return libnet.request(reqId, receiverId, payload, onFrameSent).map { }
     }
 
     private fun receiverContact(peerId: String): Result<Contact> =

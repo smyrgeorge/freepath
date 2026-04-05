@@ -84,7 +84,7 @@ class LibnetModule(
         reqId: Long,
         peerId: String,
         payload: ByteArray,
-        onFrameSent: (reqId: Long, frameIndex: Int, frameCount: Int) -> Unit = { _, _, _ -> },
+        onFrameSent: (reqId: Long, frameIndex: Int, frameCount: Int) -> Unit,
     ): Result<ByteArray> = runCatching {
         val onLan = peerId in libp2p.metrics.value.value.identifiedPeers
         val onBle = peerId in libble.metrics.value.value.identifiedPeers

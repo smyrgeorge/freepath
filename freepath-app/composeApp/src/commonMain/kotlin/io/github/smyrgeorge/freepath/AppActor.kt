@@ -47,9 +47,7 @@ class AppActor(
                 identity = state.identity,
                 contactLookup = { state.contactLookup(it) },
             )
-            resources.startLibp2p()
-            resources.startLibble()
-            resources.startLibnet()
+            resources.startNetworking()
         }
 
         log.info("[onActivate] Identity: ${state.identityEntry}")
@@ -75,9 +73,7 @@ class AppActor(
     override suspend fun onShutdown() {
         log.info("[onShutdown] Shutting down...")
         timer.cancel()
-        resources.stopLibnet()
-        resources.stopLibp2p()
-        resources.stopLibble()
+        resources.stopNetworking()
         resources.closeDatabase()
         log.info("[onShutdown] Shutdown complete.")
     }

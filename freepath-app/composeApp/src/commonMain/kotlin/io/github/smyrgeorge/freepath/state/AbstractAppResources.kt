@@ -19,6 +19,7 @@ import io.github.smyrgeorge.freepath.database.sqlite
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.LibbleModule
 import io.github.smyrgeorge.freepath.libnet.LibnetModule
+import io.github.smyrgeorge.freepath.libnet.Transport
 import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
@@ -29,7 +30,6 @@ import io.github.smyrgeorge.sqlx4k.ConnectionPool
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.delay
 import kotlin.io.encoding.Base64
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 abstract class AbstractAppResources(
@@ -115,39 +115,11 @@ abstract class AbstractAppResources(
         db.close().getOrThrow()
     }
 
-    suspend fun startLibp2p() {
-        libp2p.start(peerId = identity.peerId, sigKeyPrivate = identity.sigKeyPrivate)
-    }
+    suspend fun startNetworking() {
+        if (Transport.LIBP2P.isSupported) startLibp2p()
+        if (Transport.LIBBLE.isSupported) startLibble()
 
-    suspend fun stopLibp2p() {
-        libp2p.stop()
-    }
-
-    suspend fun startLibble() {
-        if (!LIBBLE_ENABLED) return
-        libble.start(
-            localPeerId = identity.peerId,
-            contactSecretsLookup = {
-                contactRoutingRepository.findAllByIdentitySecretNotNull(db)
-                    .getOrDefault(emptyList())
-                    .mapNotNull { entry ->
-                        entry.bleIdentitySecret?.let { b64 ->
-                            runCatching { entry.peerId to Base64.decode(b64) }.getOrNull()
-                        }
-                    }.toMap()
-            },
-        )
-    }
-
-    suspend fun stopLibble() {
-        if (!LIBBLE_ENABLED) return
-        libble.stop()
-    }
-
-    fun startLibnet() {
-        libnet.start(
-            peerId = identity.peerId,
-        )
+        libnet.start(peerId = identity.peerId)
         client = LibnetClient(
             identity = identity,
             libnet = libnet,
@@ -167,12 +139,29 @@ abstract class AbstractAppResources(
         }
     }
 
-    fun stopLibnet() {
+    suspend fun stopNetworking() {
         client.stop()
         libnet.stop()
+        if (Transport.LIBP2P.isSupported) libp2p.stop()
+        if (Transport.LIBBLE.isSupported) libble.stop()
     }
 
-    companion object {
-        internal const val LIBBLE_ENABLED = true
+    private suspend fun startLibp2p() {
+        libp2p.start(peerId = identity.peerId, sigKeyPrivate = identity.sigKeyPrivate)
+    }
+
+    private suspend fun startLibble() {
+        libble.start(
+            localPeerId = identity.peerId,
+            contactSecretsLookup = {
+                contactRoutingRepository.findAllByIdentitySecretNotNull(db)
+                    .getOrDefault(emptyList())
+                    .mapNotNull { entry ->
+                        entry.bleIdentitySecret?.let { b64 ->
+                            runCatching { entry.peerId to Base64.decode(b64) }.getOrNull()
+                        }
+                    }.toMap()
+            },
+        )
     }
 }

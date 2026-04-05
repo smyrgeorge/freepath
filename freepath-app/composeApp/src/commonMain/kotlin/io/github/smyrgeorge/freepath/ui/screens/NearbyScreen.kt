@@ -47,7 +47,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.Res
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.state.AbstractAppResources
+import io.github.smyrgeorge.freepath.libnet.Transport
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContactEntry
@@ -101,7 +101,7 @@ fun NearbyScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    if (AbstractAppResources.LIBBLE_ENABLED) {
+                    if (Transport.LIBBLE.isSupported) {
                         FreepathButton(
                             onClick = {
                                 scope.launch {
