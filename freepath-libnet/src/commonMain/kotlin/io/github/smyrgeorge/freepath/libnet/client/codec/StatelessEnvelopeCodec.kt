@@ -1,12 +1,14 @@
 package io.github.smyrgeorge.freepath.libnet.client.codec
 
 import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.ContactCodec
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.libnet.client.model.SealedPayload
 import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
 import io.github.smyrgeorge.freepath.util.codec.Base58
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlin.time.Instant
 
@@ -14,131 +16,137 @@ object StatelessEnvelopeCodec {
     const val SCHEMA = 1
     private val HKDF_INFO_PREFIX = "freepath-stateless-v1".encodeToByteArray()
 
+    /**
+     * Seals [plaintext] for [receiverIdRaw].
+     *
+     * - An ephemeral X25519 key pair is generated per envelope so the relay cannot correlate
+     *   messages to a sender even by long-term encKey, and provides per-message forward secrecy.
+     * - [type], the sender peerId, and the Ed25519 signature are all packed into a protobuf
+     *   [SealedPayload] and encrypted together, so relay nodes learn nothing beyond [receiverIdRaw].
+     * - The signature covers `AAD ∥ plaintext`, binding receiver, timestamp, nonce, and content.
+     */
     fun seal(
         sender: Identity,
         receiverIdRaw: ByteArray,
-        receiverEncKeyPublic: ByteArray,
+        receiverEncKey: ByteArray,
+        type: Byte,
         plaintext: ByteArray,
         timestamp: Instant,
-        fragmentIndex: Int = 0,
-        fragmentCount: Int = 1,
     ): StatelessEnvelope {
-        require(fragmentCount >= 1) { "fragmentCount must be >= 1" }
-        require(fragmentIndex in 0..<fragmentCount) { "fragmentIndex must be in 0..<fragmentCount" }
-        require(timestamp >= Instant.fromEpochMilliseconds(0)) { "timestamp must be non-negative Unix epoch milliseconds" }
+        require(timestamp >= Instant.fromEpochMilliseconds(0)) {
+            "timestamp must be non-negative Unix epoch milliseconds"
+        }
 
         val nonce = CryptoProvider.randomBytes(12)
-        val senderIdRaw = sender.peerIdRaw
+        val aad = buildAad(SCHEMA, receiverIdRaw, timestamp, nonce)
 
-        val key = deriveKey(sender.encKeyPrivate, receiverEncKeyPublic, senderIdRaw, receiverIdRaw)
-        val aad = buildAad(SCHEMA, senderIdRaw, receiverIdRaw, timestamp, nonce, fragmentIndex, fragmentCount)
-        val ciphertext = CryptoProvider.chacha20Poly1305Encrypt(key, nonce, plaintext, aad)
-
-        val sigInput = sigInput(aad, ciphertext)
+        val sigInput = aad + plaintext
         val signature = CryptoProvider.ed25519Sign(sender.sigKeyPrivate, sigInput)
+
+        val innerBytes = encodeSealedPayload(
+            SealedPayload(
+                senderId = sender.peerId,
+                type = type.toInt() and 0xFF,
+                signature = signature,
+                payload = plaintext,
+            )
+        )
+
+        val ephKeyPair = CryptoProvider.generateX25519KeyPair()
+        val key = deriveKey(ephKeyPair.privateKey, receiverEncKey, receiverIdRaw)
+        val ciphertext = CryptoProvider.chacha20Poly1305Encrypt(key, nonce, innerBytes, aad)
 
         return StatelessEnvelope(
             schema = SCHEMA,
-            senderId = ContactCodec.derivePeerId(sender.sigKeyPublic),
             receiverId = Base58.encode(receiverIdRaw),
             timestamp = timestamp,
             nonce = nonce,
-            fragmentIndex = fragmentIndex,
-            fragmentCount = fragmentCount,
+            ephemeralKey = ephKeyPair.publicKey,
             payload = ciphertext,
-            signature = signature,
         )
     }
 
+    /**
+     * Opens and authenticates [envelope] for [receiver].
+     *
+     * Steps:
+     * 1. Verify the envelope is addressed to [receiver].
+     * 2. Derive the message key from [receiver]'s static decryption key and the ephemeral key.
+     * 3. AEAD-decrypt the payload (also authenticates AAD).
+     * 4. Deserialize the [SealedPayload] to extract sender, type, signature, and plaintext.
+     * 5. Look up the sender's contact and verify their Ed25519 signature.
+     *
+     * Returns `(type, plaintext)` on success; throws on any failure.
+     */
     fun open(
         envelope: StatelessEnvelope,
         receiver: Identity,
         contactLookup: (peerId: String) -> Contact?,
-    ): ByteArray {
-        if (envelope.schema != SCHEMA)
-            error("Unsupported schema: ${envelope.schema}")
-        if (envelope.fragmentCount < 1)
-            error("Invalid fragmentCount: ${envelope.fragmentCount}")
-        if (envelope.fragmentIndex < 0 || envelope.fragmentIndex >= envelope.fragmentCount)
-            error("fragmentIndex ${envelope.fragmentIndex} out of range for fragmentCount ${envelope.fragmentCount}")
+    ): Pair<Byte, ByteArray> {
+        if (envelope.schema != SCHEMA) error("Unsupported schema: ${envelope.schema}")
 
         val receiverIdRaw = runCatching { Base58.decode(envelope.receiverId) }
             .getOrElse { error("Invalid receiverId encoding") }
         if (!receiverIdRaw.contentEquals(receiver.peerIdRaw))
             error("Envelope receiverId does not match local peerId")
 
-        val contact = contactLookup(envelope.senderId)
-            ?: error("Unknown sender peerId")
-        val senderIdRaw = CryptoProvider.sha256(contact.sigKeyPublic)
-
         val nonce = envelope.nonce
         if (nonce.size != 12) error("Nonce must be 12 bytes, got ${nonce.size}")
-        val ciphertext = envelope.payload
-        val signature = envelope.signature
+        if (envelope.ephemeralKey.size != 32) error("ephemeralKey must be 32 bytes, got ${envelope.ephemeralKey.size}")
 
-        val aad = buildAad(
-            schema = envelope.schema,
-            senderIdRaw = senderIdRaw,
-            receiverIdRaw = receiverIdRaw,
-            timestamp = envelope.timestamp,
-            nonce = nonce,
-            fragmentIndex = envelope.fragmentIndex,
-            fragmentCount = envelope.fragmentCount,
-        )
-        val sigInput = sigInput(aad, ciphertext)
-        if (!CryptoProvider.ed25519Verify(contact.sigKeyPublic, sigInput, signature))
+        val aad = buildAad(envelope.schema, receiverIdRaw, envelope.timestamp, nonce)
+        val key = deriveKey(receiver.encKeyPrivate, envelope.ephemeralKey, receiverIdRaw)
+
+        val innerBytes = runCatching {
+            CryptoProvider.chacha20Poly1305Decrypt(key, nonce, envelope.payload, aad)
+        }.getOrElse { error("AEAD decryption failed") }
+
+        val sealed = runCatching { decodeSealedPayload(innerBytes) }
+            .getOrElse { error("Failed to deserialize inner payload") }
+
+        val contact = contactLookup(sealed.senderId) ?: error("Unknown sender peerId: ${sealed.senderId}")
+        val sigInput = aad + sealed.payload
+        if (!CryptoProvider.ed25519Verify(contact.sigKeyPublic, sigInput, sealed.signature))
             error("Signature verification failed")
 
-        val key = deriveKey(receiver.encKeyPrivate, contact.encKeyPublic, senderIdRaw, receiverIdRaw)
-        return runCatching {
-            CryptoProvider.chacha20Poly1305Decrypt(key, nonce, ciphertext, aad)
-        }.getOrElse { error("AEAD decryption failed") }
+        return sealed.type.toByte() to sealed.payload
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    fun encode(envelope: StatelessEnvelope): ByteArray =
-        ProtoBuf.encodeToByteArray(StatelessEnvelope.serializer(), envelope)
+    fun encode(envelope: StatelessEnvelope): ByteArray = ProtoBuf.encodeToByteArray(envelope)
 
     @OptIn(ExperimentalSerializationApi::class)
-    fun decode(bytes: ByteArray): StatelessEnvelope =
-        ProtoBuf.decodeFromByteArray(StatelessEnvelope.serializer(), bytes)
+    fun decode(bytes: ByteArray): StatelessEnvelope = ProtoBuf.decodeFromByteArray(bytes)
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private fun deriveKey(
-        localEncPriv: ByteArray,
-        peerEncPub: ByteArray,
-        senderIdRaw: ByteArray,
-        receiverIdRaw: ByteArray,
-    ): ByteArray {
-        val sharedSecret = CryptoProvider.x25519DH(localEncPriv, peerEncPub)
-        if (sharedSecret.all { it == 0.toByte() })
-            error("X25519 produced low-order point (all-zero shared secret)")
-        val info = HKDF_INFO_PREFIX + senderIdRaw + receiverIdRaw
+    /**
+     * Key = HKDF-SHA256(X25519(localEncPriv, peerEncKey), salt=32 zeros, info="freepath-stateless-v1" ∥ receiverIdRaw).
+     *
+     * On seal: [localEncPriv] is the ephemeral private key, [peerEncKey] is the receiver's static key.
+     * On open: [localEncPriv] is the receiver's static private key, [peerEncKey] is the ephemeral public key.
+     */
+    private fun deriveKey(localEncPriv: ByteArray, peerEncKey: ByteArray, receiverIdRaw: ByteArray): ByteArray {
+        val sharedSecret = CryptoProvider.x25519DH(localEncPriv, peerEncKey)
+        if (sharedSecret.all { it == 0.toByte() }) error("X25519 produced low-order point (all-zero shared secret)")
+        val info = HKDF_INFO_PREFIX + receiverIdRaw
         return CryptoProvider.hkdfSha256(ikm = sharedSecret, salt = ByteArray(32), info = info, outputLen = 32)
     }
 
-    // AAD = schema(4BE) ∥ senderIdRaw(32) ∥ receiverIdRaw(32) ∥ timestamp(8BE) ∥ nonce(12) ∥ fragmentIndex(4BE) ∥ fragmentCount(4BE)
-    private fun buildAad(
-        schema: Int,
-        senderIdRaw: ByteArray,
-        receiverIdRaw: ByteArray,
-        timestamp: Instant,
-        nonce: ByteArray,
-        fragmentIndex: Int,
-        fragmentCount: Int,
-    ): ByteArray {
-        val buf = ByteArray(4 + 32 + 32 + 8 + 12 + 4 + 4)
+    // AAD = schema(4BE) ∥ receiverIdRaw(32) ∥ timestamp(8BE) ∥ nonce(12)
+    private fun buildAad(schema: Int, receiverIdRaw: ByteArray, timestamp: Instant, nonce: ByteArray): ByteArray {
+        val buf = ByteArray(4 + 32 + 8 + 12)
         var off = 0
         off = BinaryCodec.writeInt32BE(buf, off, schema)
-        senderIdRaw.copyInto(buf, off); off += 32
         receiverIdRaw.copyInto(buf, off); off += 32
         off = BinaryCodec.writeInt64BE(buf, off, timestamp.toEpochMilliseconds())
-        nonce.copyInto(buf, off); off += 12
-        off = BinaryCodec.writeInt32BE(buf, off, fragmentIndex)
-        BinaryCodec.writeInt32BE(buf, off, fragmentCount)
+        nonce.copyInto(buf, off)
         return buf
     }
 
-    private fun sigInput(aad: ByteArray, ciphertext: ByteArray): ByteArray = aad + ciphertext
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun encodeSealedPayload(payload: SealedPayload): ByteArray = ProtoBuf.encodeToByteArray(payload)
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun decodeSealedPayload(bytes: ByteArray): SealedPayload = ProtoBuf.decodeFromByteArray(bytes)
 }

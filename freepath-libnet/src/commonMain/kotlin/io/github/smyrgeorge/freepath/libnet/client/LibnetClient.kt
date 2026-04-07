@@ -69,7 +69,7 @@ class LibnetClient(
 
     private suspend fun open(request: NetRequest) {
         val (senderId, _, reqId, payload) = request
-        val (type, plaintext) = decrypt(senderId, payload).getOrElse {
+        val (type, plaintext) = open(senderId, payload).getOrElse {
             val reason = it.message ?: "Unknown error"
             log.error { "[open]: $reason" }
             nack(reqId, reason)
@@ -130,7 +130,7 @@ class LibnetClient(
     private fun seal(receiver: Contact, type: Byte, plaintext: ByteArray): ByteArray =
         LibnetClientCodec.seal(identity, receiver, type, plaintext)
 
-    private fun decrypt(senderId: String, payload: ByteArray): Result<Pair<Byte, ByteArray>> =
+    private fun open(senderId: String, payload: ByteArray): Result<Pair<Byte, ByteArray>> =
         LibnetClientCodec.open(payload, identity, contactLookup)?.let { Result.success(it) }
             ?: failure("Failed to decrypt message from $senderId")
 
