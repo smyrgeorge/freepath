@@ -38,7 +38,8 @@
       "Bash(./gradlew :freepath-libble:compileKotlinIosSimulatorArm64)",
       "Bash(./gradlew :freepath-libnet:compileKotlinJvm)",
       "Bash(./gradlew :freepath-libnet:jvmTest 2>&1)",
-      "Bash(./gradlew :freepath-libnet:jvmTest)"
+      "Bash(./gradlew :freepath-libnet:jvmTest)",
+      "Bash(./gradlew :freepath-database:jvmTest 2>&1)"
     ]
   }
 }

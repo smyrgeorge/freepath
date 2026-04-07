@@ -2,7 +2,7 @@ package io.github.smyrgeorge.freepath.libnet.client.codec
 
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
 import kotlin.time.Clock
 
 /**
@@ -13,6 +13,8 @@ import kotlin.time.Clock
  */
 object LibnetClientCodec {
     const val VERSION: Byte = 1
+    const val TYPE_CHAT: Byte = 1
+    const val TYPE_CONTENT: Byte = 2
 
     fun seal(
         identity: Identity,
@@ -20,10 +22,10 @@ object LibnetClientCodec {
         type: Byte,
         plaintext: ByteArray,
     ): ByteArray {
-        val receiverIdRaw = CryptoProvider.sha256(receiverContact.sigKeyPublic)
         val envelope = StatelessEnvelopeCodec.seal(
             sender = identity,
-            receiverIdRaw = receiverIdRaw,
+            receiverId = receiverContact.peerId,
+            receiverIdRaw = receiverContact.peerIdRaw,
             receiverEncKey = receiverContact.encKeyPublic,
             type = type,
             plaintext = plaintext,
@@ -32,14 +34,27 @@ object LibnetClientCodec {
         return byteArrayOf(VERSION, 0, 0, 0) + StatelessEnvelopeCodec.encode(envelope)
     }
 
+    /**
+     * Strips the 4-byte header and decodes the protobuf envelope without decrypting the payload.
+     * Returns `null` if the bytes are malformed or the version is unsupported.
+     */
+    fun decode(bytes: ByteArray): StatelessEnvelope? = try {
+        require(bytes.size >= 4) { "Message too short: ${bytes.size} bytes" }
+        require(bytes[0] == VERSION) { "Unsupported version: ${bytes[0].toInt()}" }
+        StatelessEnvelopeCodec.decode(bytes.copyOfRange(4, bytes.size))
+    } catch (_: Exception) {
+        null
+    }
+
+    /**
+     * Decrypts and authenticates an already-decoded [envelope].
+     * Returns `(type, plaintext)` on success, or `null` on any failure.
+     */
     fun open(
-        bytes: ByteArray,
+        envelope: StatelessEnvelope,
         identity: Identity,
         contactLookup: (String) -> Contact?,
     ): Pair<Byte, ByteArray>? = try {
-        require(bytes.size >= 4) { "Message too short: ${bytes.size} bytes" }
-        require(bytes[0] == VERSION) { "Unsupported version: ${bytes[0].toInt()}" }
-        val envelope = StatelessEnvelopeCodec.decode(bytes.drop(4).toByteArray())
         StatelessEnvelopeCodec.open(envelope, identity, contactLookup)
     } catch (_: Exception) {
         null

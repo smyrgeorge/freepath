@@ -4,7 +4,6 @@ import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.ContactCodec
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.util.codec.Base58
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -51,6 +50,7 @@ class StatelessEnvelopeCodecTest {
         timestamp: Instant = Clock.System.now(),
     ) = StatelessEnvelopeCodec.seal(
         sender = sender.identity,
+        receiverId = receiver.identity.peerId,
         receiverIdRaw = receiver.identity.peerIdRaw,
         receiverEncKey = receiver.identity.encKeyPublic,
         type = type,
@@ -119,7 +119,7 @@ class StatelessEnvelopeCodecTest {
         val envelope = seal(alice, bob)
 
         // Relay can read the receiver ID for routing — that's intentional.
-        assertEquals(Base58.encode(bob.identity.peerIdRaw), envelope.receiverId)
+        assertEquals(bob.identity.peerId, envelope.receiverId)
         // StatelessEnvelope has no senderId or signature fields — both are sealed inside the ciphertext.
     }
 

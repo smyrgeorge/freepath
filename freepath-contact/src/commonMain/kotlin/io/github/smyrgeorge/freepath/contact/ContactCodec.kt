@@ -45,6 +45,9 @@ object ContactCodec {
         return Base58.encode(multihash)
     }
 
+    /** Returns the raw 32-byte Peer ID: SHA-256(ed25519PubKey). Used for AAD and key derivation in StatelessEnvelope. */
+    fun peerIdRaw(ed25519PubKey: ByteArray): ByteArray = CryptoProvider.sha256(ed25519PubKey)
+
     /** Signs the protobuf-encoded contact bytes with [sigKeyPrivate]; returns the raw 64-byte Ed25519 signature. */
     fun sign(contact: Contact, sigKeyPrivate: ByteArray): ByteArray =
         CryptoProvider.ed25519Sign(sigKeyPrivate, encode(contact))

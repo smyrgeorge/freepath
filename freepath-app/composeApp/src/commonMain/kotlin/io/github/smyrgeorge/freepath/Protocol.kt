@@ -44,6 +44,7 @@ sealed interface Protocol : ActorProtocol {
     data class PublishContent(val body: ContentBody) : Message<Ok>()
 
     // Network events
+    data class PeerConnected(val peerId: String) : Message<Ok>()
     data class PeerIdentified(val peerId: String) : Message<Ok>()
 
     // Developer / testing

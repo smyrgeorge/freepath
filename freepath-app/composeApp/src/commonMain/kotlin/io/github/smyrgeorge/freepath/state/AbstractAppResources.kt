@@ -10,12 +10,15 @@ import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.database.MessageEntryRepository
+import io.github.smyrgeorge.freepath.database.RelayEntry
+import io.github.smyrgeorge.freepath.database.RelayEntryRepository
 import io.github.smyrgeorge.freepath.database.generated.ContactEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContactRoutingEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContentEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContentSyncEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.IdentityEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.MessageEntryRepositoryImpl
+import io.github.smyrgeorge.freepath.database.generated.RelayEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
@@ -52,10 +55,16 @@ abstract class AbstractAppResources(
     val contentSyncRepository: ContentSyncEntryRepository = ContentSyncEntryRepositoryImpl
     val contactRoutingRepository: ContactRoutingEntryRepository = ContactRoutingEntryRepositoryImpl
     val messageRepository: MessageEntryRepository = MessageEntryRepositoryImpl
+    val relayRepository: RelayEntryRepository = RelayEntryRepositoryImpl
 
     val libp2p: Libp2pModule = Libp2pModule().setEventHandler { event ->
         log.info { "LIBP2P Event: $event" }
         when (event) {
+            is Libp2pEvent.PeerConnected -> {
+                val cmd = Protocol.PeerConnected(event.peerId)
+                system.tell(cmd)
+            }
+
             is Libp2pEvent.PeerIdentified -> {
                 val cmd = Protocol.PeerIdentified(event.peerId)
                 system.tell(cmd)
@@ -134,6 +143,11 @@ abstract class AbstractAppResources(
             onContentReceived = { content ->
                 val cmd = Protocol.ContentReceived(content)
                 system.tell(cmd)
+            },
+            onRelayPacket = { receiverPeerId, payload ->
+                val entry = RelayEntry(receiverPeerId = receiverPeerId, payload = payload)
+                relayRepository.save(db, entry)
+                    .onFailure { log.error { "Failed to store relay packet for $receiverPeerId: ${it.message}" } }
             },
         ).apply {
             start()

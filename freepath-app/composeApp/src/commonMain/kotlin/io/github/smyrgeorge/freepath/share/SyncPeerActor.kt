@@ -14,11 +14,11 @@ import io.github.smyrgeorge.freepath.state.abbrev
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlin.time.Clock
 
-class PeerActor(
+class SyncPeerActor(
     key: String,
     state: AbstractAppState,
     resources: AbstractAppResources,
-) : Actor<PeerProtocol, PeerProtocol.Response>(key) {
+) : Actor<SyncPeerProtocol, SyncPeerProtocol.Response>(key) {
 
     private val peerId: String get() = key
 
@@ -36,16 +36,18 @@ class PeerActor(
         }
     }
 
-    override suspend fun onReceive(m: PeerProtocol): Behavior<PeerProtocol.Response> {
+    override suspend fun onReceive(m: SyncPeerProtocol): Behavior<SyncPeerProtocol.Response> {
         when (m) {
-            is PeerProtocol.Sync -> sync()
+            is SyncPeerProtocol.Sync -> sync()
         }
-        return Behavior.Reply(PeerProtocol.Ok)
+        return Behavior.Reply(SyncPeerProtocol.Ok)
     }
 
     private suspend fun sync() {
+        // 1. Sync any new content
         sync(contactContent)
 
+        // 2. Sync any new content from other peers
         var offset = 0
         val pageSize = 50
 

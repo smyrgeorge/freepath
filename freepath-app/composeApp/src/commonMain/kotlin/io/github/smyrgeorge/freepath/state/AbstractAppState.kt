@@ -25,6 +25,7 @@ import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.database.MessageEntry
 import io.github.smyrgeorge.freepath.database.MessageEntryRepository
 import io.github.smyrgeorge.freepath.database.MessageStatus
+import io.github.smyrgeorge.freepath.database.RelayEntryRepository
 import io.github.smyrgeorge.freepath.state.model.ConnectionSource
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
@@ -51,6 +52,7 @@ abstract class AbstractAppState(
     private val contentSyncRepository: ContentSyncEntryRepository = resources.contentSyncRepository
     private val contactRoutingRepository: ContactRoutingEntryRepository = resources.contactRoutingRepository
     private val messageRepository: MessageEntryRepository = resources.messageRepository
+    private val relayRepository: RelayEntryRepository = resources.relayRepository
 
     private val _contacts = MutableStateFlow<List<ContactEntry>>(emptyList())
     val contacts: StateFlow<List<ContactEntry>> = _contacts.asStateFlow()
@@ -229,6 +231,7 @@ abstract class AbstractAppState(
                 contentSyncRepository.deleteAll(this).getOrThrow()
                 contactRoutingRepository.deleteAll(this).getOrThrow()
                 messageRepository.deleteAll(this).getOrThrow()
+                relayRepository.deleteAll(this).getOrThrow()
             }
         }.onSuccess {
             log.info("[dev] All data deleted.")

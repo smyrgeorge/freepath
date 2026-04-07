@@ -3,7 +3,8 @@ package io.github.smyrgeorge.freepath
 import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.actor4k.system.registry.SimpleActorRegistry
 import io.github.smyrgeorge.actor4k.util.SimpleLoggerFactory
-import io.github.smyrgeorge.freepath.share.PeerActor
+import io.github.smyrgeorge.freepath.share.SyncPeerActor
+import io.github.smyrgeorge.freepath.share.RelayPeerActor
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.hours
@@ -28,8 +29,11 @@ object AppHooks {
                     resources = AppResources,
                 )
             }
-            .factoryFor(PeerActor::class) { key ->
-                PeerActor(key = key, state = AppState, resources = AppResources)
+            .factoryFor(SyncPeerActor::class) { key ->
+                SyncPeerActor(key = key, state = AppState, resources = AppResources)
+            }
+            .factoryFor(RelayPeerActor::class) { key ->
+                RelayPeerActor(key = key, resources = AppResources)
             }
 
         ActorSystem

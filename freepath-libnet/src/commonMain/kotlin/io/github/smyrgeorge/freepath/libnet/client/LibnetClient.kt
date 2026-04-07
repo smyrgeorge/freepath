@@ -9,6 +9,7 @@ import io.github.smyrgeorge.freepath.content.MessageCodec
 import io.github.smyrgeorge.freepath.libnet.LibnetModule
 import io.github.smyrgeorge.freepath.libnet.NetRequest
 import io.github.smyrgeorge.freepath.libnet.client.codec.LibnetClientCodec
+import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,7 @@ class LibnetClient(
     private val contactLookup: (peerId: String) -> Contact?,
     private val onMessageReceived: suspend (Message) -> Result<Unit>,
     private val onContentReceived: suspend (Content) -> Result<Unit>,
+    private val onRelayPacket: suspend (receiverPeerId: String, payload: ByteArray) -> Unit,
 ) {
     private val log: Logger = Logger.of(this::class)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -63,13 +65,29 @@ class LibnetClient(
         return libnet.request(reqId, receiverId, payload, onFrameSent).map { }
     }
 
-    private fun receiverContact(peerId: String): Result<Contact> =
-        contactLookup(peerId)?.let { Result.success(it) }
-            ?: failure("No contact card for $peerId, cannot encrypt")
+    suspend fun relay(
+        payload: ByteArray,
+        receiverId: String,
+        reqId: Long = Random.nextLong(),
+    ): Result<Unit> = libnet.request(reqId, receiverId, payload) { _, _, _ -> }.map { }
 
     private suspend fun open(request: NetRequest) {
         val (senderId, _, reqId, payload) = request
-        val (type, plaintext) = open(senderId, payload).getOrElse {
+
+        val envelope = LibnetClientCodec.decode(payload) ?: run {
+            log.error { "[open]: malformed packet from $senderId" }
+            nack(reqId, "Malformed packet")
+            return
+        }
+
+        if (envelope.receiverId != identity.peerId) {
+            log.debug { "[open]: storing relay packet for ${envelope.receiverId}" }
+            onRelayPacket(envelope.receiverId, payload)
+            ack(reqId)
+            return
+        }
+
+        val (type, plaintext) = open(senderId, envelope).getOrElse {
             val reason = it.message ?: "Unknown error"
             log.error { "[open]: $reason" }
             nack(reqId, reason)
@@ -130,13 +148,17 @@ class LibnetClient(
     private fun seal(receiver: Contact, type: Byte, plaintext: ByteArray): ByteArray =
         LibnetClientCodec.seal(identity, receiver, type, plaintext)
 
-    private fun open(senderId: String, payload: ByteArray): Result<Pair<Byte, ByteArray>> =
-        LibnetClientCodec.open(payload, identity, contactLookup)?.let { Result.success(it) }
+    private fun open(senderId: String, envelope: StatelessEnvelope): Result<Pair<Byte, ByteArray>> =
+        LibnetClientCodec.open(envelope, identity, contactLookup)?.let { Result.success(it) }
             ?: failure("Failed to decrypt message from $senderId")
 
+    private fun receiverContact(peerId: String): Result<Contact> =
+        contactLookup(peerId)?.let { Result.success(it) }
+            ?: failure("No contact card for $peerId, cannot encrypt")
+
     companion object {
-        const val TYPE_CHAT: Byte = 1
-        const val TYPE_CONTENT: Byte = 2
+        const val TYPE_CHAT: Byte = LibnetClientCodec.TYPE_CHAT
+        const val TYPE_CONTENT: Byte = LibnetClientCodec.TYPE_CONTENT
 
         private fun <T> failure(reason: String): Result<T> = Result.failure(IllegalStateException(reason))
     }

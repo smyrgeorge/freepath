@@ -23,9 +23,12 @@ data class Contact(
     /** Human-readable display name chosen by the owner. Max 64 chars. */
     @ProtoNumber(5) val name: String? = null,
 ) {
-    val peerId: String by lazy { ContactCodec.derivePeerId(Base64.decode(sigKey)) }
     val sigKeyPublic: ByteArray by lazy { Base64.decode(sigKey) }
     val encKeyPublic: ByteArray by lazy { Base64.decode(encKey) }
+
+    /** Raw 32-byte Peer ID: SHA-256(sigKeyPublic). Used for AAD and key derivation in StatelessEnvelope. */
+    val peerIdRaw: ByteArray by lazy { ContactCodec.peerIdRaw(sigKeyPublic) }
+    val peerId: String by lazy { ContactCodec.derivePeerId(sigKeyPublic) }
 
     init {
         require(schema == SCHEMA) { "Unsupported schema version: $schema (expected $SCHEMA)" }

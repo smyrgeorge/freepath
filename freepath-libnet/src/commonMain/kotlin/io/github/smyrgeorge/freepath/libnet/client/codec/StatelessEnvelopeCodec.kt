@@ -5,7 +5,6 @@ import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.libnet.client.model.SealedPayload
 import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
-import io.github.smyrgeorge.freepath.util.codec.Base58
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -22,11 +21,14 @@ object StatelessEnvelopeCodec {
      * - An ephemeral X25519 key pair is generated per envelope so the relay cannot correlate
      *   messages to a sender even by long-term encKey, and provides per-message forward secrecy.
      * - [type], the sender peerId, and the Ed25519 signature are all packed into a protobuf
-     *   [SealedPayload] and encrypted together, so relay nodes learn nothing beyond [receiverIdRaw].
+     *   [SealedPayload] and encrypted together, so relay nodes learn nothing beyond [receiverId].
      * - The signature covers `AAD ∥ plaintext`, binding receiver, timestamp, nonce, and content.
+     * - [receiverId] is the libp2p-format peer ID stored in the envelope for routing.
+     *   [receiverIdRaw] is the underlying SHA-256 bytes used for AAD and key derivation.
      */
     fun seal(
         sender: Identity,
+        receiverId: String,
         receiverIdRaw: ByteArray,
         receiverEncKey: ByteArray,
         type: Byte,
@@ -58,7 +60,7 @@ object StatelessEnvelopeCodec {
 
         return StatelessEnvelope(
             schema = SCHEMA,
-            receiverId = Base58.encode(receiverIdRaw),
+            receiverId = receiverId,
             timestamp = timestamp,
             nonce = nonce,
             ephemeralKey = ephKeyPair.publicKey,
@@ -84,12 +86,10 @@ object StatelessEnvelopeCodec {
         contactLookup: (peerId: String) -> Contact?,
     ): Pair<Byte, ByteArray> {
         if (envelope.schema != SCHEMA) error("Unsupported schema: ${envelope.schema}")
-
-        val receiverIdRaw = runCatching { Base58.decode(envelope.receiverId) }
-            .getOrElse { error("Invalid receiverId encoding") }
-        if (!receiverIdRaw.contentEquals(receiver.peerIdRaw))
+        if (envelope.receiverId != receiver.peerId)
             error("Envelope receiverId does not match local peerId")
 
+        val receiverIdRaw = receiver.peerIdRaw
         val nonce = envelope.nonce
         if (nonce.size != 12) error("Nonce must be 12 bytes, got ${nonce.size}")
         if (envelope.ephemeralKey.size != 32) error("ephemeralKey must be 32 bytes, got ${envelope.ephemeralKey.size}")
