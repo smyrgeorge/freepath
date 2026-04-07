@@ -124,10 +124,10 @@ abstract class AbstractAppResources(
             identity = identity,
             libnet = libnet,
             contactLookup = contactLookup,
-            onChatMessageReceived = { msg ->
-                val cmd = Protocol.ChatMessageReceived(msg.senderId, msg.receiverId, msg)
+            onMessageReceived = { msg ->
+                val cmd = Protocol.MessageReceived(msg)
                 system.tell(cmd).map { }
-                    .onFailure { log.error { "Failed to deliver chat message to the system actor: $it" } }
+                    .onFailure { log.error { "Failed to deliver message to the system actor: $it" } }
             },
             onContentReceived = { content ->
                 val cmd = Protocol.ContentReceived(content)

@@ -73,7 +73,7 @@ class FeedHelpersTest {
 
     @Test
     fun previewText_returnsContact_forContact() {
-        assertEquals("Contact", ContentBody.Contact(bio = "Hello").previewText())
+        assertEquals("Contact", ContentBody.Contact(bio = "Hello", avatar = null, location = null).previewText())
     }
 
     // ── ContentBody.fullText() ─────────────────────────────────────────────────
@@ -95,11 +95,11 @@ class FeedHelpersTest {
 
     @Test
     fun fullText_returnsBio_forContactWithBio() {
-        assertEquals("My bio", ContentBody.Contact(bio = "My bio").fullText())
+        assertEquals("My bio", ContentBody.Contact(bio = "My bio", avatar = null, location = null).fullText())
     }
 
     @Test
     fun fullText_returnsEmpty_forContactWithNoBio() {
-        assertEquals("", ContentBody.Contact().fullText())
+        assertEquals("", ContentBody.Contact(bio = null, avatar = null, location = null).fullText())
     }
 }

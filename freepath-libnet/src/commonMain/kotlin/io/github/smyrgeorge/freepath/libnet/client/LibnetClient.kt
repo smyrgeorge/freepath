@@ -4,10 +4,11 @@ import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.content.ContentCodec
+import io.github.smyrgeorge.freepath.content.Message
+import io.github.smyrgeorge.freepath.content.MessageCodec
 import io.github.smyrgeorge.freepath.libnet.LibnetModule
 import io.github.smyrgeorge.freepath.libnet.NetRequest
 import io.github.smyrgeorge.freepath.libnet.client.codec.LibnetClientCodec
-import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,7 @@ class LibnetClient(
     private val identity: Identity,
     private val libnet: LibnetModule,
     private val contactLookup: (peerId: String) -> Contact?,
-    private val onChatMessageReceived: suspend (ChatMessage) -> Result<Unit>,
+    private val onMessageReceived: suspend (Message) -> Result<Unit>,
     private val onContentReceived: suspend (Content) -> Result<Unit>,
 ) {
     private val log: Logger = Logger.of(this::class)
@@ -37,15 +38,16 @@ class LibnetClient(
     }
 
     suspend fun send(
-        message: ChatMessage,
+        message: Message,
+        receiverId: String,
         reqId: Long = Random.nextLong(),
         onFrameSent: (reqId: Long, frameIndex: Int, frameCount: Int) -> Unit = { reqId, frameIndex, frameCount ->
             log.debug { "Sent frame ${frameIndex + 1} of $frameCount for reqId=$reqId" }
         },
     ): Result<Unit> {
-        val receiver = receiverContact(message.receiverId).getOrElse { return Result.failure(it) }
-        val payload = seal(receiver, TYPE_CHAT, message.encodeToByteArray())
-        return libnet.request(reqId, message.receiverId, payload, onFrameSent).map { }
+        val receiver = receiverContact(receiverId).getOrElse { return Result.failure(it) }
+        val payload = seal(receiver, TYPE_CHAT, MessageCodec.encode(message))
+        return libnet.request(reqId, receiverId, payload, onFrameSent).map { }
     }
 
     suspend fun send(
@@ -66,7 +68,7 @@ class LibnetClient(
             ?: failure("No contact card for $peerId, cannot encrypt")
 
     private suspend fun open(request: NetRequest) {
-        val (senderId, recipientId, reqId, payload) = request
+        val (senderId, _, reqId, payload) = request
         val (type, plaintext) = decrypt(senderId, payload).getOrElse {
             val reason = it.message ?: "Unknown error"
             log.error { "[open]: $reason" }
@@ -76,9 +78,14 @@ class LibnetClient(
 
         when (type) {
             TYPE_CHAT -> {
-                val message = ChatMessage.decodeFromByteArray(plaintext, senderId, recipientId)
-                onChatMessageReceived(message).onFailure {
-                    val reason = "Failed to deliver chat message from $senderId: ${it.message}"
+                val message = MessageCodec.decode(plaintext).getOrElse {
+                    val reason = "Failed to decode message from $senderId: ${it.message}"
+                    log.error { "[open]: $reason" }
+                    nack(reqId, reason)
+                    return
+                }
+                onMessageReceived(message).onFailure {
+                    val reason = "Failed to deliver message from $senderId: ${it.message}"
                     log.error { "[open]: $reason" }
                     nack(reqId, reason)
                     return

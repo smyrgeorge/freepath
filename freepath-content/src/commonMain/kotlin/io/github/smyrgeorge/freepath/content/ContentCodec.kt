@@ -14,17 +14,13 @@ import kotlin.time.Instant
 @OptIn(ExperimentalSerializationApi::class)
 object ContentCodec {
 
-    const val SCHEMA = 1
-
     fun sign(envelope: Content, sigKeyPrivate: ByteArray): ByteArray {
         val bytes = ProtobufCodec.protobuf.encodeToByteArray(toSignable(envelope))
         return CryptoProvider.ed25519Sign(sigKeyPrivate, bytes)
     }
 
-    fun verify(envelope: Content, sigKeyPublic: String): Boolean {
-        val sigKeyPublic = Base64.decode(sigKeyPublic)
-        return verify(envelope, sigKeyPublic)
-    }
+    fun verify(envelope: Content, sigKeyPublic: String): Boolean =
+        verify(envelope, Base64.decode(sigKeyPublic))
 
     fun verify(envelope: Content, sigKeyPublic: ByteArray): Boolean {
         val signatureBytes = Base64.decode(envelope.signature)
@@ -40,7 +36,7 @@ object ContentCodec {
     ): Content {
         val placeholder = Content(
             id = ContentBodyCodec.deriveId(body),
-            schema = SCHEMA,
+            schema = Content.SCHEMA,
             type = typeOf(body),
             authorId = authorId,
             version = 1,

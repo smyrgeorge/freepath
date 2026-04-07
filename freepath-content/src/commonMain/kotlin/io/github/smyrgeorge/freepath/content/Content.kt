@@ -11,7 +11,7 @@ import kotlin.time.Instant
 @Serializable
 data class Content(
     @ProtoNumber(1) val id: String,
-    @ProtoNumber(2) val schema: Int = 1,
+    @ProtoNumber(2) val schema: Int = SCHEMA,
     @ProtoNumber(3) val type: ContentType,
     @ProtoNumber(4) val authorId: String,
     @ProtoNumber(5) val version: Int = 1,

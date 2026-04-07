@@ -87,7 +87,7 @@ fun ChatScreen(
         if (text.isBlank()) return
         inputText = ""
         scope.launch {
-            AppResources.system.tell(Protocol.SendChatMessage(contact.peerId, text))
+            AppResources.system.tell(Protocol.SendMessage(contact.peerId, text))
         }
     }
 
@@ -139,7 +139,7 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(messages) { msg ->
-                    ChatBubble(text = msg.text, fromMe = msg.senderId == AppState.contact.peerId)
+                    ChatBubble(text = msg.body ?: "", fromMe = msg.senderId == AppState.contact.peerId)
                 }
             }
         }

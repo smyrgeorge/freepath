@@ -1,12 +1,12 @@
 package io.github.smyrgeorge.freepath
 
 import io.github.smyrgeorge.actor4k.actor.ActorProtocol
-import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContactEntry
+import io.github.smyrgeorge.freepath.content.Message as ChatMessage
 
 sealed interface Protocol : ActorProtocol {
     sealed class Message<R : ActorProtocol.Response> : Protocol, ActorProtocol.Message<R>()
@@ -36,8 +36,8 @@ sealed interface Protocol : ActorProtocol {
     data class BleContactExchangeFailed(val reason: String) : Message<Ok>()
 
     // Chat
-    data class SendChatMessage(val peerId: String, val text: String) : Message<Ok>()
-    data class ChatMessageReceived(val senderId: String, val receiverId: String, val msg: ChatMessage) : Message<Ok>()
+    data class SendMessage(val peerId: String, val text: String) : Message<Ok>()
+    data class MessageReceived(val msg: ChatMessage) : Message<Ok>()
 
     // Content
     data class ContentReceived(val envelope: Content) : Message<Ok>()

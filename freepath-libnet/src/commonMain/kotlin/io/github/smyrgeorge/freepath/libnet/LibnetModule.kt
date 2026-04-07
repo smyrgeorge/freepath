@@ -208,7 +208,7 @@ class LibnetModule(
             // intermediate frame — buffer it and ACK immediately (bypasses pendingRequests)
             pendingMutex.withLock {
                 reassemblyBuffers.getOrPut(Pair(senderId, header.transferId)) {
-                    ReassemblyBuffer(header.frameCount, senderId)
+                    ReassemblyBuffer(header.frameCount)
                 }.add(header.frameIndex, header.payload)
             }
             when (transport) {

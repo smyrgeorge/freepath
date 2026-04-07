@@ -1,10 +1,13 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package io.github.smyrgeorge.freepath
 
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.actor4k.actor.impl.BehaviorActor
 import io.github.smyrgeorge.actor4k.system.ActorSystem
+import io.github.smyrgeorge.freepath.content.Message
+import io.github.smyrgeorge.freepath.content.MessageCodec
 import io.github.smyrgeorge.freepath.database.ContactEntry
-import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
 import io.github.smyrgeorge.freepath.share.PeerActor
 import io.github.smyrgeorge.freepath.share.PeerProtocol
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
@@ -18,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.measureTime
+import kotlin.uuid.ExperimentalUuidApi
 
 class AppActor(
     key: String,
@@ -106,21 +110,28 @@ class AppActor(
                             sigKeyPrivate = state.identity.sigKeyPrivate,
                         )
                         result.onSuccess { r ->
-                            ctx.tell(Protocol.BleContactExchangeSucceeded(r.contact, r.peripheralId, r.identitySecret)).getOrThrow()
+                            ctx.tell(Protocol.BleContactExchangeSucceeded(r.contact, r.peripheralId, r.identitySecret))
+                                .getOrThrow()
                         }.onFailure { e ->
                             ctx.tell(Protocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed")).getOrThrow()
                         }
                     }
                 }
 
-                is Protocol.SendChatMessage -> {
-                    val message = ChatMessage(state.identityEntry.peerId, m.peerId, m.text)
-                    resources.client.send(message)
+                is Protocol.SendMessage -> {
+                    val message = MessageCodec.seal(
+                        sigKeyPrivate = state.identity.sigKeyPrivate,
+                        conversationId = Message.conversationId(state.identityEntry.peerId, m.peerId),
+                        senderId = state.identityEntry.peerId,
+                        recipientId = m.peerId,
+                        body = m.text,
+                    )
+                    resources.client.send(message, m.peerId)
                         .onSuccess { state.appendMessage(message) }
                         .onFailure { log.error("Failed to send chat message: ${it.message}") }
                 }
 
-                is Protocol.ChatMessageReceived -> state.appendMessage(m.msg)
+                is Protocol.MessageReceived -> state.appendMessage(m.msg)
                 is Protocol.ContentReceived -> state.receiveContent(m.envelope)
                 is Protocol.PublishContent -> state.publishContent(m.body)
                 is Protocol.PeerIdentified -> {
@@ -173,7 +184,8 @@ class AppActor(
                             sigKeyPrivate = state.identity.sigKeyPrivate,
                         )
                         result.onSuccess { r ->
-                            ctx.tell(Protocol.BleContactExchangeSucceeded(r.contact, r.peripheralId, r.identitySecret)).getOrThrow()
+                            ctx.tell(Protocol.BleContactExchangeSucceeded(r.contact, r.peripheralId, r.identitySecret))
+                                .getOrThrow()
                         }.onFailure { e ->
                             ctx.tell(Protocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed")).getOrThrow()
                         }
@@ -201,7 +213,7 @@ class AppActor(
                     // Stay in exchange until user dismisses the Failed drawer via BleContactExchangeCancelled
                 }
 
-                is Protocol.ChatMessageReceived -> state.appendMessage(m.msg)
+                is Protocol.MessageReceived -> state.appendMessage(m.msg)
                 is Protocol.ContentReceived -> state.receiveContent(m.envelope)
                 else -> log.warn("[exchange] Contact exchange in process.. (ignored $m)")
             }

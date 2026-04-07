@@ -4,7 +4,6 @@ import kotlin.time.Clock
 
 internal class ReassemblyBuffer(
     val frameCount: Int,
-    val senderId: String,
 ) {
     var updatedAt = Clock.System.now()
         private set

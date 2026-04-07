@@ -21,7 +21,7 @@ import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentTrust
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
-import io.github.smyrgeorge.freepath.libnet.client.model.ChatMessage
+import io.github.smyrgeorge.freepath.content.Message
 import io.github.smyrgeorge.freepath.state.model.ConnectionSource
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
@@ -53,8 +53,8 @@ abstract class AbstractAppState(
     private val _contactContents = MutableStateFlow<Map<String, ContentBody.Contact>>(emptyMap())
     val contactContents: StateFlow<Map<String, ContentBody.Contact>> = _contactContents.asStateFlow()
 
-    private val _chats = MutableStateFlow<Map<String, List<ChatMessage>>>(emptyMap())
-    val chats: StateFlow<Map<String, List<ChatMessage>>> = _chats.asStateFlow()
+    private val _chats = MutableStateFlow<Map<String, List<Message>>>(emptyMap())
+    val chats: StateFlow<Map<String, List<Message>>> = _chats.asStateFlow()
 
     private val _feedEntries = MutableStateFlow<List<ContentEntry>>(emptyList())
     val feedEntries: StateFlow<List<ContentEntry>> = _feedEntries.asStateFlow()
@@ -184,11 +184,11 @@ abstract class AbstractAppState(
         contactContentBody = body
     }
 
-    fun appendMessage(message: ChatMessage) {
+    fun appendMessage(message: Message) {
         // The chat map is keyed by the remote peer's node ID so the UI can look up
         // messages with chats[contact.peerId]. Use whichever side is not us.
         val conversationKey =
-            if (message.senderId == contact.peerId) message.receiverId
+            if (message.senderId == contact.peerId) message.recipientId ?: message.senderId
             else message.senderId
         _chats.update { current ->
             current + (conversationKey to (current[conversationKey] ?: emptyList()) + message)

@@ -10,7 +10,7 @@ class ReassemblyBufferTest {
 
     @Test
     fun `single frame completes buffer immediately`() {
-        val buf = ReassemblyBuffer(1, "sender", "recipient", Transport.LIBP2P)
+        val buf = ReassemblyBuffer(1)
         val complete = buf.add(0, byteArrayOf(1, 2, 3))
         assertTrue(complete)
         assertContentEquals(byteArrayOf(1, 2, 3), buf.assemble())
@@ -18,7 +18,7 @@ class ReassemblyBufferTest {
 
     @Test
     fun `three frames in order complete and assemble correctly`() {
-        val buf = ReassemblyBuffer(3, "sender", "recipient", Transport.LIBP2P)
+        val buf = ReassemblyBuffer(3)
         assertFalse(buf.add(0, byteArrayOf(1, 2)))
         assertFalse(buf.add(1, byteArrayOf(3, 4)))
         assertTrue(buf.add(2, byteArrayOf(5, 6)))
@@ -27,7 +27,7 @@ class ReassemblyBufferTest {
 
     @Test
     fun `three frames out of order complete and assemble correctly`() {
-        val buf = ReassemblyBuffer(3, "sender", "recipient", Transport.LIBBLE)
+        val buf = ReassemblyBuffer(3)
         assertFalse(buf.add(2, byteArrayOf(5, 6)))
         assertFalse(buf.add(0, byteArrayOf(1, 2)))
         assertTrue(buf.add(1, byteArrayOf(3, 4)))
@@ -36,7 +36,7 @@ class ReassemblyBufferTest {
 
     @Test
     fun `partial buffer is not complete`() {
-        val buf = ReassemblyBuffer(3, "sender", "recipient", Transport.LIBP2P)
+        val buf = ReassemblyBuffer(3)
         assertFalse(buf.add(0, byteArrayOf(1)))
         assertFalse(buf.add(1, byteArrayOf(2)))
         // frame 2 not yet received — buffer incomplete
@@ -44,7 +44,7 @@ class ReassemblyBufferTest {
 
     @Test
     fun `assemble with empty frame chunks produces correct result`() {
-        val buf = ReassemblyBuffer(2, "sender", "recipient", Transport.LIBP2P)
+        val buf = ReassemblyBuffer(2)
         buf.add(0, byteArrayOf(1, 2, 3))
         buf.add(1, ByteArray(0))
         assertContentEquals(byteArrayOf(1, 2, 3), buf.assemble())
