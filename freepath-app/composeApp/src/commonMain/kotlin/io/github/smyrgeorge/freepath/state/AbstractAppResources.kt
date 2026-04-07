@@ -9,11 +9,13 @@ import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
+import io.github.smyrgeorge.freepath.database.MessageEntryRepository
 import io.github.smyrgeorge.freepath.database.generated.ContactEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContactRoutingEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContentEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContentSyncEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.IdentityEntryRepositoryImpl
+import io.github.smyrgeorge.freepath.database.generated.MessageEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
@@ -49,6 +51,7 @@ abstract class AbstractAppResources(
     val contentRepository: ContentEntryRepository = ContentEntryRepositoryImpl
     val contentSyncRepository: ContentSyncEntryRepository = ContentSyncEntryRepositoryImpl
     val contactRoutingRepository: ContactRoutingEntryRepository = ContactRoutingEntryRepositoryImpl
+    val messageRepository: MessageEntryRepository = MessageEntryRepositoryImpl
 
     val libp2p: Libp2pModule = Libp2pModule().setEventHandler { event ->
         log.info { "LIBP2P Event: $event" }

@@ -77,6 +77,11 @@ fun ChatScreen(
 
     val isOnline = contact.peerId in nearbyPeers
 
+    // Load chat history from the database when the screen opens
+    LaunchedEffect(contact.peerId) {
+        AppState.loadChat(contact.peerId)
+    }
+
     // Scroll to bottom whenever messages change
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -139,7 +144,7 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(messages) { msg ->
-                    ChatBubble(text = msg.body ?: "", fromMe = msg.senderId == AppState.contact.peerId)
+                    ChatBubble(text = msg.message.body ?: "", fromMe = msg.senderId == AppState.contact.peerId)
                 }
             }
         }

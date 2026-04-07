@@ -10,4 +10,5 @@ val migrations: List<MigrationFile> = listOf(
     MigrationFile("5_create_table_content_sync.sql", V5_CreateTableContentSync),
     MigrationFile("6_add_ble_identity_secret.sql", V6_AddBleIdentitySecret),
     MigrationFile("7_drop_ble_peripheral_id.sql", V7_DropBlePeripheralId),
+    MigrationFile("8_create_table_message.sql", V8_CreateTableMessage),
 )

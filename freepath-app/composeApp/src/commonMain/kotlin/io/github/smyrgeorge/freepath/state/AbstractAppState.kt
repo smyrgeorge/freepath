@@ -9,6 +9,7 @@ import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.content.ContentCodec
 import io.github.smyrgeorge.freepath.content.ContentType
+import io.github.smyrgeorge.freepath.content.Message
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.crypto.KeyPair
 import io.github.smyrgeorge.freepath.database.ContactEntry
@@ -21,7 +22,9 @@ import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentTrust
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
-import io.github.smyrgeorge.freepath.content.Message
+import io.github.smyrgeorge.freepath.database.MessageEntry
+import io.github.smyrgeorge.freepath.database.MessageEntryRepository
+import io.github.smyrgeorge.freepath.database.MessageStatus
 import io.github.smyrgeorge.freepath.state.model.ConnectionSource
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
@@ -33,6 +36,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
+import kotlin.uuid.ExperimentalUuidApi
 
 abstract class AbstractAppState(
     resources: AbstractAppResources,
@@ -46,6 +50,7 @@ abstract class AbstractAppState(
     private val contentRepository: ContentEntryRepository = resources.contentRepository
     private val contentSyncRepository: ContentSyncEntryRepository = resources.contentSyncRepository
     private val contactRoutingRepository: ContactRoutingEntryRepository = resources.contactRoutingRepository
+    private val messageRepository: MessageEntryRepository = resources.messageRepository
 
     private val _contacts = MutableStateFlow<List<ContactEntry>>(emptyList())
     val contacts: StateFlow<List<ContactEntry>> = _contacts.asStateFlow()
@@ -53,8 +58,8 @@ abstract class AbstractAppState(
     private val _contactContents = MutableStateFlow<Map<String, ContentBody.Contact>>(emptyMap())
     val contactContents: StateFlow<Map<String, ContentBody.Contact>> = _contactContents.asStateFlow()
 
-    private val _chats = MutableStateFlow<Map<String, List<Message>>>(emptyMap())
-    val chats: StateFlow<Map<String, List<Message>>> = _chats.asStateFlow()
+    private val _chats = MutableStateFlow<Map<String, List<MessageEntry>>>(emptyMap())
+    val chats: StateFlow<Map<String, List<MessageEntry>>> = _chats.asStateFlow()
 
     private val _feedEntries = MutableStateFlow<List<ContentEntry>>(emptyList())
     val feedEntries: StateFlow<List<ContentEntry>> = _feedEntries.asStateFlow()
@@ -184,15 +189,31 @@ abstract class AbstractAppState(
         contactContentBody = body
     }
 
-    fun appendMessage(message: Message) {
+    suspend fun saveMessage(message: Message, status: MessageStatus): MessageEntry {
+        val entry = MessageEntry.from(message = message, status = status)
+        val saved = messageRepository.insert(db, entry).getOrThrow()
+
         // The chat map is keyed by the remote peer's node ID so the UI can look up
         // messages with chats[contact.peerId]. Use whichever side is not us.
         val conversationKey =
             if (message.senderId == contact.peerId) message.recipientId ?: message.senderId
             else message.senderId
         _chats.update { current ->
-            current + (conversationKey to (current[conversationKey] ?: emptyList()) + message)
+            current + (conversationKey to (current[conversationKey] ?: emptyList()) + saved)
         }
+
+        return saved
+    }
+
+    @OptIn(ExperimentalUuidApi::class)
+    suspend fun loadChat(peerId: String, limit: Int = 50) {
+        val conversationId = Message.conversationId(identityEntry.peerId, peerId)
+        val messages = messageRepository.findAllByConversationId(db, conversationId, limit, 0).getOrThrow()
+        _chats.update { current -> current + (peerId to messages) }
+    }
+
+    suspend fun updateMessageStatus(entry: MessageEntry, status: MessageStatus) {
+        messageRepository.update(db, entry.copy(status = status)).getOrThrow()
     }
 
     fun contactLookup(peerId: String): Contact? =
@@ -207,6 +228,7 @@ abstract class AbstractAppState(
                 contentRepository.deleteAll(this).getOrThrow()
                 contentSyncRepository.deleteAll(this).getOrThrow()
                 contactRoutingRepository.deleteAll(this).getOrThrow()
+                messageRepository.deleteAll(this).getOrThrow()
             }
         }.onSuccess {
             log.info("[dev] All data deleted.")
@@ -253,14 +275,6 @@ abstract class AbstractAppState(
         }
     }
 
-    private suspend fun loadIdentity() {
-        val existing = identityRepository.findAll(db).getOrThrow()
-        require(existing.size <= 1) { "Expected at most one identity entry, got $existing" }
-        val entry = existing.firstOrNull() ?: createAndSaveIdentity()
-        identity = entry.identity
-        identityEntry = entry
-    }
-
     suspend fun updateAvatar(avatar: String?) {
         val updatedBody = contactContentBody.copy(avatar = avatar)
         val updatedEnvelope = contactContentEntry.content.copy(body = updatedBody)
@@ -297,6 +311,14 @@ abstract class AbstractAppState(
         contentRepository.insert(db, entry).getOrThrow()
         log.info("[publishContent] Published content: ${envelope.id}")
         loadFeed()
+    }
+
+    private suspend fun loadIdentity() {
+        val existing = identityRepository.findAll(db).getOrThrow()
+        require(existing.size <= 1) { "Expected at most one identity entry, got $existing" }
+        val entry = existing.firstOrNull() ?: createAndSaveIdentity()
+        identity = entry.identity
+        identityEntry = entry
     }
 
     private suspend fun Content.trust(): ContentTrust {

@@ -38,6 +38,12 @@ data class Message(
         content?.let {
             require(it !is ContentBody.Article) { "message content cannot be an article" }
         }
+        require(validateConversationId()) { "conversation id does not match sender and recipient" }
+    }
+
+    private fun validateConversationId(): Boolean {
+        val recipientId = recipientId ?: return true
+        return conversationId == conversationId(senderId, recipientId)
     }
 
     companion object {

@@ -8,6 +8,7 @@ import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.freepath.content.Message
 import io.github.smyrgeorge.freepath.content.MessageCodec
 import io.github.smyrgeorge.freepath.database.ContactEntry
+import io.github.smyrgeorge.freepath.database.MessageStatus
 import io.github.smyrgeorge.freepath.share.PeerActor
 import io.github.smyrgeorge.freepath.share.PeerProtocol
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
@@ -126,12 +127,16 @@ class AppActor(
                         recipientId = m.peerId,
                         body = m.text,
                     )
+                    val entry = state.saveMessage(message, MessageStatus.SENDING)
                     resources.client.send(message, m.peerId)
-                        .onSuccess { state.appendMessage(message) }
-                        .onFailure { log.error("Failed to send chat message: ${it.message}") }
+                        .onSuccess { state.updateMessageStatus(entry, MessageStatus.SENT) }
+                        .onFailure {
+                            state.updateMessageStatus(entry, MessageStatus.FAILED)
+                            log.error("Failed to send message: ${it.message}")
+                        }
                 }
 
-                is Protocol.MessageReceived -> state.appendMessage(m.msg)
+                is Protocol.MessageReceived -> state.saveMessage(m.msg, MessageStatus.RECEIVED)
                 is Protocol.ContentReceived -> state.receiveContent(m.envelope)
                 is Protocol.PublishContent -> state.publishContent(m.body)
                 is Protocol.PeerIdentified -> {
@@ -213,7 +218,7 @@ class AppActor(
                     // Stay in exchange until user dismisses the Failed drawer via BleContactExchangeCancelled
                 }
 
-                is Protocol.MessageReceived -> state.appendMessage(m.msg)
+                is Protocol.MessageReceived -> state.saveMessage(m.msg, MessageStatus.RECEIVED)
                 is Protocol.ContentReceived -> state.receiveContent(m.envelope)
                 else -> log.warn("[exchange] Contact exchange in process.. (ignored $m)")
             }
