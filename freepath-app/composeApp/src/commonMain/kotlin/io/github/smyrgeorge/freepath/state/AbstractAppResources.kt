@@ -129,13 +129,11 @@ abstract class AbstractAppResources(
             contactLookup = contactLookup,
             onMessageReceived = { msg ->
                 val cmd = Protocol.MessageReceived(msg)
-                system.tell(cmd).map { }
-                    .onFailure { log.error { "Failed to deliver message to the system actor: $it" } }
+                system.tell(cmd)
             },
             onContentReceived = { content ->
                 val cmd = Protocol.ContentReceived(content)
-                system.tell(cmd).map { }
-                    .onFailure { log.error { "Failed to deliver content to the system actor: $it" } }
+                system.tell(cmd)
             },
         ).apply {
             start()
