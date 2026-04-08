@@ -1,6 +1,7 @@
 package io.github.smyrgeorge.freepath.contact
 
 import io.github.smyrgeorge.freepath.contact.Contact.Companion.SCHEMA
+import io.github.smyrgeorge.freepath.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -28,6 +29,7 @@ data class Contact(
 
     /** Raw 32-byte Peer ID: SHA-256(sigKeyPublic). Used for AAD and key derivation in StatelessEnvelope. */
     val peerIdRaw: ByteArray by lazy { ContactCodec.peerIdRaw(sigKeyPublic) }
+    val peerIdHash: ByteArray by lazy { CryptoProvider.sha256(peerIdRaw) }
     val peerId: String by lazy { ContactCodec.derivePeerId(sigKeyPublic) }
 
     init {

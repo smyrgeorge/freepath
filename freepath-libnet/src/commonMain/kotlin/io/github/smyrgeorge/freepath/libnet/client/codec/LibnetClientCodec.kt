@@ -2,6 +2,7 @@ package io.github.smyrgeorge.freepath.libnet.client.codec
 
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
+import io.github.smyrgeorge.freepath.libnet.client.model.RelayOptions
 import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
 import kotlin.time.Clock
 
@@ -21,15 +22,16 @@ object LibnetClientCodec {
         receiverContact: Contact,
         type: Byte,
         plaintext: ByteArray,
+        relay: RelayOptions? = null,
     ): ByteArray {
         val envelope = StatelessEnvelopeCodec.seal(
             sender = identity,
-            receiverId = receiverContact.peerId,
             receiverIdRaw = receiverContact.peerIdRaw,
             receiverEncKey = receiverContact.encKeyPublic,
             type = type,
             plaintext = plaintext,
             timestamp = Clock.System.now(),
+            relay = relay,
         )
         return byteArrayOf(VERSION, 0, 0, 0) + StatelessEnvelopeCodec.encode(envelope)
     }

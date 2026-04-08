@@ -169,6 +169,21 @@ class LibbleModule {
     suspend fun request(timeout: Duration, peerId: String, payload: ByteArray): Response =
         rpc.request(timeout) { sendRequest(peerId, it, payload) }
 
+    /**
+     * Forwards [payload] to a specific BLE peripheral without knowing its peerId.
+     * Intended for store-and-forward relay to peers whose identity has not yet been
+     * established via contact exchange. The [peripheralId] must refer to a currently
+     * connected or recently discovered peripheral with a known PSM.
+     */
+    suspend fun relayToUnknown(timeout: Duration, peripheralId: String, payload: ByteArray): Response =
+        rpc.request(timeout) { reqId ->
+            pool.withConnection(peripheralId) { channel, _ ->
+                val frame = encodeReqId(reqId) +
+                        byteArrayOf(localPeerIdBytes.size.toByte()) + localPeerIdBytes + payload
+                channel.send(BleFrameType.REQUEST, frame)
+            }
+        }
+
     suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray) {
         suspend fun sendVia(targetId: String) {
             pool.withConnection(targetId) { channel, _ ->

@@ -4,12 +4,15 @@ import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.ContactCodec
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.libnet.client.model.RelayOptions
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -48,14 +51,15 @@ class StatelessEnvelopeCodecTest {
         plaintext: ByteArray = "hello".encodeToByteArray(),
         type: Byte = 1,
         timestamp: Instant = Clock.System.now(),
+        relay: RelayOptions? = null,
     ) = StatelessEnvelopeCodec.seal(
         sender = sender.identity,
-        receiverId = receiver.identity.peerId,
         receiverIdRaw = receiver.identity.peerIdRaw,
         receiverEncKey = receiver.identity.encKeyPublic,
         type = type,
         plaintext = plaintext,
         timestamp = timestamp,
+        relay = relay,
     )
 
     // ── Round-trip ────────────────────────────────────────────────────────────
@@ -101,7 +105,6 @@ class StatelessEnvelopeCodecTest {
         val alice = makeTestPeer()
         val bob = makeTestPeer()
 
-        // InstantSerializer stores milliseconds only, so truncate to avoid precision loss in round-trip.
         val timestamp = Instant.fromEpochMilliseconds(Clock.System.now().toEpochMilliseconds())
         val envelope = seal(alice, bob, timestamp = timestamp)
 
@@ -109,18 +112,19 @@ class StatelessEnvelopeCodecTest {
         assertEquals(envelope, decoded)
     }
 
-    // ── Sealed sender ─────────────────────────────────────────────────────────
+    // ── Receiver identity hash ────────────────────────────────────────────────
 
     @Test
-    fun `envelope exposes only receiver identity sender is not visible in header`() {
+    fun `envelope exposes receiver identity hash not plain peerId`() {
         val alice = makeTestPeer()
         val bob = makeTestPeer()
 
         val envelope = seal(alice, bob)
 
-        // Relay can read the receiver ID for routing — that's intentional.
-        assertEquals(bob.identity.peerId, envelope.receiverId)
-        // StatelessEnvelope has no senderId or signature fields — both are sealed inside the ciphertext.
+        // Relay nodes check the hash to route without learning the peerId.
+        val expectedHash = CryptoProvider.sha256(bob.identity.peerIdRaw)
+        assertContentEquals(expectedHash, envelope.receiverIdHash)
+        // StatelessEnvelope has no senderId or signature fields — sealed inside ciphertext.
     }
 
     @Test
@@ -134,6 +138,82 @@ class StatelessEnvelopeCodecTest {
         assertFalse(e1.ephemeralKey.contentEquals(e2.ephemeralKey))
     }
 
+    // ── Relay ─────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `direct envelope has null relay`() {
+        val alice = makeTestPeer()
+        val bob = makeTestPeer()
+
+        val envelope = seal(alice, bob)
+        assertNull(envelope.relay)
+    }
+
+    @Test
+    fun `relay envelope round-trip preserves metadata and plaintext`() {
+        val alice = makeTestPeer()
+        val bob = makeTestPeer()
+        val plaintext = "relay message".encodeToByteArray()
+
+        val envelope = seal(alice, bob, plaintext, relay = RelayOptions(ttl = 3, priority = 2))
+
+        val relay = assertNotNull(envelope.relay)
+        assertEquals(3, relay.ttl)
+        assertEquals(2, relay.priority)
+        assertEquals(32, relay.messageId.size)
+
+        val (_, result) = StatelessEnvelopeCodec.open(envelope, bob.identity, lookup(alice))
+        assertContentEquals(plaintext, result)
+    }
+
+    @Test
+    fun `messageId equals sha256 of nonce concatenated with ephemeralKey`() {
+        val alice = makeTestPeer()
+        val bob = makeTestPeer()
+
+        val envelope = seal(alice, bob, relay = RelayOptions(ttl = 3))
+
+        val expected = CryptoProvider.sha256(envelope.nonce + envelope.ephemeralKey)
+        assertContentEquals(expected, envelope.relay!!.messageId)
+    }
+
+    @Test
+    fun `relay ttl can be decremented without breaking open`() {
+        val alice = makeTestPeer()
+        val bob = makeTestPeer()
+
+        val envelope = seal(alice, bob, relay = RelayOptions(ttl = 3))
+        // TTL is excluded from AAD — relay nodes may decrement it legitimately.
+        val decremented = envelope.copy(relay = envelope.relay!!.copy(ttl = 2))
+
+        val (_, result) = StatelessEnvelopeCodec.open(decremented, bob.identity, lookup(alice))
+        assertContentEquals("hello".encodeToByteArray(), result)
+    }
+
+    @Test
+    fun `open fails when relay messageId is tampered`() {
+        val alice = makeTestPeer()
+        val bob = makeTestPeer()
+
+        val envelope = seal(alice, bob, relay = RelayOptions(ttl = 3))
+        val tampered = envelope.copy(
+            relay = envelope.relay!!.copy(messageId = ByteArray(32) { 0xFF.toByte() })
+        )
+
+        assertFails { StatelessEnvelopeCodec.open(tampered, bob.identity, lookup(alice)) }
+    }
+
+    @Test
+    fun `open fails when relay priority is tampered`() {
+        val alice = makeTestPeer()
+        val bob = makeTestPeer()
+
+        val envelope = seal(alice, bob, relay = RelayOptions(ttl = 3, priority = 1))
+        val tampered = envelope.copy(relay = envelope.relay!!.copy(priority = 99))
+
+        assertFails { StatelessEnvelopeCodec.open(tampered, bob.identity, lookup(alice)) }
+    }
+
     // ── Failure cases ─────────────────────────────────────────────────────────
 
     @Test
@@ -143,8 +223,6 @@ class StatelessEnvelopeCodecTest {
         val carol = makeTestPeer()
 
         val envelope = seal(alice, bob)
-
-        // Carol tries to open an envelope addressed to Bob — receiverId mismatch.
         assertFails { StatelessEnvelopeCodec.open(envelope, carol.identity, lookup(alice)) }
     }
 
@@ -168,8 +246,6 @@ class StatelessEnvelopeCodecTest {
         val bob = makeTestPeer()
 
         val envelope = seal(alice, bob)
-
-        // Bob's contact list maps alice's peerId to mallory's sigKey — signature verification fails.
         val wrongContact = Contact(
             schema = ContactCodec.SCHEMA,
             sigKey = Base64.encode(mallory.identity.sigKeyPublic),
@@ -199,7 +275,6 @@ class StatelessEnvelopeCodecTest {
         val bob = makeTestPeer()
 
         val envelope = seal(alice, bob)
-
         assertFails { StatelessEnvelopeCodec.open(envelope, bob.identity) { null } }
     }
 

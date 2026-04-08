@@ -9,7 +9,6 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -93,14 +92,14 @@ class LibnetClientCodecTest {
     // ── decode ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `decode returns receiverId matching the receiver peerId`() {
+    fun `decode returns receiverIdHash matching sha256 of receiver peerIdRaw`() {
         val alice = makeTestPeer()
         val bob = makeTestPeer()
 
         val bytes = seal(alice, bob)
         val envelope = assertNotNull(LibnetClientCodec.decode(bytes))
 
-        assertEquals(bob.identity.peerId, envelope.receiverId)
+        assertContentEquals(CryptoProvider.sha256(bob.identity.peerIdRaw), envelope.receiverIdHash)
     }
 
     @Test
@@ -210,7 +209,7 @@ class LibnetClientCodecTest {
     // ── Routing ───────────────────────────────────────────────────────────────
 
     @Test
-    fun `decoded receiverId identifies relay vs own packet`() {
+    fun `decoded receiverIdHash identifies relay vs own packet`() {
         val alice = makeTestPeer()
         val bob = makeTestPeer()
         val carol = makeTestPeer()
@@ -218,9 +217,9 @@ class LibnetClientCodecTest {
         val forBob = assertNotNull(LibnetClientCodec.decode(seal(alice, bob)))
         val forCarol = assertNotNull(LibnetClientCodec.decode(seal(alice, carol)))
 
-        // Bob can distinguish packets for him from relay candidates.
-        assertEquals(bob.identity.peerId, forBob.receiverId)
-        assertEquals(carol.identity.peerId, forCarol.receiverId)
-        assertNotEquals(forCarol.receiverId, bob.identity.peerId)
+        // Bob can distinguish packets for him from relay candidates via receiverIdHash.
+        assertContentEquals(CryptoProvider.sha256(bob.identity.peerIdRaw), forBob.receiverIdHash)
+        assertContentEquals(CryptoProvider.sha256(carol.identity.peerIdRaw), forCarol.receiverIdHash)
+        assertFalse(forCarol.receiverIdHash.contentEquals(CryptoProvider.sha256(bob.identity.peerIdRaw)))
     }
 }

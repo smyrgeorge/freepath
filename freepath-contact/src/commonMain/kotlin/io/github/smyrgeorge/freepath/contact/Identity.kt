@@ -1,5 +1,7 @@
 package io.github.smyrgeorge.freepath.contact
 
+import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+
 data class Identity(
     /** Raw 32-byte Peer ID: SHA-256(sigKey). */
     val peerIdRaw: ByteArray,
@@ -13,6 +15,7 @@ data class Identity(
     val encKeyPrivate: ByteArray,
 ) {
     val peerId: String by lazy { ContactCodec.derivePeerId(sigKeyPublic) }
+    val peerIdHash: ByteArray by lazy { CryptoProvider.sha256(peerIdRaw) }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

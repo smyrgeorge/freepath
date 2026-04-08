@@ -144,10 +144,18 @@ abstract class AbstractAppResources(
                 val cmd = Protocol.ContentReceived(content)
                 system.tell(cmd)
             },
-            onRelayPacket = { receiverPeerId, payload ->
-                val entry = RelayEntry(receiverPeerId = receiverPeerId, payload = payload)
-                relayRepository.save(db, entry)
-                    .onFailure { log.error { "Failed to store relay packet for $receiverPeerId: ${it.message}" } }
+            onRelayPacket = { receiverIdHash, payload ->
+                val receiverPeerId = contactRepository.findAll(db)
+                    .getOrNull()
+                    ?.firstOrNull { entry -> entry.contact.peerIdHash.contentEquals(receiverIdHash) }
+                    ?.peerId
+                if (receiverPeerId != null) {
+                    val entry = RelayEntry(receiverPeerId = receiverPeerId, payload = payload)
+                    relayRepository.save(db, entry)
+                        .onFailure { log.error { "Failed to store relay packet for $receiverPeerId: ${it.message}" } }
+                } else {
+                    log.warn { "Received relay packet for unknown peer (hash ${receiverIdHash.size}B), dropping" }
+                }
             },
         ).apply {
             start()
