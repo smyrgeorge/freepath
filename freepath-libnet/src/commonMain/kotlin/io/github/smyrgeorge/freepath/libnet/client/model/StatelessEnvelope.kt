@@ -1,6 +1,7 @@
 package io.github.smyrgeorge.freepath.libnet.client.model
 
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
@@ -21,21 +22,21 @@ data class StatelessEnvelope(
      * sha256(receiverIdRaw) — 32 bytes.
      * Relay nodes can check if this envelope is addressed to them without learning the peerId.
      */
-    @ProtoNumber(2) val receiverIdHash: ByteArray,
+    @Contextual @ProtoNumber(2) val receiverIdHash: ByteArray,
     /** Unix epoch milliseconds. Used for replay protection and bound to the ciphertext via AAD. */
     @ProtoNumber(3) @Serializable(with = InstantSerializer::class) val timestamp: Instant,
     /** Random 12-byte nonce unique per envelope. */
-    @ProtoNumber(4) val nonce: ByteArray,
+    @Contextual @ProtoNumber(4) val nonce: ByteArray,
     /**
      * Ephemeral X25519 public key (32 bytes) generated fresh for each envelope.
      * Allows the recipient to derive the message key without knowing the sender's identity.
      */
-    @ProtoNumber(5) val ephemeralKey: ByteArray,
+    @Contextual @ProtoNumber(5) val ephemeralKey: ByteArray,
     /**
      * ChaCha20-Poly1305 ciphertext of a protobuf-encoded [SealedPayload].
      * Contains sender identity, message type, signature, and payload — all hidden from relays.
      */
-    @ProtoNumber(6) val payload: ByteArray,
+    @Contextual @ProtoNumber(6) val payload: ByteArray,
     /** Null for direct peer-to-peer messages. Present only when relay is needed. */
     @ProtoNumber(7) val relay: RelayMetadata? = null,
 ) {

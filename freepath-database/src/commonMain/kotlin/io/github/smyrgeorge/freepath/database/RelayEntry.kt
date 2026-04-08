@@ -1,13 +1,16 @@
 package io.github.smyrgeorge.freepath.database
 
 import io.github.smyrgeorge.freepath.database.util.Auditable
-import io.github.smyrgeorge.freepath.database.util.ByteArrayConverter
 import io.github.smyrgeorge.freepath.database.util.InstantConverter
+import io.github.smyrgeorge.freepath.database.util.StatelessEnvelopeConverter
+import io.github.smyrgeorge.freepath.libnet.client.codec.LibnetClientCodec
+import io.github.smyrgeorge.freepath.libnet.client.codec.StatelessEnvelopeCodec
+import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
+import io.github.smyrgeorge.sqlx4k.annotation.Column
 import io.github.smyrgeorge.sqlx4k.annotation.Converter
 import io.github.smyrgeorge.sqlx4k.annotation.Id
 import io.github.smyrgeorge.sqlx4k.annotation.Table
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 @Table("relay")
@@ -18,27 +21,25 @@ data class RelayEntry(
     override var createdAt: Instant = Clock.System.now(),
     @Converter(InstantConverter::class)
     override var updatedAt: Instant = Clock.System.now(),
-    /** The peerId of the intended recipient (Base58 multihash, visible in the envelope header). */
-    val receiverPeerId: String,
-    /** The raw encrypted wire bytes (version header + protobuf envelope), stored as Base64. */
-    @Converter(ByteArrayConverter::class)
-    val payload: ByteArray,
-    /** When this entry should be discarded (epoch millis). Default TTL: 7 days. */
-    @Converter(InstantConverter::class)
-    val expireAt: Instant = Clock.System.now() + 7.days,
+    /** Full StatelessEnvelope stored as JSON. ByteArray fields are base64-encoded. */
+    @Converter(StatelessEnvelopeConverter::class)
+    val envelope: StatelessEnvelope,
+    /** Generated column: json_extract(envelope, '$.relay.ttl'). Read-only — managed by SQLite. */
+    @Column(insert = false, update = false)
+    val ttl: Int = envelope.relay?.ttl ?: error("Envelope without relay metadata"),
 ) : Auditable<Int> {
+
+    fun toWireBytes(): ByteArray =
+        byteArrayOf(LibnetClientCodec.VERSION, 0, 0, 0) + StatelessEnvelopeCodec.encode(envelope)
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
-
         other as RelayEntry
-
         if (id != other.id) return false
         if (createdAt != other.createdAt) return false
         if (updatedAt != other.updatedAt) return false
-        if (receiverPeerId != other.receiverPeerId) return false
-        if (expireAt != other.expireAt) return false
-
+        if (envelope != other.envelope) return false
         return true
     }
 
@@ -46,11 +47,22 @@ data class RelayEntry(
         var result = id
         result = 31 * result + createdAt.hashCode()
         result = 31 * result + updatedAt.hashCode()
-        result = 31 * result + receiverPeerId.hashCode()
-        result = 31 * result + expireAt.hashCode()
+        result = 31 * result + envelope.hashCode()
         return result
     }
 
     override fun toString(): String =
-        "RelayEntry(receiverPeerId='$receiverPeerId', updatedAt=$updatedAt, createdAt=$createdAt, id=$id, expireAt=$expireAt)"
+        "RelayEntry(id=$id, ttl=$ttl, timestamp=${envelope.timestamp}, updatedAt=$updatedAt)"
+
+    companion object {
+        /**
+         * Converts a [StatelessEnvelope] to a [RelayEntry] for storage.
+         * Requires [StatelessEnvelope.relay] to be non-null — envelopes without relay metadata
+         * must not be stored in the relay table.
+         */
+        fun StatelessEnvelope.toRelayEntry(): RelayEntry {
+            requireNotNull(relay) { "Cannot store envelope without relay metadata in relay table" }
+            return RelayEntry(envelope = this)
+        }
+    }
 }

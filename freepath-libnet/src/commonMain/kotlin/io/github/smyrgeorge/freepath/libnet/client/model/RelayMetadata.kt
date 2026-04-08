@@ -1,5 +1,6 @@
 package io.github.smyrgeorge.freepath.libnet.client.model
 
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
@@ -13,11 +14,11 @@ data class RelayMetadata(
      * sha256(nonce + ephemeralKey). Computed by [StatelessEnvelopeCodec.seal].
      * Bound to AAD — tamper-evident via AEAD authentication.
      */
-    @ProtoNumber(2) val messageId: ByteArray,
+    @Contextual @ProtoNumber(2) val messageId: ByteArray,
     /** Priority hint. Bound to AAD — tamper-evident. */
     @ProtoNumber(3) val priority: Int = 1,
     /** Reserved for anti-spam proof-of-work. Not yet implemented. */
-    @ProtoNumber(4) val pow: ByteArray = ByteArray(0),
+    @Contextual @ProtoNumber(4) val pow: ByteArray = ByteArray(0),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

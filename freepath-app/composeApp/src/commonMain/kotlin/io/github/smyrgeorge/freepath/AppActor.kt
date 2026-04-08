@@ -9,8 +9,8 @@ import io.github.smyrgeorge.freepath.content.Message
 import io.github.smyrgeorge.freepath.content.MessageCodec
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.MessageStatus
-import io.github.smyrgeorge.freepath.share.ConnectedPeerActor
-import io.github.smyrgeorge.freepath.share.ConnectedPeerProtocol
+import io.github.smyrgeorge.freepath.sync.SyncPeerActor
+import io.github.smyrgeorge.freepath.sync.SyncPeerProtocol
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.state.AbstractAppState
 import io.github.smyrgeorge.freepath.state.AbstractViewState
@@ -140,14 +140,14 @@ class AppActor(
                 is Protocol.ContentReceived -> state.receiveContent(m.envelope)
                 is Protocol.PublishContent -> state.publishContent(m.body)
                 is Protocol.PeerConnected -> {
-                    ActorSystem.get(ConnectedPeerActor::class, m.peerId)
-                        .tell(ConnectedPeerProtocol.Connected)
+                    ActorSystem.get(SyncPeerActor::class, m.peerId)
+                        .tell(SyncPeerProtocol.Connected)
                         .onFailure { log.warn("[PeerConnected] Failed to trigger for ${m.peerId}: ${it.message}") }
                 }
 
                 is Protocol.PeerIdentified -> {
-                    ActorSystem.get(ConnectedPeerActor::class, m.peerId)
-                        .tell(ConnectedPeerProtocol.Identified)
+                    ActorSystem.get(SyncPeerActor::class, m.peerId)
+                        .tell(SyncPeerProtocol.Identified)
                         .onFailure { log.warn("[PeerIdentified] Failed to trigger for ${m.peerId}: ${it.message}") }
                 }
 

@@ -10,7 +10,7 @@ import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
 import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.database.MessageEntryRepository
-import io.github.smyrgeorge.freepath.database.RelayEntry
+import io.github.smyrgeorge.freepath.database.RelayEntry.Companion.toRelayEntry
 import io.github.smyrgeorge.freepath.database.RelayEntryRepository
 import io.github.smyrgeorge.freepath.database.generated.ContactEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContactRoutingEntryRepositoryImpl
@@ -144,17 +144,12 @@ abstract class AbstractAppResources(
                 val cmd = Protocol.ContentReceived(content)
                 system.tell(cmd)
             },
-            onRelayPacket = { receiverIdHash, payload ->
-                val receiverPeerId = contactRepository.findAll(db)
-                    .getOrNull()
-                    ?.firstOrNull { entry -> entry.contact.peerIdHash.contentEquals(receiverIdHash) }
-                    ?.peerId
-                if (receiverPeerId != null) {
-                    val entry = RelayEntry(receiverPeerId = receiverPeerId, payload = payload)
-                    relayRepository.save(db, entry)
-                        .onFailure { log.error { "Failed to store relay packet for $receiverPeerId: ${it.message}" } }
+            onRelayPacket = { envelope ->
+                if (envelope.relay == null) {
+                    log.warn { "Received relay packet without relay metadata, dropping" }
                 } else {
-                    log.warn { "Received relay packet for unknown peer (hash ${receiverIdHash.size}B), dropping" }
+                    relayRepository.save(db, envelope.toRelayEntry())
+                        .onFailure { log.error { "Failed to store relay packet: ${it.message}" } }
                 }
             },
         ).apply {

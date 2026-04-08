@@ -36,6 +36,7 @@ kotlin {
                 implementation(project(":freepath-contact"))
                 implementation(project(":freepath-content"))
                 implementation(project(":freepath-crypto"))
+                implementation(project(":freepath-libnet"))
                 implementation(project(":freepath-util"))
                 api(libs.sqlx4k.sqlite)
                 implementation(libs.kotlinx.serialization.json)

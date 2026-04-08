@@ -26,7 +26,7 @@ class LibnetClient(
     private val contactLookup: (peerId: String) -> Contact?,
     private val onMessageReceived: suspend (Message) -> Result<Unit>,
     private val onContentReceived: suspend (Content) -> Result<Unit>,
-    private val onRelayPacket: suspend (receiverIdHash: ByteArray, payload: ByteArray) -> Unit,
+    private val onRelayPacket: suspend (envelope: StatelessEnvelope) -> Unit,
 ) {
     private val log: Logger = Logger.of(this::class)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -82,7 +82,7 @@ class LibnetClient(
 
         if (!envelope.receiverIdHash.contentEquals(identity.peerIdHash)) {
             log.debug { "[open]: storing relay packet (receiverIdHash mismatch)" }
-            onRelayPacket(envelope.receiverIdHash, payload)
+            onRelayPacket(envelope)
             ack(reqId)
             return
         }

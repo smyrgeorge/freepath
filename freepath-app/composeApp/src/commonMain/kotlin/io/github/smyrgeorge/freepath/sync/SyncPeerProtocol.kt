@@ -1,9 +1,9 @@
-package io.github.smyrgeorge.freepath.share
+package io.github.smyrgeorge.freepath.sync
 
 import io.github.smyrgeorge.actor4k.actor.ActorProtocol
 
-sealed interface ConnectedPeerProtocol : ActorProtocol {
-    sealed class Message<R : ActorProtocol.Response> : ConnectedPeerProtocol, ActorProtocol.Message<R>()
+sealed interface SyncPeerProtocol : ActorProtocol {
+    sealed class Message<R : ActorProtocol.Response> : SyncPeerProtocol, ActorProtocol.Message<R>()
     sealed class Response : ActorProtocol.Response()
 
     data object Ok : Response()

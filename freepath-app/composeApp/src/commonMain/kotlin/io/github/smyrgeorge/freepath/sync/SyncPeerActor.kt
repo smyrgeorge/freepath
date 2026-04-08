@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.share
+package io.github.smyrgeorge.freepath.sync
 
 import io.github.smyrgeorge.actor4k.actor.Actor
 import io.github.smyrgeorge.actor4k.actor.Behavior
@@ -9,19 +9,17 @@ import io.github.smyrgeorge.freepath.database.ContentSyncEntry
 import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
 import io.github.smyrgeorge.freepath.database.RelayEntryRepository
 import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
-import io.github.smyrgeorge.freepath.libnet.client.codec.LibnetClientCodec
-import io.github.smyrgeorge.freepath.libnet.client.codec.StatelessEnvelopeCodec
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.state.AbstractAppState
 import io.github.smyrgeorge.freepath.state.abbrev
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlin.time.Clock
 
-class ConnectedPeerActor(
+class SyncPeerActor(
     key: String,
     state: AbstractAppState,
     resources: AbstractAppResources,
-) : Actor<ConnectedPeerProtocol, ConnectedPeerProtocol.Response>(key) {
+) : Actor<SyncPeerProtocol, SyncPeerProtocol.Response>(key) {
 
     private val peerId: String get() = key
     private val contactContent = state.contactContent
@@ -33,19 +31,19 @@ class ConnectedPeerActor(
     private val contentRepository: ContentEntryRepository = resources.contentRepository
     private val syncRepository: ContentSyncEntryRepository = resources.contentSyncRepository
 
-    override suspend fun onReceive(m: ConnectedPeerProtocol): Behavior<ConnectedPeerProtocol.Response> {
+    override suspend fun onReceive(m: SyncPeerProtocol): Behavior<SyncPeerProtocol.Response> {
         when (m) {
-            is ConnectedPeerProtocol.Connected -> {
+            is SyncPeerProtocol.Connected -> {
                 relay()
                 sync()
             }
-            is ConnectedPeerProtocol.Identified -> {
+            is SyncPeerProtocol.Identified -> {
                 sync(contactContent)
                 relay()
                 sync()
             }
         }
-        return Behavior.Reply(ConnectedPeerProtocol.Ok)
+        return Behavior.Reply(SyncPeerProtocol.Ok)
     }
 
     private suspend fun relay() {
@@ -55,55 +53,51 @@ class ConnectedPeerActor(
                 return
             }
 
+        // Look up this peer's receiverIdHash to distinguish Pass 1 (for them) vs Pass 2 (mesh hops).
+        val peerIdHash: ByteArray? = contactRepository.findOneByPeerId(db, peerId).getOrNull()?.contact?.peerIdHash
+
         // Pass 1: deliver packets intended for this peer.
-        entries
-            .filter { it.receiverPeerId == peerId }
-            .forEach { entry ->
-                client.relay(entry.payload, peerId)
-                    .onSuccess {
-                        relayRepository.deleteById(db, entry.id).onFailure {
-                            log.error("[${peerId.abbrev()}] Failed to delete relay entry ${entry.id}: ${it.message}")
+        // No TTL enforcement here — this is final delivery, not mesh forwarding.
+        if (peerIdHash != null) {
+            entries
+                .filter { it.envelope.receiverIdHash.contentEquals(peerIdHash) }
+                .forEach { entry ->
+                    client.relay(entry.toWireBytes(), peerId)
+                        .onSuccess {
+                            relayRepository.deleteById(db, entry.id).onFailure {
+                                log.error("[${peerId.abbrev()}] Failed to delete relay entry ${entry.id}: ${it.message}")
+                            }
+                            log.info("[${peerId.abbrev()}] Delivered relay packet ${entry.id}")
                         }
-                        log.info("[${peerId.abbrev()}] Delivered relay packet ${entry.id}")
-                    }
-                    .onFailure {
-                        log.warn("[${peerId.abbrev()}] Failed to deliver relay packet ${entry.id}: ${it.message}")
-                    }
-            }
+                        .onFailure {
+                            log.warn("[${peerId.abbrev()}] Failed to deliver relay packet ${entry.id}: ${it.message}")
+                        }
+                }
+        }
 
         // Pass 2: forward mesh hop packets (not intended for this peer).
+        // If peerIdHash is unknown (unidentified peer), forward all entries as mesh hops.
         entries
-            .filter { it.receiverPeerId != peerId }
+            .filter { peerIdHash == null || !it.envelope.receiverIdHash.contentEquals(peerIdHash) }
             .forEach { entry ->
-                val envelope = LibnetClientCodec.decode(entry.payload)
-                if (envelope == null) {
-                    // Malformed payload — discard.
-                    relayRepository.deleteById(db, entry.id).onFailure {
-                        log.error("[${peerId.abbrev()}] Failed to delete malformed relay entry ${entry.id}: ${it.message}")
-                    }
-                    return@forEach
-                }
-
-                val relay = envelope.relay
-                val ttl = relay?.ttl ?: 0
-                if (ttl <= 0 || relay == null) {
-                    // Expired or non-relay envelope — discard.
+                val ttl = entry.ttl
+                if (ttl <= 0) {
+                    // TTL expired — discard.
                     relayRepository.deleteById(db, entry.id).onFailure {
                         log.error("[${peerId.abbrev()}] Failed to delete expired relay entry ${entry.id}: ${it.message}")
                     }
                     return@forEach
                 }
-
-                // Decrement TTL, update DB, then forward. relay is non-null here.
-                val decremented = envelope.copy(relay = relay.copy(ttl = ttl - 1))
-                val newPayload = byteArrayOf(LibnetClientCodec.VERSION, 0, 0, 0) +
-                        StatelessEnvelopeCodec.encode(decremented)
-                val saveResult = relayRepository.save(db, entry.copy(payload = newPayload))
-                if (saveResult.isFailure) {
-                    log.error("[${peerId.abbrev()}] Failed to update TTL for relay entry ${entry.id}: ${saveResult.exceptionOrNull()?.message}")
+                // Decrement TTL before sending (per-attempt semantics: TTL counts forward
+                // attempts, not successful deliveries). This prevents retry storms — if the send
+                // repeatedly fails, TTL still decrements and the entry is eventually discarded.
+                // If the save fails, we skip the send to avoid forwarding with a stale TTL.
+                val updated = entry.copy(envelope = entry.envelope.copy(relay = entry.envelope.relay!!.copy(ttl = ttl - 1)))
+                relayRepository.save(db, updated).onFailure {
+                    log.error("[${peerId.abbrev()}] Failed to update TTL for relay entry ${entry.id}: ${it.message}")
                     return@forEach
                 }
-                client.relay(newPayload, peerId)
+                client.relay(updated.toWireBytes(), peerId)
                     .onSuccess { log.info("[${peerId.abbrev()}] Forwarded mesh hop ${entry.id} (ttl=${ttl - 1})") }
                     .onFailure { log.warn("[${peerId.abbrev()}] Failed to forward mesh hop ${entry.id}: ${it.message}") }
             }

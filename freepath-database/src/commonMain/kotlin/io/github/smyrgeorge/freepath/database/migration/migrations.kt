@@ -14,4 +14,5 @@ val migrations: List<MigrationFile> = listOf(
     MigrationFile("9_create_table_store_and_forward.sql", V9_CreateTableStoreAndForward),
     MigrationFile("10_rename_table_store_and_forward_to_relay.sql", V10_RenameTableStoreAndForwardToRelay),
     MigrationFile("11_change_relay_payload_to_text.sql", V11_ChangeRelayPayloadToText),
+    MigrationFile("12_rework_relay_table.sql", V12_ReworkRelayTable),
 )

@@ -39,7 +39,14 @@
       "Bash(./gradlew :freepath-libnet:compileKotlinJvm)",
       "Bash(./gradlew :freepath-libnet:jvmTest 2>&1)",
       "Bash(./gradlew :freepath-libnet:jvmTest)",
-      "Bash(./gradlew :freepath-database:jvmTest 2>&1)"
+      "Bash(./gradlew :freepath-database:jvmTest 2>&1)",
+      "Bash(./gradlew :freepath-database:compileKotlinJvm)",
+      "Bash(./gradlew :freepath-database:clean :freepath-database:jvmTest)",
+      "Bash(./gradlew :freepath-database:compileTestKotlinJvm)",
+      "Bash(./gradlew :freepath-database:compileTestKotlinJvm --info)",
+      "Bash(./gradlew :freepath-database:compileKotlinJvm :freepath-app:composeApp:compileKotlinJvm)",
+      "Bash(./gradlew :freepath-libnet:compileKotlinJvm :freepath-app:composeApp:compileKotlinJvm)",
+      "Bash(./gradlew :freepath-database:jvmTest :freepath-app:composeApp:compileKotlinJvm)"
     ]
   }
 }
