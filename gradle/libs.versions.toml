@@ -12,7 +12,7 @@ log4k = "1.4.3"
 # https://github.com/smyrgeorge/actor4k
 actor4k = "1.4.10"
 # https://github.com/Kotlin/kotlinx.serialization
-kotlinx-serialization = "1.10.0"
+kotlinx-serialization = "1.11.0"
 # https://github.com/ktorio/ktor
 ktor = "3.4.2"
 # https://www.bouncycastle.org
