@@ -21,7 +21,6 @@ kotlin {
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
     }
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
     applyDefaultHierarchyTemplate()
