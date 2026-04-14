@@ -25,15 +25,18 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
         peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
+        contactLookup: (String) -> Boolean,
     ) {
         if (nodeHandle.get() != null) return
         ensureNativeLoaded()
         mdns = MdnsPeerDiscovery(peerId)
+        contactLookups[handlerId] = contactLookup
         eventHandlers[handlerId] = ::dispatch
         val handle = withContext(dispatcher) { Libp2pJni.start(peerId, sigKeyPrivate, listenAddrs, handlerId) }
         if (handle == 0L) {
             nodeHandle.set(null)
             eventHandlers.remove(handlerId)
+            contactLookups.remove(handlerId)
             mdns = null
             error("libp2p_start returned null — check stderr")
         }
@@ -48,6 +51,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
         mdnsStarted.set(false)
         scope.coroutineContext.cancelChildren()
         eventHandlers.remove(handlerId)
+        contactLookups.remove(handlerId)
         metrics.close()
         withContext(dispatcher) { Libp2pJni.stop(h) }
     }
@@ -93,8 +97,11 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
     companion object {
         private val nativeLoaded = AtomicBoolean(false)
         private val eventHandlers = ConcurrentHashMap<Long, (Libp2pEvent) -> Unit>()
+        private val contactLookups = ConcurrentHashMap<Long, (String) -> Boolean>()
         private val handlerCounter = java.util.concurrent.atomic.AtomicLong(0)
         internal fun getEventHandler(id: Long): ((Libp2pEvent) -> Unit)? = eventHandlers[id]
+        internal fun isKnownContact(handlerId: Long, peerId: String): Boolean =
+            contactLookups[handlerId]?.invoke(peerId) ?: false
 
         private fun ensureNativeLoaded() {
             if (!nativeLoaded.compareAndSet(false, true)) return

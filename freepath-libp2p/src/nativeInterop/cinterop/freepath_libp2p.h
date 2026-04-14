@@ -44,7 +44,9 @@ void *libp2p_start(const char *node_id,
                    uintptr_t sig_key_len,
                    const char *listen_addr,
                    void *event_callback,
-                   void (*event_fun)(void*, struct RawLibP2pEvent*));
+                   void (*event_fun)(void*, struct RawLibP2pEvent*),
+                   void *contact_callback,
+                   bool (*contact_fun)(void*, const uint8_t*, uintptr_t));
 
 /**
  * Stop the node and release the Arc.

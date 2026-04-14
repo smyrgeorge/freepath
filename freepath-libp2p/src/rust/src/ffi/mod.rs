@@ -11,7 +11,7 @@ pub extern "C" fn libp2p_set_log_callback(
     crate::logging::init(cb);
 }
 
-use crate::core::{EventCallback, LibP2pNode, RawLibP2pEvent};
+use crate::core::{ContactCallback, EventCallback, LibP2pNode, RawLibP2pEvent};
 use std::ffi::{c_char, c_void, CStr};
 use std::sync::Arc;
 
@@ -25,6 +25,8 @@ pub extern "C" fn libp2p_start(
     listen_addr: *const c_char,
     event_callback: *mut c_void,
     event_fun: unsafe extern "C" fn(*mut c_void, *mut RawLibP2pEvent),
+    contact_callback: *mut c_void,
+    contact_fun: unsafe extern "C" fn(*mut c_void, *const u8, usize) -> bool,
 ) -> *mut c_void {
     // All pointer arguments are required — a null here is a Kotlin/Swift caller bug.
     assert!(!node_id.is_null(), "libp2p_start: node_id must not be null");
@@ -45,11 +47,15 @@ pub extern "C" fn libp2p_start(
         .to_str()
         .expect("libp2p_start: listen_addr is not valid UTF-8");
 
-    let cb = EventCallback {
+    let event_cb = EventCallback {
         ptr: event_callback,
         fun: event_fun,
     };
-    match crate::core::start_node(nid, key_bytes, addr, cb) {
+    let contact_cb = ContactCallback {
+        ptr: contact_callback,
+        fun: contact_fun,
+    };
+    match crate::core::start_node(nid, key_bytes, addr, event_cb, contact_cb) {
         Ok(arc) => Arc::into_raw(arc) as *mut c_void,
         Err(e) => {
             log::error!("start failed: {e}");

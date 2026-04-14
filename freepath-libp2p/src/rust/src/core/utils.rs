@@ -13,6 +13,16 @@ pub struct EventCallback {
 unsafe impl Send for EventCallback {}
 unsafe impl Sync for EventCallback {}
 
+/// Synchronous callback invoked from the swarm loop to check whether a peer is a known contact.
+/// The function receives the peer_id as a UTF-8 byte slice and returns `true` if the peer is
+/// present in the caller's contact database.
+pub struct ContactCallback {
+    pub ptr: *mut c_void,
+    pub fun: unsafe extern "C" fn(*mut c_void, *const u8, usize) -> bool,
+}
+unsafe impl Send for ContactCallback {}
+unsafe impl Sync for ContactCallback {}
+
 pub enum SwarmCommand {
     Stop,
     /// Dial a peer by multiaddr string (parsed inside the swarm loop).

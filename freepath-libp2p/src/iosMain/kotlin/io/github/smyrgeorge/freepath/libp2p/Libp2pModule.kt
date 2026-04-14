@@ -32,9 +32,11 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
     private val mutex = Mutex()
     private var nodePtr: COpaquePointer? = null
     private var handlerRef: StableRef<AtomicReference<((Libp2pEvent) -> Unit)?>>? = null
+    private var contactRef: StableRef<AtomicReference<((String) -> Boolean)?>>? = null
 
     // The AtomicReference holds the internal dispatcher; its address is pinned across the FFI.
     private val dispatcherRef = AtomicReference<((Libp2pEvent) -> Unit)?>(null)
+    private val contactLookupRef = AtomicReference<((String) -> Boolean)?>(null)
 
     private var mdns: MdnsPeerDiscovery? = null
 
@@ -50,12 +52,15 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
         peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
+        contactLookup: (String) -> Boolean,
     ) {
         mutex.withLock {
             if (nodePtr != null) return
             mdns = MdnsPeerDiscovery(peerId)
             dispatcherRef.value = ::dispatch
+            contactLookupRef.value = contactLookup
             val ref = StableRef.create(dispatcherRef)
+            val cref = StableRef.create(contactLookupRef)
             val ptr = sigKeyPrivate.usePinned { pinned ->
                 withContext(dispatcher) {
                     libp2p_start(
@@ -65,16 +70,21 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
                         listen_addr = listenAddrs,
                         event_callback = ref.asCPointer(),
                         event_fun = Libp2pCallback.eventDispatcher,
+                        contact_callback = cref.asCPointer(),
+                        contact_fun = Libp2pCallback.contactDispatcher,
                     )
                 }
             }
             if (ptr == null) {
                 ref.dispose()
+                cref.dispose()
                 dispatcherRef.value = null
+                contactLookupRef.value = null
                 mdns = null
                 error("libp2p_start returned null")
             }
             handlerRef = ref
+            contactRef = cref
             nodePtr = ptr
         }
     }
@@ -91,6 +101,9 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
             handlerRef?.dispose()
             handlerRef = null
             dispatcherRef.value = null
+            contactRef?.dispose()
+            contactRef = null
+            contactLookupRef.value = null
             metrics.close()
             withContext(dispatcher) { libp2p_stop(ptr) }
         }

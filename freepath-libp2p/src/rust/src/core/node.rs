@@ -11,7 +11,7 @@ use libp2p_swarm::{NetworkBehaviour, SwarmEvent};
 
 use crate::core::event::RawLibP2pEvent;
 use crate::core::messaging::{FreepathCodec, FreepathProtocol};
-use crate::core::utils::{EventCallback, SwarmCommand, RUNTIME};
+use crate::core::utils::{ContactCallback, EventCallback, SwarmCommand, RUNTIME};
 
 pub struct LibP2pNode {
     pub swarm_tx: mpsc::Sender<SwarmCommand>,
@@ -88,6 +88,7 @@ pub fn start_node(
     sig_key_private_bytes: &[u8],
     listen_addr: &str,
     event_cb: EventCallback,
+    contact_cb: ContactCallback,
 ) -> Result<Arc<LibP2pNode>, String> {
     let mut key_bytes = sig_key_private_bytes.to_vec();
     let secret = identity::ed25519::SecretKey::try_from_bytes(&mut key_bytes)
@@ -185,7 +186,7 @@ pub fn start_node(
         loop {
             tokio::select! {
                 event = futures::StreamExt::next(&mut swarm) => {
-                    if handle_swarm_event(event, &mut swarm, &mut state, &local_peer_id, &event_cb) {
+                    if handle_swarm_event(event, &mut swarm, &mut state, &local_peer_id, &event_cb, &contact_cb) {
                         break;
                     }
                 }
@@ -223,6 +224,7 @@ fn handle_swarm_event(
     state: &mut NodeState,
     local_peer_id: &str,
     event_cb: &EventCallback,
+    contact_cb: &ContactCallback,
 ) -> bool {
     match event {
         Some(SwarmEvent::Behaviour(BehaviourEvent::Messaging(ev))) => {
@@ -239,7 +241,7 @@ fn handle_swarm_event(
             false
         }
         Some(ev) => {
-            handle_event(ev, event_cb);
+            handle_event(ev, event_cb, contact_cb);
             false
         }
         None => {
@@ -371,14 +373,20 @@ fn handle_messaging(
     }
 }
 
-fn handle_event(ev: SwarmEvent<BehaviourEvent>, event_cb: &EventCallback) {
+fn handle_event(
+    ev: SwarmEvent<BehaviourEvent>,
+    event_cb: &EventCallback,
+    contact_cb: &ContactCallback,
+) {
     match ev {
         SwarmEvent::ConnectionEstablished {
             peer_id, endpoint, ..
         } => {
-            let addr = endpoint.get_remote_address().to_string();
-            let raw = RawLibP2pEvent::peer_connected(peer_id.to_string(), addr);
-            unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+            log::debug!(
+                "Connection established: peer={} addr={}",
+                peer_id,
+                endpoint.get_remote_address()
+            );
         }
         SwarmEvent::NewListenAddr { address, .. } => {
             let raw = RawLibP2pEvent::new_listen_addr(address.to_string());
@@ -417,8 +425,24 @@ fn handle_event(ev: SwarmEvent<BehaviourEvent>, event_cb: &EventCallback) {
             ..
         })) => {
             if info.agent_version.starts_with("freepath/") {
-                let raw = RawLibP2pEvent::peer_identified(peer_id.to_string());
+                // Fire peer_connected using the peer's first advertised listen address.
+                let addr = info
+                    .listen_addrs
+                    .first()
+                    .map(|a| a.to_string())
+                    .unwrap_or_default();
+                let raw = RawLibP2pEvent::peer_connected(peer_id.to_string(), addr);
                 unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+                // Fire peer_identified only if this peer is in the caller's contact database.
+                let pid_str = peer_id.to_string();
+                let pid_bytes = pid_str.as_bytes();
+                let is_known = unsafe {
+                    (contact_cb.fun)(contact_cb.ptr, pid_bytes.as_ptr(), pid_bytes.len())
+                };
+                if is_known {
+                    let raw = RawLibP2pEvent::peer_identified(peer_id.to_string());
+                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+                }
             }
         }
         _ => {}

@@ -6,4 +6,4 @@ pub mod utils;
 pub use event::RawLibP2pEvent;
 pub use node::{start_node, LibP2pNode};
 #[allow(unused_imports)]
-pub use utils::{EventCallback, SwarmCommand, RUNTIME};
+pub use utils::{ContactCallback, EventCallback, SwarmCommand, RUNTIME};

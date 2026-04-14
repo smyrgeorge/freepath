@@ -1,6 +1,6 @@
 #![cfg(not(target_os = "ios"))]
 
-use crate::core::{EventCallback, LibP2pNode, RawLibP2pEvent};
+use crate::core::{ContactCallback, EventCallback, LibP2pNode, RawLibP2pEvent};
 use jni::objects::{JByteArray, JClass, JString};
 use jni::sys::{jint, jlong, JNI_VERSION_1_6};
 use jni::{jni_sig, jni_str, EnvUnowned, JavaVM};
@@ -74,6 +74,34 @@ fn deliver_log(level: u8, tag: &str, msg: &str) {
         )?;
         Ok(())
     });
+}
+
+fn is_known_contact(event_handle: jlong, peer_id: &str) -> bool {
+    let ptr = CALLBACK_CLASS_PTR.load(Ordering::Acquire);
+    if ptr == 0 {
+        log::error!("is_known_contact: class not cached");
+        return false;
+    }
+    let Some(jvm) = JVM.get() else {
+        log::error!("is_known_contact: JVM not initialised");
+        return false;
+    };
+    let mut result = false;
+    if let Err(e) = jvm.attach_current_thread(|env| -> jni::errors::Result<()> {
+        let cls: JClass<'_> = unsafe { std::mem::transmute(ptr as jni::sys::jobject) };
+        let pid_str = env.new_string(peer_id)?;
+        let r = env.call_static_method(
+            &cls,
+            jni_str!("isKnownContact"),
+            jni_sig!("(JLjava/lang/String;)Z"),
+            &[event_handle.into(), (&pid_str).into()],
+        )?;
+        result = r.z()?;
+        Ok(())
+    }) {
+        log::error!("is_known_contact failed: {e:?}");
+    }
+    result
 }
 
 fn deliver_event(
@@ -186,7 +214,27 @@ pub extern "C" fn Java_io_github_smyrgeorge_freepath_libp2p_Libp2pJni_start(
         fun: event_fun,
     };
 
-    match crate::core::start_node(&nid, &key_bytes, &addr, event_cb) {
+    let contact_fun: unsafe extern "C" fn(*mut c_void, *const u8, usize) -> bool = {
+        unsafe extern "C" fn cb(
+            ctx: *mut c_void,
+            peer_id_ptr: *const u8,
+            peer_id_len: usize,
+        ) -> bool {
+            let event_handle = ctx as jlong;
+            let peer_id = std::str::from_utf8(unsafe {
+                std::slice::from_raw_parts(peer_id_ptr, peer_id_len)
+            })
+            .unwrap_or("");
+            is_known_contact(event_handle, peer_id)
+        }
+        cb
+    };
+    let contact_cb = ContactCallback {
+        ptr: event_handle as *mut c_void,
+        fun: contact_fun,
+    };
+
+    match crate::core::start_node(&nid, &key_bytes, &addr, event_cb, contact_cb) {
         Ok(arc) => Arc::into_raw(arc) as jlong,
         Err(e) => {
             log::error!("JNI start failed: {e}");

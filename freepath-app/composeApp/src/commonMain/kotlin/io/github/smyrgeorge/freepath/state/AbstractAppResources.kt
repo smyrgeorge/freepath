@@ -165,7 +165,11 @@ abstract class AbstractAppResources(
     }
 
     private suspend fun startLibp2p() {
-        libp2p.start(peerId = identity.peerId, sigKeyPrivate = identity.sigKeyPrivate)
+        libp2p.start(
+            peerId = identity.peerId,
+            sigKeyPrivate = identity.sigKeyPrivate,
+            contactLookup = { peerId -> contactLookup(peerId) != null },
+        )
     }
 
     private suspend fun startLibble() {

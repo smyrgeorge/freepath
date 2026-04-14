@@ -24,4 +24,8 @@ internal object Libp2pCallback {
         }
         handler(event)
     }
+
+    @JvmStatic
+    fun isKnownContact(handlerId: Long, peerId: String): Boolean =
+        Libp2pModule.isKnownContact(handlerId, peerId)
 }

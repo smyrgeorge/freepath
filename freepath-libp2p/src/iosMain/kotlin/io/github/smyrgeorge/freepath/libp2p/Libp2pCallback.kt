@@ -9,6 +9,7 @@ import kotlinx.cinterop.CFunction
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.get
 import kotlinx.cinterop.pointed
@@ -68,5 +69,18 @@ internal object Libp2pCallback {
             }
             libp2p_event_free(ev)
             onEvent(handler, kind, reqId, peerId, addr, value)
+        }
+
+    /**
+     * C FFI entry point: checks whether a peer is a known contact.
+     * ctx is a StableRef<AtomicReference<((String) -> Boolean)?>> pinned in [Libp2pModule].
+     */
+    val contactDispatcher: CPointer<CFunction<(COpaquePointer?, CPointer<UByteVar>?, ULong) -> Boolean>> =
+        staticCFunction { ctx, peerIdPtr, peerIdLen ->
+            if (ctx == null || peerIdPtr == null) return@staticCFunction false
+            val ref = ctx.asStableRef<AtomicReference<((String) -> Boolean)?>>()
+            val lookup = ref.get().value ?: return@staticCFunction false
+            val peerId = ByteArray(peerIdLen.toInt()) { peerIdPtr[it].toByte() }.decodeToString()
+            lookup(peerId)
         }
 }

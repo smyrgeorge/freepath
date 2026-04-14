@@ -52,7 +52,12 @@ abstract class AbstractLibp2pModule(
     }
 
     protected abstract fun onFirstListenAddr(port: Int)
-    abstract suspend fun start(peerId: String, sigKeyPrivate: ByteArray, listenAddrs: String = defaultListenAddrs)
+    abstract suspend fun start(
+        peerId: String,
+        sigKeyPrivate: ByteArray,
+        listenAddrs: String = defaultListenAddrs,
+        contactLookup: (String) -> Boolean = { false },
+    )
     abstract suspend fun stop()
     abstract suspend fun dial(multiaddr: String)
     abstract suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray)
