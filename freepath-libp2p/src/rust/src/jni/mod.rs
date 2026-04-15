@@ -150,7 +150,7 @@ fn deliver_event(
     }
 }
 
-/// Java: `external fun start(nodeId: String, sigKeyPrivate: ByteArray, listenAddr: String, eventHandle: Long): Long`
+/// Java: `external fun start(nodeId: String, sigKeyPrivate: ByteArray, listenAddr: String, relayAddrs: String, eventHandle: Long): Long`
 #[no_mangle]
 pub extern "C" fn Java_io_github_smyrgeorge_freepath_libp2p_Libp2pJni_start(
     mut env: EnvUnowned<'_>,
@@ -158,15 +158,19 @@ pub extern "C" fn Java_io_github_smyrgeorge_freepath_libp2p_Libp2pJni_start(
     node_id: JString<'_>,
     sig_key: JByteArray<'_>,
     listen_addr: JString<'_>,
+    relay_addrs: JString<'_>,
     event_handle: jlong,
 ) -> jlong {
-    let (nid, key_bytes, addr) = match env
-        .with_env(|env| -> jni::errors::Result<(String, Vec<u8>, String)> {
-            let nid: String = node_id.try_to_string(env)?;
-            let key_bytes: Vec<u8> = env.convert_byte_array(&sig_key)?;
-            let addr: String = listen_addr.try_to_string(env)?;
-            Ok((nid, key_bytes, addr))
-        })
+    let (nid, key_bytes, addr, relays) = match env
+        .with_env(
+            |env| -> jni::errors::Result<(String, Vec<u8>, String, String)> {
+                let nid: String = node_id.try_to_string(env)?;
+                let key_bytes: Vec<u8> = env.convert_byte_array(&sig_key)?;
+                let addr: String = listen_addr.try_to_string(env)?;
+                let relays: String = relay_addrs.try_to_string(env)?;
+                Ok((nid, key_bytes, addr, relays))
+            },
+        )
         .into_outcome()
     {
         jni::Outcome::Ok(v) => v,
@@ -234,7 +238,7 @@ pub extern "C" fn Java_io_github_smyrgeorge_freepath_libp2p_Libp2pJni_start(
         fun: contact_fun,
     };
 
-    match crate::core::start_node(&nid, &key_bytes, &addr, event_cb, contact_cb) {
+    match crate::core::start_node(&nid, &key_bytes, &addr, &relays, event_cb, contact_cb) {
         Ok(arc) => Arc::into_raw(arc) as jlong,
         Err(e) => {
             log::error!("JNI start failed: {e}");

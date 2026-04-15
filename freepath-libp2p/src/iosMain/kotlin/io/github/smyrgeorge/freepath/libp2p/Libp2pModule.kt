@@ -52,6 +52,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
         peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
+        relayAddrs: String,
         contactLookup: (String) -> Boolean,
     ) {
         mutex.withLock {
@@ -68,6 +69,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
                         sig_key_private = pinned.addressOf(0).reinterpret(),
                         sig_key_len = sigKeyPrivate.size.convert(),
                         listen_addr = listenAddrs,
+                        relay_addrs = relayAddrs,
                         event_callback = ref.asCPointer(),
                         event_fun = Libp2pCallback.eventDispatcher,
                         contact_callback = cref.asCPointer(),

@@ -5,7 +5,8 @@ use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
 use libp2p::{
-    identify, identity, noise, ping, request_response, tcp, yamux, Multiaddr, SwarmBuilder,
+    identify, identity, noise, ping, rendezvous, request_response, tcp, yamux, Multiaddr, PeerId,
+    SwarmBuilder,
 };
 use libp2p_swarm::{NetworkBehaviour, SwarmEvent};
 
@@ -29,6 +30,7 @@ pub struct Behaviour {
     pub identify: identify::Behaviour,
     pub ping: ping::Behaviour,
     pub messaging: request_response::Behaviour<FreepathCodec>,
+    pub rendezvous: rendezvous::client::Behaviour,
 }
 
 /// All mutable state owned exclusively by the swarm task.
@@ -87,6 +89,7 @@ pub fn start_node(
     node_id: &str,
     sig_key_private_bytes: &[u8],
     listen_addr: &str,
+    relay_addrs: &str,
     event_cb: EventCallback,
     contact_cb: ContactCallback,
 ) -> Result<Arc<LibP2pNode>, String> {
@@ -114,6 +117,17 @@ pub fn start_node(
     if listen_addrs.is_empty() {
         panic!("listen_addr must contain at least one multiaddr");
     }
+
+    // Parse relay multiaddrs (may be empty — rendezvous is optional).
+    let relay_multiaddrs: Vec<Multiaddr> = relay_addrs
+        .lines()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            s.parse()
+                .unwrap_or_else(|e| panic!("invalid relay addr '{s}': {e:?}"))
+        })
+        .collect();
 
     let runtime = RUNTIME.get_or_init(|| Runtime::new().expect("Tokio runtime init failed"));
     let (cmd_tx, mut cmd_rx) = mpsc::channel::<SwarmCommand>(64);
@@ -159,6 +173,7 @@ pub fn start_node(
                             )),
                             request_response::Config::default(),
                         ),
+                        rendezvous: rendezvous::client::Behaviour::new(key.clone()),
                     })
                 })?
                 .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(60)))
@@ -183,16 +198,73 @@ pub fn start_node(
         let local_peer_id = swarm.local_peer_id().to_string();
         let mut state = NodeState::new();
 
+        // Extract relay PeerIds from multiaddrs and dial them.
+        let mut relay_peer_ids: std::collections::HashSet<PeerId> =
+            std::collections::HashSet::new();
+        for addr in &relay_multiaddrs {
+            if let Some(pid) = addr
+                .iter()
+                .find_map(|p| match p {
+                    libp2p::multiaddr::Protocol::P2p(id) => Some(id),
+                    _ => None,
+                })
+            {
+                relay_peer_ids.insert(pid);
+            }
+            if let Err(e) = swarm.dial(addr.clone()) {
+                log::warn!("relay dial({addr}) failed: {e:?}");
+            }
+        }
+
+        // Rendezvous re-register interval (well before default 2h TTL).
+        let mut rendezvous_interval = tokio::time::interval(Duration::from_secs(30 * 60));
+        // Skip the immediate first tick — registration happens on identify.
+        rendezvous_interval.tick().await;
+
+        // Rendezvous re-discover interval.
+        let mut discover_interval = tokio::time::interval(Duration::from_secs(5 * 60));
+        discover_interval.tick().await;
+
+        // Cookie for progressive discovery per relay.
+        let mut rendezvous_cookies: HashMap<PeerId, rendezvous::Cookie> = HashMap::new();
+
         loop {
             tokio::select! {
                 event = futures::StreamExt::next(&mut swarm) => {
-                    if handle_swarm_event(event, &mut swarm, &mut state, &local_peer_id, &event_cb, &contact_cb) {
+                    if handle_swarm_event(event, &mut swarm, &mut state, &local_peer_id, &event_cb, &contact_cb, &relay_peer_ids, &mut rendezvous_cookies) {
                         break;
                     }
                 }
                 Some(cmd) = cmd_rx.recv() => {
                     if handle_command(cmd, &mut swarm, &mut state, &local_peer_id, &event_cb) {
                         break;
+                    }
+                }
+                _ = rendezvous_interval.tick() => {
+                    for &relay_id in &relay_peer_ids {
+                        if swarm.is_connected(&relay_id) {
+                            log::debug!("rendezvous: re-registering with {relay_id}");
+                            if let Err(e) = swarm.behaviour_mut().rendezvous.register(
+                                rendezvous::Namespace::from_static("freepath"),
+                                relay_id,
+                                None,
+                            ) {
+                                log::warn!("rendezvous: re-register failed: {e}");
+                            }
+                        }
+                    }
+                }
+                _ = discover_interval.tick() => {
+                    for &relay_id in &relay_peer_ids {
+                        if swarm.is_connected(&relay_id) {
+                            log::debug!("rendezvous: re-discovering from {relay_id}");
+                            swarm.behaviour_mut().rendezvous.discover(
+                                Some(rendezvous::Namespace::from_static("freepath")),
+                                rendezvous_cookies.get(&relay_id).cloned(),
+                                None,
+                                relay_id,
+                            );
+                        }
                     }
                 }
             }
@@ -225,10 +297,16 @@ fn handle_swarm_event(
     local_peer_id: &str,
     event_cb: &EventCallback,
     contact_cb: &ContactCallback,
+    relay_peer_ids: &std::collections::HashSet<PeerId>,
+    rendezvous_cookies: &mut HashMap<PeerId, rendezvous::Cookie>,
 ) -> bool {
     match event {
         Some(SwarmEvent::Behaviour(BehaviourEvent::Messaging(ev))) => {
             handle_messaging(ev, swarm, state, local_peer_id, event_cb);
+            false
+        }
+        Some(SwarmEvent::Behaviour(BehaviourEvent::Rendezvous(ev))) => {
+            handle_rendezvous(ev, swarm, relay_peer_ids, rendezvous_cookies);
             false
         }
         // Only fire peer_disconnected when the last connection to the peer is gone.
@@ -241,7 +319,14 @@ fn handle_swarm_event(
             false
         }
         Some(ev) => {
-            handle_event(ev, event_cb, contact_cb);
+            handle_event(
+                ev,
+                swarm,
+                event_cb,
+                contact_cb,
+                relay_peer_ids,
+                rendezvous_cookies,
+            );
             false
         }
         None => {
@@ -373,10 +458,79 @@ fn handle_messaging(
     }
 }
 
+fn handle_rendezvous(
+    ev: rendezvous::client::Event,
+    swarm: &mut libp2p::Swarm<Behaviour>,
+    relay_peer_ids: &std::collections::HashSet<PeerId>,
+    rendezvous_cookies: &mut HashMap<PeerId, rendezvous::Cookie>,
+) {
+    match ev {
+        rendezvous::client::Event::Registered {
+            rendezvous_node,
+            ttl,
+            namespace,
+        } => {
+            log::info!(
+                "rendezvous: registered in '{}' with {rendezvous_node} (ttl={ttl}s)",
+                namespace
+            );
+        }
+        rendezvous::client::Event::RegisterFailed {
+            rendezvous_node,
+            namespace,
+            error,
+        } => {
+            log::warn!(
+                "rendezvous: registration in '{}' with {rendezvous_node} failed: {error:?}",
+                namespace
+            );
+        }
+        rendezvous::client::Event::Discovered {
+            rendezvous_node,
+            registrations,
+            cookie,
+        } => {
+            rendezvous_cookies.insert(rendezvous_node, cookie);
+            let local_peer_id = *swarm.local_peer_id();
+            for registration in registrations {
+                let peer_id = registration.record.peer_id();
+                if peer_id == local_peer_id || relay_peer_ids.contains(&peer_id) {
+                    continue;
+                }
+                if swarm.is_connected(&peer_id) {
+                    continue;
+                }
+                for addr in registration.record.addresses() {
+                    log::debug!("rendezvous: discovered {peer_id} at {addr}, dialing");
+                    if let Err(e) = swarm.dial(addr.clone()) {
+                        log::warn!("rendezvous: dial {addr} failed: {e:?}");
+                    }
+                }
+            }
+        }
+        rendezvous::client::Event::DiscoverFailed {
+            rendezvous_node,
+            namespace,
+            error,
+        } => {
+            log::warn!(
+                "rendezvous: discover '{}' from {rendezvous_node} failed: {error:?}",
+                namespace.map(|n| n.to_string()).unwrap_or_default()
+            );
+        }
+        rendezvous::client::Event::Expired { peer } => {
+            log::debug!("rendezvous: registration expired for {peer}");
+        }
+    }
+}
+
 fn handle_event(
     ev: SwarmEvent<BehaviourEvent>,
+    swarm: &mut libp2p::Swarm<Behaviour>,
     event_cb: &EventCallback,
     contact_cb: &ContactCallback,
+    relay_peer_ids: &std::collections::HashSet<PeerId>,
+    rendezvous_cookies: &mut HashMap<PeerId, rendezvous::Cookie>,
 ) {
     match ev {
         SwarmEvent::ConnectionEstablished {
@@ -425,6 +579,25 @@ fn handle_event(
             ..
         })) => {
             if info.agent_version.starts_with("freepath/") {
+                // If this is a relay peer, register and discover via rendezvous.
+                if relay_peer_ids.contains(&peer_id) {
+                    log::info!("rendezvous: identified relay {peer_id}, registering + discovering");
+                    if let Err(e) = swarm.behaviour_mut().rendezvous.register(
+                        rendezvous::Namespace::from_static("freepath"),
+                        peer_id,
+                        None,
+                    ) {
+                        log::warn!("rendezvous: register failed: {e}");
+                    }
+                    swarm.behaviour_mut().rendezvous.discover(
+                        Some(rendezvous::Namespace::from_static("freepath")),
+                        rendezvous_cookies.get(&peer_id).cloned(),
+                        None,
+                        peer_id,
+                    );
+                    return;
+                }
+
                 // Fire peer_connected using the peer's first advertised listen address.
                 let addr = info
                     .listen_addrs

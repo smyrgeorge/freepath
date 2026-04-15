@@ -5,6 +5,7 @@ internal object Libp2pJni {
         nodeId: String,
         sigKeyPrivate: ByteArray,
         listenAddr: String,
+        relayAddrs: String,
         eventHandle: Long,
     ): Long
 

@@ -1,0 +1,38 @@
+[Unit]
+Description=Freepath Rendezvous Relay
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=freepath
+Group=freepath
+ExecStart=/usr/local/bin/freepath-relay \
+    --listen-addr /ip4/0.0.0.0/tcp/4001 \
+    --extra-listen-addr /ip4/0.0.0.0/udp/4001/quic-v1 \
+    --key-file /etc/freepath/relay.key
+Environment=RUST_LOG=info
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/etc/freepath
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

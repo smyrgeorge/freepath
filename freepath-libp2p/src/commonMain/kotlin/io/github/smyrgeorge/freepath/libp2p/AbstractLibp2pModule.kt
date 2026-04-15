@@ -55,9 +55,11 @@ abstract class AbstractLibp2pModule(
     abstract suspend fun start(
         peerId: String,
         sigKeyPrivate: ByteArray,
-        listenAddrs: String = defaultListenAddrs,
+        listenAddrs: String,
+        relayAddrs: String,
         contactLookup: (String) -> Boolean = { false },
     )
+
     abstract suspend fun stop()
     abstract suspend fun dial(multiaddr: String)
     abstract suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray)

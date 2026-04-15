@@ -23,6 +23,7 @@ pub extern "C" fn libp2p_start(
     sig_key_private: *const u8,
     sig_key_len: usize,
     listen_addr: *const c_char,
+    relay_addrs: *const c_char,
     event_callback: *mut c_void,
     event_fun: unsafe extern "C" fn(*mut c_void, *mut RawLibP2pEvent),
     contact_callback: *mut c_void,
@@ -38,6 +39,10 @@ pub extern "C" fn libp2p_start(
         !listen_addr.is_null(),
         "libp2p_start: listen_addr must not be null"
     );
+    assert!(
+        !relay_addrs.is_null(),
+        "libp2p_start: relay_addrs must not be null"
+    );
 
     let nid = unsafe { CStr::from_ptr(node_id) }
         .to_str()
@@ -46,6 +51,9 @@ pub extern "C" fn libp2p_start(
     let addr = unsafe { CStr::from_ptr(listen_addr) }
         .to_str()
         .expect("libp2p_start: listen_addr is not valid UTF-8");
+    let relays = unsafe { CStr::from_ptr(relay_addrs) }
+        .to_str()
+        .expect("libp2p_start: relay_addrs is not valid UTF-8");
 
     let event_cb = EventCallback {
         ptr: event_callback,
@@ -55,7 +63,7 @@ pub extern "C" fn libp2p_start(
         ptr: contact_callback,
         fun: contact_fun,
     };
-    match crate::core::start_node(nid, key_bytes, addr, event_cb, contact_cb) {
+    match crate::core::start_node(nid, key_bytes, addr, relays, event_cb, contact_cb) {
         Ok(arc) => Arc::into_raw(arc) as *mut c_void,
         Err(e) => {
             log::error!("start failed: {e}");

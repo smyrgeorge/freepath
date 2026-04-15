@@ -43,6 +43,7 @@ void *libp2p_start(const char *node_id,
                    const uint8_t *sig_key_private,
                    uintptr_t sig_key_len,
                    const char *listen_addr,
+                   const char *relay_addrs,
                    void *event_callback,
                    void (*event_fun)(void*, struct RawLibP2pEvent*),
                    void *contact_callback,
@@ -96,13 +97,14 @@ void libp2p_event_free(struct RawLibP2pEvent *event);
 jint JNI_OnLoad(JavaVM *vm, void *_reserved);
 
 /**
- * Java: `external fun start(nodeId: String, sigKeyPrivate: ByteArray, listenAddr: String, eventHandle: Long): Long`
+ * Java: `external fun start(nodeId: String, sigKeyPrivate: ByteArray, listenAddr: String, relayAddrs: String, eventHandle: Long): Long`
  */
 jlong Java_io_github_smyrgeorge_freepath_libp2p_Libp2pJni_start(EnvUnowned env,
                                                                 JClass _class,
                                                                 JString node_id,
                                                                 JByteArray sig_key,
                                                                 JString listen_addr,
+                                                                JString relay_addrs,
                                                                 jlong event_handle);
 
 /**

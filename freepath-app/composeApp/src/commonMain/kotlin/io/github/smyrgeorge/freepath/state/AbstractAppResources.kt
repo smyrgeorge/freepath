@@ -28,6 +28,7 @@ import io.github.smyrgeorge.freepath.libnet.Transport
 import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
+import io.github.smyrgeorge.freepath.libp2p.defaultListenAddrs
 import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.log4k.impl.extensions.launch
@@ -168,6 +169,8 @@ abstract class AbstractAppResources(
         libp2p.start(
             peerId = identity.peerId,
             sigKeyPrivate = identity.sigKeyPrivate,
+            listenAddrs = defaultListenAddrs,
+            relayAddrs = "",
             contactLookup = { peerId -> contactLookup(peerId) != null },
         )
     }

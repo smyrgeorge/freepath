@@ -25,6 +25,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
         peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
+        relayAddrs: String,
         contactLookup: (String) -> Boolean,
     ) {
         if (nodeHandle.get() != null) return
@@ -32,7 +33,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
         mdns = MdnsPeerDiscovery(peerId)
         contactLookups[handlerId] = contactLookup
         eventHandlers[handlerId] = ::dispatch
-        val handle = withContext(dispatcher) { Libp2pJni.start(peerId, sigKeyPrivate, listenAddrs, handlerId) }
+        val handle = withContext(dispatcher) { Libp2pJni.start(peerId, sigKeyPrivate, listenAddrs, relayAddrs, handlerId) }
         if (handle == 0L) {
             nodeHandle.set(null)
             eventHandlers.remove(handlerId)

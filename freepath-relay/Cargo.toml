@@ -1,22 +1,24 @@
 [package]
-name = "freepath_libp2p"
+name = "freepath-relay"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib", "staticlib"]
+[[bin]]
+name = "freepath-relay"
+path = "src/main.rs"
 
 [dependencies]
 # https://crates.io/crates/log
 log = "0.4.29"
-# https://crates.io/crates/async-trait
-async-trait = "0.1.89"
+# https://crates.io/crates/env_logger
+env_logger = "0.11"
+# https://crates.io/crates/clap
+clap = { version = "4", features = ["derive"] }
 # https://crates.io/crates/libp2p
 libp2p = { version = "0.56.0", features = [
     "tcp", "noise", "yamux",
-    "identify", "ping", "tokio",
-    "quic", "request-response", "dns",
-    "rendezvous"
+    "identify", "ping", "rendezvous", "tokio",
+    "quic", "dns"
 ] }
 # https://crates.io/crates/libp2p-dns
 libp2p-dns = { version = "0.44.0", features = ["tokio"] }
@@ -26,11 +28,3 @@ libp2p-swarm = { version = "0.47.1", features = ["macros"] }
 tokio = { version = "1.50.0", features = ["full"] }
 # https://crates.io/crates/futures
 futures = "0.3.32"
-
-# https://crates.io/crates/jni
-[target.'cfg(not(target_os = "ios"))'.dependencies]
-jni = { version = "0.22.4", features = ["invocation"] }
-
-# https://crates.io/crates/cbindgen
-[build-dependencies]
-cbindgen = { version = "0.29.2" }

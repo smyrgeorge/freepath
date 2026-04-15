@@ -1,0 +1,60 @@
+name: Deploy Relay
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "freepath-relay/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: freepath-relay
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install cross-compilation linker
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            freepath-relay/target
+          key: relay-aarch64-${{ hashFiles('freepath-relay/Cargo.lock') }}
+          restore-keys: relay-aarch64-
+
+      - name: Configure linker
+        run: |
+          mkdir -p ~/.cargo
+          cat >> ~/.cargo/config.toml <<'EOF'
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
+
+      - name: Set up SSH and deploy
+        env:
+          RELAY_SSH_PRIVATE_KEY: ${{ secrets.RELAY_SSH_PRIVATE_KEY }}
+          RELAY_HOST: ${{ secrets.RELAY_HOST }}
+          RELAY_USER: ${{ secrets.RELAY_USER }}
+        run: |
+          if [ -z "$RELAY_SSH_PRIVATE_KEY" ] || [ -z "$RELAY_HOST" ] || [ -z "$RELAY_USER" ]; then
+            echo "Skipping deploy: RELAY_SSH_PRIVATE_KEY, RELAY_HOST, or RELAY_USER secret not set"
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          echo "$RELAY_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$RELAY_HOST" >> ~/.ssh/known_hosts
+          ./deploy.sh "$RELAY_USER@$RELAY_HOST"
