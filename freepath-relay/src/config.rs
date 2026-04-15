@@ -6,19 +6,21 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(name = "freepath-relay", about = "Freepath rendezvous relay server")]
 pub struct Config {
-    /// Multiaddr to listen on (e.g. /ip4/0.0.0.0/tcp/4001)
-    #[arg(long, default_value = "/ip4/0.0.0.0/tcp/4001")]
-    pub listen_addr: String,
+    /// Multiaddr(s) to listen on (can be repeated).
+    /// Defaults to TCP + QUIC on all IPv4 and IPv6 interfaces if not specified.
+    #[arg(long, default_values = [
+        "/ip4/0.0.0.0/tcp/4001",
+        "/ip4/0.0.0.0/udp/4001/quic-v1",
+        "/ip6/::/tcp/4001",
+        "/ip6/::/udp/4001/quic-v1",
+    ])]
+    pub listen_addr: Vec<String>,
 
     /// Path to a 32-byte ed25519 private key file.
     /// If the file does not exist, a new key is generated and saved.
     /// If omitted, an ephemeral key is used.
     #[arg(long)]
     pub key_file: Option<PathBuf>,
-
-    /// Additional multiaddr to listen on (can be repeated, e.g. for QUIC)
-    #[arg(long)]
-    pub extra_listen_addr: Vec<String>,
 }
 
 pub fn load_or_generate_keypair(path: Option<&PathBuf>) -> identity::Keypair {

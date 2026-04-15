@@ -19,11 +19,6 @@ async fn main() {
     let peer_id = keypair.public().to_peer_id();
     log::info!("Relay PeerId: {peer_id}");
 
-    let listen_addr: Multiaddr = config
-        .listen_addr
-        .parse()
-        .expect("invalid --listen-addr multiaddr");
-
     // DNS resolvers: Quad9 + Cloudflare + Google for resilience.
     let mut dns_config = libp2p_dns::ResolverConfig::new();
     for ns in libp2p_dns::ResolverConfig::quad9().name_servers() {
@@ -51,15 +46,9 @@ async fn main() {
         .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(60)))
         .build();
 
-    swarm
-        .listen_on(listen_addr.clone())
-        .expect("failed to listen");
-
-    for addr_str in &config.extra_listen_addr {
-        let addr: Multiaddr = addr_str.parse().expect("invalid --extra-listen-addr");
-        swarm
-            .listen_on(addr)
-            .expect("failed to listen on extra addr");
+    for addr_str in &config.listen_addr {
+        let addr: Multiaddr = addr_str.parse().expect("invalid --listen-addr multiaddr");
+        swarm.listen_on(addr).expect("failed to listen on addr");
     }
 
     loop {
