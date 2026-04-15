@@ -1,5 +1,5 @@
 use crate::messaging::{FreepathCodec, FreepathProtocol};
-use libp2p::{identify, identity, ping, rendezvous, request_response};
+use libp2p::{identify, identity, ping, relay, rendezvous, request_response};
 use libp2p_swarm::NetworkBehaviour;
 
 #[derive(NetworkBehaviour)]
@@ -7,6 +7,7 @@ use libp2p_swarm::NetworkBehaviour;
 pub struct RelayBehaviour {
     pub identify: identify::Behaviour,
     pub ping: ping::Behaviour,
+    pub relay: relay::Behaviour,
     pub messaging: request_response::Behaviour<FreepathCodec>,
     pub rendezvous: rendezvous::server::Behaviour,
 }
@@ -20,6 +21,8 @@ impl RelayBehaviour {
                     .with_agent_version(format!("freepath/{peer_id}")),
             ),
             ping: ping::Behaviour::default(),
+            // TODO: configure relay.
+            relay: relay::Behaviour::new(peer_id, relay::Config::default()),
             messaging: request_response::Behaviour::with_codec(
                 FreepathCodec,
                 std::iter::once((FreepathProtocol, request_response::ProtocolSupport::Full)),

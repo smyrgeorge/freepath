@@ -52,6 +52,12 @@ async fn main() {
         swarm.listen_on(addr).expect("failed to listen on addr");
     }
 
+    for addr_str in &config.external_addr {
+        let addr: Multiaddr = addr_str.parse().expect("invalid --external-addr multiaddr");
+        log::info!("Adding external address: {addr}");
+        swarm.add_external_address(addr);
+    }
+
     loop {
         match swarm.select_next_some().await {
             SwarmEvent::Behaviour(RelayBehaviourEvent::Identify(identify::Event::Received {
@@ -72,6 +78,10 @@ async fn main() {
 
             SwarmEvent::Behaviour(RelayBehaviourEvent::Rendezvous(event)) => {
                 handle_rendezvous_event(event);
+            }
+
+            SwarmEvent::Behaviour(RelayBehaviourEvent::Relay(event)) => {
+                log::info!("Relay event: {event:?}");
             }
 
             SwarmEvent::Behaviour(RelayBehaviourEvent::Messaging(

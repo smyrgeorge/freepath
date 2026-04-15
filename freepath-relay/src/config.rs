@@ -16,6 +16,12 @@ pub struct Config {
     ])]
     pub listen_addr: Vec<String>,
 
+    /// External multiaddr(s) that this relay is reachable at (can be repeated).
+    /// Required for circuit relay: included in reservation responses so clients
+    /// know how to advertise the relay's address.
+    #[arg(long)]
+    pub external_addr: Vec<String>,
+
     /// Path to a 32-byte ed25519 private key file.
     /// If the file does not exist, a new key is generated and saved.
     /// If omitted, an ephemeral key is used.

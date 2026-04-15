@@ -5,8 +5,8 @@ use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
 use libp2p::{
-    identify, identity, noise, ping, rendezvous, request_response, tcp, yamux, Multiaddr, PeerId,
-    SwarmBuilder,
+    identify, identity, noise, ping, relay, rendezvous, request_response, tcp, yamux, Multiaddr,
+    PeerId, SwarmBuilder,
 };
 use libp2p_swarm::{NetworkBehaviour, SwarmEvent};
 
@@ -29,6 +29,7 @@ impl Drop for LibP2pNode {
 pub struct Behaviour {
     pub identify: identify::Behaviour,
     pub ping: ping::Behaviour,
+    pub relay_client: relay::client::Behaviour,
     pub messaging: request_response::Behaviour<FreepathCodec>,
     pub rendezvous: rendezvous::client::Behaviour,
 }
@@ -158,13 +159,15 @@ pub fn start_node(
                 )?
                 .with_quic()
                 .with_dns_config(dns_config, libp2p_dns::ResolverOpts::default())
-                .with_behaviour(|key| {
+                .with_relay_client(noise::Config::new, yamux::Config::default)?
+                .with_behaviour(|key, relay_client| {
                     Ok(Behaviour {
                         identify: identify::Behaviour::new(
                             identify::Config::new("/freepath/1.0.0".into(), key.public())
                                 .with_agent_version(format!("freepath/{peer_id}")),
                         ),
                         ping: ping::Behaviour::default(),
+                        relay_client,
                         messaging: request_response::Behaviour::with_codec(
                             FreepathCodec,
                             std::iter::once((
@@ -199,8 +202,8 @@ pub fn start_node(
         let mut state = NodeState::new();
 
         // Extract relay PeerIds from multiaddrs and dial them.
-        let mut relay_peer_ids: std::collections::HashSet<PeerId> =
-            std::collections::HashSet::new();
+        // Maps relay PeerId → original dial Multiaddr (used for circuit address construction).
+        let mut relay_peer_ids: HashMap<PeerId, Multiaddr> = HashMap::new();
         for addr in &relay_multiaddrs {
             if let Some(pid) = addr
                 .iter()
@@ -209,7 +212,7 @@ pub fn start_node(
                     _ => None,
                 })
             {
-                relay_peer_ids.insert(pid);
+                relay_peer_ids.insert(pid, addr.clone());
             }
             if let Err(e) = swarm.dial(addr.clone()) {
                 log::warn!("relay dial({addr}) failed: {e:?}");
@@ -227,11 +230,13 @@ pub fn start_node(
 
         // Cookie for progressive discovery per relay.
         let mut rendezvous_cookies: HashMap<PeerId, rendezvous::Cookie> = HashMap::new();
+        // Track relays where we already started a circuit listener to avoid duplicates.
+        let mut circuit_listening: std::collections::HashSet<PeerId> = std::collections::HashSet::new();
 
         loop {
             tokio::select! {
                 event = futures::StreamExt::next(&mut swarm) => {
-                    if handle_swarm_event(event, &mut swarm, &mut state, &local_peer_id, &event_cb, &contact_cb, &relay_peer_ids, &mut rendezvous_cookies) {
+                    if handle_swarm_event(event, &mut swarm, &mut state, &local_peer_id, &event_cb, &contact_cb, &relay_peer_ids, &mut rendezvous_cookies, &mut circuit_listening) {
                         break;
                     }
                 }
@@ -241,7 +246,7 @@ pub fn start_node(
                     }
                 }
                 _ = rendezvous_interval.tick() => {
-                    for &relay_id in &relay_peer_ids {
+                    for (&relay_id, _) in &relay_peer_ids {
                         if swarm.is_connected(&relay_id) {
                             log::debug!("rendezvous: re-registering with {relay_id}");
                             if let Err(e) = swarm.behaviour_mut().rendezvous.register(
@@ -255,7 +260,7 @@ pub fn start_node(
                     }
                 }
                 _ = discover_interval.tick() => {
-                    for &relay_id in &relay_peer_ids {
+                    for (&relay_id, _) in &relay_peer_ids {
                         if swarm.is_connected(&relay_id) {
                             log::debug!("rendezvous: re-discovering from {relay_id}");
                             swarm.behaviour_mut().rendezvous.discover(
@@ -297,8 +302,9 @@ fn handle_swarm_event(
     local_peer_id: &str,
     event_cb: &EventCallback,
     contact_cb: &ContactCallback,
-    relay_peer_ids: &std::collections::HashSet<PeerId>,
+    relay_peer_ids: &HashMap<PeerId, Multiaddr>,
     rendezvous_cookies: &mut HashMap<PeerId, rendezvous::Cookie>,
+    circuit_listening: &mut std::collections::HashSet<PeerId>,
 ) -> bool {
     match event {
         Some(SwarmEvent::Behaviour(BehaviourEvent::Messaging(ev))) => {
@@ -307,6 +313,10 @@ fn handle_swarm_event(
         }
         Some(SwarmEvent::Behaviour(BehaviourEvent::Rendezvous(ev))) => {
             handle_rendezvous(ev, swarm, event_cb, relay_peer_ids, rendezvous_cookies);
+            false
+        }
+        Some(SwarmEvent::Behaviour(BehaviourEvent::RelayClient(ev))) => {
+            log::info!("relay client event: {ev:?}");
             false
         }
         // Only fire peer_disconnected when the last connection to the peer is gone.
@@ -326,6 +336,7 @@ fn handle_swarm_event(
                 contact_cb,
                 relay_peer_ids,
                 rendezvous_cookies,
+                circuit_listening,
             );
             false
         }
@@ -462,7 +473,7 @@ fn handle_rendezvous(
     ev: rendezvous::client::Event,
     swarm: &mut libp2p::Swarm<Behaviour>,
     event_cb: &EventCallback,
-    relay_peer_ids: &std::collections::HashSet<PeerId>,
+    relay_peer_ids: &HashMap<PeerId, Multiaddr>,
     rendezvous_cookies: &mut HashMap<PeerId, rendezvous::Cookie>,
 ) {
     match ev {
@@ -506,7 +517,7 @@ fn handle_rendezvous(
             let local_peer_id = *swarm.local_peer_id();
             for registration in registrations {
                 let peer_id = registration.record.peer_id();
-                if peer_id == local_peer_id || relay_peer_ids.contains(&peer_id) {
+                if peer_id == local_peer_id || relay_peer_ids.contains_key(&peer_id) {
                     continue;
                 }
                 if swarm.is_connected(&peer_id) {
@@ -541,8 +552,9 @@ fn handle_event(
     swarm: &mut libp2p::Swarm<Behaviour>,
     event_cb: &EventCallback,
     contact_cb: &ContactCallback,
-    relay_peer_ids: &std::collections::HashSet<PeerId>,
+    relay_peer_ids: &HashMap<PeerId, Multiaddr>,
     rendezvous_cookies: &mut HashMap<PeerId, rendezvous::Cookie>,
+    circuit_listening: &mut std::collections::HashSet<PeerId>,
 ) {
     match ev {
         SwarmEvent::ConnectionEstablished {
@@ -554,7 +566,12 @@ fn handle_event(
                 endpoint.get_remote_address()
             );
         }
-        SwarmEvent::NewListenAddr { address, .. } => {
+        SwarmEvent::NewListenAddr {
+            address,
+            listener_id,
+            ..
+        } => {
+            log::info!("NewListenAddr: {address} (listener_id={listener_id:?})");
             let raw = RawLibP2pEvent::new_listen_addr(address.to_string());
             unsafe { (event_cb.fun)(event_cb.ptr, raw) }
         }
@@ -567,8 +584,13 @@ fn handle_event(
         SwarmEvent::ExpiredListenAddr { address, .. } => {
             log::warn!("TODO: Expired listen addr: {}", address);
         }
-        SwarmEvent::ListenerClosed { addresses, .. } => {
-            log::warn!("TODO: Expired listen addrs: {:?}", addresses);
+        SwarmEvent::ListenerClosed {
+            addresses,
+            listener_id,
+            reason,
+            ..
+        } => {
+            log::warn!("ListenerClosed: listener_id={listener_id:?}, addresses={addresses:?}, reason={reason:?}");
         }
         SwarmEvent::ListenerError { error, .. } => {
             log::error!("TODO: Listener error: {}", error);
@@ -592,7 +614,7 @@ fn handle_event(
         })) => {
             if info.agent_version.starts_with("freepath/") {
                 // If this is a relay peer, register and discover via rendezvous.
-                if relay_peer_ids.contains(&peer_id) {
+                if relay_peer_ids.contains_key(&peer_id) {
                     log::info!("rendezvous: identified relay {peer_id}, registering + discovering");
                     // The relay tells us our observed (external) address.
                     // Add it so the rendezvous client has an externally reachable address to advertise.
@@ -600,7 +622,34 @@ fn handle_event(
                         "rendezvous: adding observed external addr {}",
                         info.observed_addr
                     );
-                    swarm.add_external_address(info.observed_addr);
+                    swarm.add_external_address(info.observed_addr.clone());
+
+                    // Listen on the relay's circuit address to make a reservation.
+                    // Use the original dial multiaddr (externally reachable), not the relay's
+                    // self-reported listen_addrs which may include localhost/link-local addresses.
+                    // Only do this once per relay (identify fires per-connection: TCP + QUIC).
+                    if !circuit_listening.contains(&peer_id) {
+                        if let Some(relay_addr) = relay_peer_ids.get(&peer_id) {
+                            circuit_listening.insert(peer_id);
+                            // Strip trailing /p2p/<id> if present (already part of the dial addr),
+                            // then append /p2p-circuit.
+                            let base: Multiaddr = relay_addr
+                                .iter()
+                                .filter(|p| !matches!(p, libp2p::multiaddr::Protocol::P2p(_)))
+                                .collect();
+                            let circuit_addr = base
+                                .with(libp2p::multiaddr::Protocol::P2p(peer_id))
+                                .with(libp2p::multiaddr::Protocol::P2pCircuit);
+                            log::info!("relay: listening on circuit address {circuit_addr}");
+                            match swarm.listen_on(circuit_addr) {
+                                Ok(id) => log::info!(
+                                    "relay: circuit listener started, listener_id={id:?}"
+                                ),
+                                Err(e) => log::warn!("relay: listen_on circuit failed: {e}"),
+                            }
+                        }
+                    }
+
                     // Emit RelayConnected event.
                     let raw = RawLibP2pEvent::relay_connected(peer_id.to_string());
                     unsafe { (event_cb.fun)(event_cb.ptr, raw) }

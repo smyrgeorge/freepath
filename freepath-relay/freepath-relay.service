@@ -10,7 +10,9 @@ Type=simple
 User=freepath
 Group=freepath
 ExecStart=/usr/local/bin/freepath-relay \
-    --key-file /etc/freepath/relay.key
+    --key-file /etc/freepath/relay.key \
+    --external-addr /ip6/2a01:4f8:1c1a:1798::1/tcp/4001 \
+    --external-addr /ip6/2a01:4f8:1c1a:1798::1/udp/4001/quic-v1
 Environment=RUST_LOG=info
 Restart=on-failure
 RestartSec=5

@@ -17,7 +17,7 @@ clap = { version = "4", features = ["derive"] }
 # https://crates.io/crates/libp2p
 libp2p = { version = "0.56.0", features = [
     "tcp", "noise", "yamux",
-    "identify", "ping", "rendezvous", "request-response", "tokio",
+    "identify", "ping", "relay", "rendezvous", "request-response", "tokio",
     "quic", "dns"
 ] }
 # https://crates.io/crates/libp2p-dns

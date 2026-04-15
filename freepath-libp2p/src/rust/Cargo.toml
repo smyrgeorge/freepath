@@ -14,7 +14,7 @@ async-trait = "0.1.89"
 # https://crates.io/crates/libp2p
 libp2p = { version = "0.56.0", features = [
     "tcp", "noise", "yamux",
-    "identify", "ping", "tokio",
+    "identify", "ping", "relay", "tokio",
     "quic", "request-response", "dns",
     "rendezvous"
 ] }

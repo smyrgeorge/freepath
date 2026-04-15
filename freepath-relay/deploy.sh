@@ -3,8 +3,9 @@ set -euo pipefail
 
 # --- Config ---
 REMOTE_HOST="${1:?Usage: ./deploy.sh <user@host>}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-BINARY="target/aarch64-unknown-linux-gnu/release/freepath-relay"
+BINARY="$SCRIPT_DIR/target/aarch64-unknown-linux-gnu/release/freepath-relay"
 if [ ! -f "$BINARY" ]; then
     echo "ERROR: binary not found at $BINARY"
     exit 1
@@ -38,7 +39,7 @@ REMOTE
 
 # --- Upload and enable service ---
 echo "==> Installing systemd service..."
-cat freepath-relay.service | ssh "$REMOTE_HOST" "sudo tee /etc/systemd/system/freepath-relay.service > /dev/null"
+cat "$SCRIPT_DIR/freepath-relay.service" | ssh "$REMOTE_HOST" "sudo tee /etc/systemd/system/freepath-relay.service > /dev/null"
 ssh "$REMOTE_HOST" bash -s <<'REMOTE'
 set -euo pipefail
 sudo systemctl daemon-reload
