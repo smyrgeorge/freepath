@@ -306,7 +306,7 @@ fn handle_swarm_event(
             false
         }
         Some(SwarmEvent::Behaviour(BehaviourEvent::Rendezvous(ev))) => {
-            handle_rendezvous(ev, swarm, relay_peer_ids, rendezvous_cookies);
+            handle_rendezvous(ev, swarm, event_cb, relay_peer_ids, rendezvous_cookies);
             false
         }
         // Only fire peer_disconnected when the last connection to the peer is gone.
@@ -461,6 +461,7 @@ fn handle_messaging(
 fn handle_rendezvous(
     ev: rendezvous::client::Event,
     swarm: &mut libp2p::Swarm<Behaviour>,
+    event_cb: &EventCallback,
     relay_peer_ids: &std::collections::HashSet<PeerId>,
     rendezvous_cookies: &mut HashMap<PeerId, rendezvous::Cookie>,
 ) {
@@ -474,6 +475,12 @@ fn handle_rendezvous(
                 "rendezvous: registered in '{}' with {rendezvous_node} (ttl={ttl}s)",
                 namespace
             );
+            let raw = RawLibP2pEvent::relay_registered(
+                rendezvous_node.to_string(),
+                namespace.to_string(),
+                ttl,
+            );
+            unsafe { (event_cb.fun)(event_cb.ptr, raw) }
         }
         rendezvous::client::Event::RegisterFailed {
             rendezvous_node,
@@ -484,6 +491,11 @@ fn handle_rendezvous(
                 "rendezvous: registration in '{}' with {rendezvous_node} failed: {error:?}",
                 namespace
             );
+            let raw = RawLibP2pEvent::relay_registration_failed(
+                rendezvous_node.to_string(),
+                format!("{error:?}"),
+            );
+            unsafe { (event_cb.fun)(event_cb.ptr, raw) }
         }
         rendezvous::client::Event::Discovered {
             rendezvous_node,
@@ -582,12 +594,27 @@ fn handle_event(
                 // If this is a relay peer, register and discover via rendezvous.
                 if relay_peer_ids.contains(&peer_id) {
                     log::info!("rendezvous: identified relay {peer_id}, registering + discovering");
+                    // The relay tells us our observed (external) address.
+                    // Add it so the rendezvous client has an externally reachable address to advertise.
+                    log::debug!(
+                        "rendezvous: adding observed external addr {}",
+                        info.observed_addr
+                    );
+                    swarm.add_external_address(info.observed_addr);
+                    // Emit RelayConnected event.
+                    let raw = RawLibP2pEvent::relay_connected(peer_id.to_string());
+                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
                     if let Err(e) = swarm.behaviour_mut().rendezvous.register(
                         rendezvous::Namespace::from_static("freepath"),
                         peer_id,
                         None,
                     ) {
                         log::warn!("rendezvous: register failed: {e}");
+                        let raw = RawLibP2pEvent::relay_registration_failed(
+                            peer_id.to_string(),
+                            e.to_string(),
+                        );
+                        unsafe { (event_cb.fun)(event_cb.ptr, raw) }
                     }
                     swarm.behaviour_mut().rendezvous.discover(
                         Some(rendezvous::Namespace::from_static("freepath")),

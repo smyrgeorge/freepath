@@ -39,6 +39,15 @@ internal object Libp2pCallback {
                 error = value?.decodeToString() ?: ""
             )
 
+            9 -> Libp2pEvent.RelayConnected(relayPeerId = peerId)
+            10 -> Libp2pEvent.RelayRegistered(
+                relayPeerId = peerId,
+                namespace = addr,
+                ttl = value?.decodeToString()?.toLongOrNull() ?: 0L
+            )
+
+            11 -> Libp2pEvent.RelayRegistrationFailed(relayPeerId = peerId, error = value?.decodeToString() ?: "")
+
             else -> return
         }
         handler(event)

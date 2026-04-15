@@ -40,12 +40,32 @@ class Libp2pMetrics {
             is Libp2pEvent.PeerConnected -> s.copy(connectedPeers = s.connectedPeers + event.peerId)
             is Libp2pEvent.PeerDisconnected -> s.copy(
                 connectedPeers = s.connectedPeers - event.peerId,
-                identifiedPeers = s.identifiedPeers - event.peerId
+                identifiedPeers = s.identifiedPeers - event.peerId,
+                connectedRelays = s.connectedRelays - event.peerId,
+                registeredRelays = s.registeredRelays - event.peerId,
             )
 
             is Libp2pEvent.PeerIdentified -> s.copy(identifiedPeers = s.identifiedPeers + event.peerId)
             is Libp2pEvent.MdnsPeerDiscovered -> s.copy(mdnsPeers = s.mdnsPeers + (event.peerId to event.addr))
             is Libp2pEvent.MdnsPeerExpired -> s.copy(mdnsPeers = s.mdnsPeers - event.peerId)
+            is Libp2pEvent.RelayConnected -> s.copy(
+                connectedRelays = s.connectedRelays + event.relayPeerId,
+                failedRelays = s.failedRelays - event.relayPeerId,
+            )
+
+            is Libp2pEvent.RelayRegistered -> s.copy(
+                registeredRelays = s.registeredRelays + (event.relayPeerId to Libp2pMetricsSnapshot.RelayRegistration(
+                    event.namespace,
+                    event.ttl
+                )),
+                failedRelays = s.failedRelays - event.relayPeerId,
+            )
+
+            is Libp2pEvent.RelayRegistrationFailed -> s.copy(
+                failedRelays = s.failedRelays + (event.relayPeerId to event.error),
+                registeredRelays = s.registeredRelays - event.relayPeerId,
+            )
+
             else -> s
         }
 }

@@ -8,13 +8,16 @@
 
 /**
  * Event kinds:
- *   0 = PeerConnected    (peer_id + addr)
- *   1 = PeerDisconnected (peer_id)
- *   3 = NewListenAddr    (addr stored in peer_id field)
- *   4 = PeerIdentified   (peer_id)
- *   6 = RequestReceived  (req_id, peer_id=senderId, addr=recipientId, value=payload)
- *   7 = ResponseReceived (req_id, peer_id=senderId, addr=recipientId, value=payload)
- *   8 = RequestFailed    (req_id, peer_id=senderId, addr=recipientId, value=error bytes)
+ *   0 = PeerConnected             (peer_id + addr)
+ *   1 = PeerDisconnected          (peer_id)
+ *   3 = NewListenAddr             (addr stored in peer_id field)
+ *   4 = PeerIdentified            (peer_id)
+ *   6 = RequestReceived           (req_id, peer_id=senderId, addr=recipientId, value=payload)
+ *   7 = ResponseReceived          (req_id, peer_id=senderId, addr=recipientId, value=payload)
+ *   8 = RequestFailed             (req_id, peer_id=senderId, addr=recipientId, value=error bytes)
+ *   9 = RelayConnected            (peer_id=relayPeerId)
+ *  10 = RelayRegistered           (peer_id=relayPeerId, addr=namespace, value=ttl as decimal string)
+ *  11 = RelayRegistrationFailed   (peer_id=relayPeerId, value=error string)
  */
 typedef struct RawLibP2pEvent {
   uint8_t kind;

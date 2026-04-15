@@ -8,6 +8,15 @@ sealed class Libp2pEvent {
     data class MdnsPeerDiscovered(val peerId: String, val addr: String) : Libp2pEvent()
     data class MdnsPeerExpired(val peerId: String) : Libp2pEvent()
 
+    /** Relay peer was identified — connection + identify completed. */
+    data class RelayConnected(val relayPeerId: String) : Libp2pEvent()
+
+    /** Successfully registered with a rendezvous relay. */
+    data class RelayRegistered(val relayPeerId: String, val namespace: String, val ttl: Long) : Libp2pEvent()
+
+    /** Failed to register with a rendezvous relay. */
+    data class RelayRegistrationFailed(val relayPeerId: String, val error: String) : Libp2pEvent()
+
     data class RequestReceived(
         val reqId: Long,
         val senderId: String,

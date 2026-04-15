@@ -15,7 +15,7 @@ impl RelayBehaviour {
         Self {
             identify: identify::Behaviour::new(
                 identify::Config::new("/freepath/1.0.0".into(), key.public())
-                    .with_agent_version(format!("freepath-relay/{peer_id}")),
+                    .with_agent_version(format!("freepath/{peer_id}")),
             ),
             ping: ping::Behaviour::default(),
             rendezvous: rendezvous::server::Behaviour::new(rendezvous::server::Config::default()),

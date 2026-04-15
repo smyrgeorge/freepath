@@ -68,6 +68,8 @@ import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_listen_add
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_mdns_peers
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_metrics_title
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_none
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_relay_connected
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_relay_registered
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_data
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_data_subtitle
 import io.github.smyrgeorge.composeapp.generated.resources.dev_section_title
@@ -86,6 +88,7 @@ import io.github.smyrgeorge.freepath.state.RandomAvatarGenerator
 import io.github.smyrgeorge.freepath.state.abbrev
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
 import io.github.smyrgeorge.freepath.ui.components.FreepathButton
+import io.github.smyrgeorge.freepath.libp2p.relayPeerIdToHost
 import io.github.smyrgeorge.freepath.ui.components.FreepathDivider
 import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
@@ -354,6 +357,30 @@ private fun Libp2pMetricsPanel(metrics: Libp2pMetricsSnapshot, selfPeerId: Strin
                 ?.entries?.joinToString("\n") { (peerId, addr) ->
                     val suffix = if (peerId == selfPeerId) " (self)" else ""
                     "${peerId.abbrev()} @ $addr$suffix"
+                } ?: none,
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libp2p_relay_connected),
+            value = when {
+                metrics.failedRelays.isNotEmpty() ->
+                    metrics.failedRelays.entries.joinToString("\n") { (peerId, error) ->
+                        val host = relayPeerIdToHost[peerId]
+                        val label = if (host != null) "${peerId.abbrev()} @ $host" else peerId.abbrev()
+                        "$label (failed: $error)"
+                    }
+                metrics.connectedRelays.isNotEmpty() ->
+                    metrics.connectedRelays.joinToString("\n") { peerId ->
+                        val host = relayPeerIdToHost[peerId]
+                        if (host != null) "${peerId.abbrev()} @ $host" else peerId.abbrev()
+                    }
+                else -> none
+            },
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libp2p_relay_registered),
+            value = metrics.registeredRelays.takeIf { it.isNotEmpty() }
+                ?.entries?.joinToString("\n") { (peerId, reg) ->
+                    "${peerId.abbrev()} / ${reg.namespace} (ttl=${reg.ttl}s)"
                 } ?: none,
         )
     }

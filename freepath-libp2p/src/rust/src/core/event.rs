@@ -1,11 +1,14 @@
 /// Event kinds:
-///   0 = PeerConnected    (peer_id + addr)
-///   1 = PeerDisconnected (peer_id)
-///   3 = NewListenAddr    (addr stored in peer_id field)
-///   4 = PeerIdentified   (peer_id)
-///   6 = RequestReceived  (req_id, peer_id=senderId, addr=recipientId, value=payload)
-///   7 = ResponseReceived (req_id, peer_id=senderId, addr=recipientId, value=payload)
-///   8 = RequestFailed    (req_id, peer_id=senderId, addr=recipientId, value=error bytes)
+///   0 = PeerConnected             (peer_id + addr)
+///   1 = PeerDisconnected          (peer_id)
+///   3 = NewListenAddr             (addr stored in peer_id field)
+///   4 = PeerIdentified            (peer_id)
+///   6 = RequestReceived           (req_id, peer_id=senderId, addr=recipientId, value=payload)
+///   7 = ResponseReceived          (req_id, peer_id=senderId, addr=recipientId, value=payload)
+///   8 = RequestFailed             (req_id, peer_id=senderId, addr=recipientId, value=error bytes)
+///   9 = RelayConnected            (peer_id=relayPeerId)
+///  10 = RelayRegistered           (peer_id=relayPeerId, addr=namespace, value=ttl as decimal string)
+///  11 = RelayRegistrationFailed   (peer_id=relayPeerId, value=error string)
 #[repr(C)]
 pub struct RawLibP2pEvent {
     pub kind: u8,
@@ -155,6 +158,78 @@ impl RawLibP2pEvent {
             addr_len: rid_len,
             value: val_ptr,
             value_len: val_len,
+            key: std::ptr::null_mut(),
+            key_len: 0,
+        }))
+    }
+
+    /// Relay peer was identified (connection + identify completed).
+    /// `relay_peer_id` = PeerId of the relay (stored in peer_id field).
+    pub fn relay_connected(relay_peer_id: String) -> *mut Self {
+        let pid = relay_peer_id.into_bytes();
+        let pid_len = pid.len();
+        let pid_ptr = Box::into_raw(pid.into_boxed_slice()) as *mut u8;
+        Box::into_raw(Box::new(Self {
+            kind: 9,
+            req_id: 0,
+            peer_id: pid_ptr,
+            peer_id_len: pid_len,
+            addr: std::ptr::null_mut(),
+            addr_len: 0,
+            value: std::ptr::null_mut(),
+            value_len: 0,
+            key: std::ptr::null_mut(),
+            key_len: 0,
+        }))
+    }
+
+    /// Successfully registered with a rendezvous relay.
+    /// `relay_peer_id` = PeerId of the relay (stored in peer_id field).
+    /// `namespace` = rendezvous namespace (stored in addr field).
+    /// `ttl` = registration TTL in seconds as a decimal string (stored in value field).
+    pub fn relay_registered(relay_peer_id: String, namespace: String, ttl: u64) -> *mut Self {
+        let pid = relay_peer_id.into_bytes();
+        let pid_len = pid.len();
+        let pid_ptr = Box::into_raw(pid.into_boxed_slice()) as *mut u8;
+        let ns = namespace.into_bytes();
+        let ns_len = ns.len();
+        let ns_ptr = Box::into_raw(ns.into_boxed_slice()) as *mut u8;
+        let ttl_str = ttl.to_string().into_bytes();
+        let ttl_len = ttl_str.len();
+        let ttl_ptr = Box::into_raw(ttl_str.into_boxed_slice()) as *mut u8;
+        Box::into_raw(Box::new(Self {
+            kind: 10,
+            req_id: 0,
+            peer_id: pid_ptr,
+            peer_id_len: pid_len,
+            addr: ns_ptr,
+            addr_len: ns_len,
+            value: ttl_ptr,
+            value_len: ttl_len,
+            key: std::ptr::null_mut(),
+            key_len: 0,
+        }))
+    }
+
+    /// Failed to register with a rendezvous relay.
+    /// `relay_peer_id` = PeerId of the relay (stored in peer_id field).
+    /// `error` = human-readable error string (stored in value field).
+    pub fn relay_registration_failed(relay_peer_id: String, error: String) -> *mut Self {
+        let pid = relay_peer_id.into_bytes();
+        let pid_len = pid.len();
+        let pid_ptr = Box::into_raw(pid.into_boxed_slice()) as *mut u8;
+        let err = error.into_bytes();
+        let err_len = err.len();
+        let err_ptr = Box::into_raw(err.into_boxed_slice()) as *mut u8;
+        Box::into_raw(Box::new(Self {
+            kind: 11,
+            req_id: 0,
+            peer_id: pid_ptr,
+            peer_id_len: pid_len,
+            addr: std::ptr::null_mut(),
+            addr_len: 0,
+            value: err_ptr,
+            value_len: err_len,
             key: std::ptr::null_mut(),
             key_len: 0,
         }))
