@@ -59,7 +59,5 @@ jobs:
           mkdir -p ~/.ssh
           echo "$RELAY_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          echo "Host $RELAY_HOST" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
-          echo "  UserKnownHostsFile /dev/null" >> ~/.ssh/config
+          ssh-keyscan -H "$RELAY_HOST" >> ~/.ssh/known_hosts
           ./deploy.sh "$RELAY_USER@$RELAY_HOST"
