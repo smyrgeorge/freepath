@@ -735,6 +735,7 @@ dependencies = [
 name = "freepath-relay"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "clap",
  "env_logger",
  "futures",
@@ -1438,6 +1439,7 @@ dependencies = [
  "libp2p-ping",
  "libp2p-quic",
  "libp2p-rendezvous",
+ "libp2p-request-response",
  "libp2p-swarm",
  "libp2p-tcp",
  "libp2p-upnp",

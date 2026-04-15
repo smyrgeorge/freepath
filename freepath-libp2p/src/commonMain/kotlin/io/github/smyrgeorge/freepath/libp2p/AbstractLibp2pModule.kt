@@ -49,6 +49,19 @@ abstract class AbstractLibp2pModule(
                 }
             }
         }
+        scope.launch {
+            while (true) {
+                delay(PING_DELAY)
+                val relays = metrics.value.value.connectedRelays
+                if (relays.isNotEmpty()) {
+                    log.debug { "Keep-alive: pinging ${relays.size} connected relay(s)" }
+                    relays.forEach { peerId ->
+                        runCatching { sendRequest(peerId, PING_REQ_ID, byteArrayOf(PING_MARKER)) }
+                            .onFailure { log.debug { "Keep-alive ping failed for relay $peerId: $it" } }
+                    }
+                }
+            }
+        }
     }
 
     protected abstract fun onFirstListenAddr(port: Int)

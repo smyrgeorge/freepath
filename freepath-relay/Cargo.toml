@@ -17,7 +17,7 @@ clap = { version = "4", features = ["derive"] }
 # https://crates.io/crates/libp2p
 libp2p = { version = "0.56.0", features = [
     "tcp", "noise", "yamux",
-    "identify", "ping", "rendezvous", "tokio",
+    "identify", "ping", "rendezvous", "request-response", "tokio",
     "quic", "dns"
 ] }
 # https://crates.io/crates/libp2p-dns
@@ -26,5 +26,7 @@ libp2p-dns = { version = "0.44.0", features = ["tokio"] }
 libp2p-swarm = { version = "0.47.1", features = ["macros"] }
 # https://crates.io/crates/tokio
 tokio = { version = "1.50.0", features = ["full"] }
+# https://crates.io/crates/async-trait
+async-trait = "0.1.89"
 # https://crates.io/crates/futures
 futures = "0.3.32"

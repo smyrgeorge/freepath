@@ -1,12 +1,13 @@
 mod behaviour;
 mod config;
+mod messaging;
 
 use behaviour::{RelayBehaviour, RelayBehaviourEvent};
 use config::{load_or_generate_keypair, Config};
 
 use clap::Parser;
 use futures::StreamExt;
-use libp2p::{identify, rendezvous, Multiaddr, SwarmBuilder};
+use libp2p::{identify, rendezvous, request_response, Multiaddr, SwarmBuilder};
 use libp2p_swarm::SwarmEvent;
 use std::time::Duration;
 
@@ -71,6 +72,27 @@ async fn main() {
 
             SwarmEvent::Behaviour(RelayBehaviourEvent::Rendezvous(event)) => {
                 handle_rendezvous_event(event);
+            }
+
+            SwarmEvent::Behaviour(RelayBehaviourEvent::Messaging(
+                request_response::Event::Message {
+                    peer,
+                    message:
+                        request_response::Message::Request {
+                            channel, request, ..
+                        },
+                    ..
+                },
+            )) => {
+                log::debug!(
+                    "Messaging request from {peer} ({} bytes), auto-acking",
+                    request.len()
+                );
+                // Success response: 0x00 prefix = success discriminator.
+                let _ = swarm
+                    .behaviour_mut()
+                    .messaging
+                    .send_response(channel, vec![0x00]);
             }
 
             SwarmEvent::NewListenAddr { address, .. } => {
