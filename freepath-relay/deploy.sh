@@ -4,10 +4,6 @@ set -euo pipefail
 # --- Config ---
 REMOTE_HOST="${1:?Usage: ./deploy.sh <user@host>}"
 
-# --- Cross-compile for aarch64-linux ---
-echo "==> Building for aarch64-unknown-linux-gnu..."
-cargo build --release --target aarch64-unknown-linux-gnu
-
 BINARY="target/aarch64-unknown-linux-gnu/release/freepath-relay"
 if [ ! -f "$BINARY" ]; then
     echo "ERROR: binary not found at $BINARY"
