@@ -187,10 +187,14 @@ pub extern "C" fn Java_io_github_smyrgeorge_freepath_libp2p_Libp2pJni_start(
             // ev is always set by the Rust core before invoking this callback — null is a bug.
             assert!(!ev.is_null(), "JNI event callback: ev must not be null");
             let e = unsafe { &*ev };
-            let pid = String::from_utf8_lossy(unsafe {
-                std::slice::from_raw_parts(e.peer_id, e.peer_id_len)
-            })
-            .into_owned();
+            let pid = if e.peer_id.is_null() {
+                String::new()
+            } else {
+                String::from_utf8_lossy(unsafe {
+                    std::slice::from_raw_parts(e.peer_id, e.peer_id_len)
+                })
+                .into_owned()
+            };
             let addr = if e.addr.is_null() {
                 String::new()
             } else {

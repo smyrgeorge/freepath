@@ -1,6 +1,7 @@
 use crate::messaging::{FreepathCodec, FreepathProtocol};
-use libp2p::{identify, identity, ping, relay, rendezvous, request_response};
+use libp2p::{autonat, identify, identity, ping, relay, rendezvous, request_response};
 use libp2p_swarm::NetworkBehaviour;
+use rand::rngs::OsRng;
 
 #[derive(NetworkBehaviour)]
 #[behaviour(prelude = "libp2p_swarm::derive_prelude")]
@@ -10,6 +11,7 @@ pub struct RelayBehaviour {
     pub relay: relay::Behaviour,
     pub messaging: request_response::Behaviour<FreepathCodec>,
     pub rendezvous: rendezvous::server::Behaviour,
+    pub autonat: autonat::v2::server::Behaviour,
 }
 
 impl RelayBehaviour {
@@ -29,6 +31,7 @@ impl RelayBehaviour {
                 request_response::Config::default(),
             ),
             rendezvous: rendezvous::server::Behaviour::new(rendezvous::server::Config::default()),
+            autonat: autonat::v2::server::Behaviour::new(OsRng),
         }
     }
 }

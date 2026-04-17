@@ -15,6 +15,17 @@ data class Libp2pMetricsSnapshot(
     val registeredRelays: Map<String, RelayRegistration> = emptyMap(),
     /** Maps relay PeerId → error string for relays where registration failed. */
     val failedRelays: Map<String, String> = emptyMap(),
+    /** Externally reachable multiaddrs confirmed by AutoNAT v2. */
+    val externalAddresses: Set<String> = emptySet(),
+    /** Inferred NAT reachability status from AutoNAT v2 probe results. */
+    val natStatus: NatStatus = NatStatus.Unknown,
+    /** UPnP port-mapping status on the local router. */
+    val upnpStatus: UpnpStatus = UpnpStatus.Unknown,
+    /** External addresses mapped via UPnP. */
+    val upnpAddresses: Set<String> = emptySet(),
 ) {
     data class RelayRegistration(val namespace: String, val ttl: Long)
+
+    enum class NatStatus { Unknown, Public, NAT }
+    enum class UpnpStatus { Unknown, Unavailable, Active }
 }

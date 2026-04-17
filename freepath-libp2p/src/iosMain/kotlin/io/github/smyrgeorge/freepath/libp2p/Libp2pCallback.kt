@@ -47,7 +47,17 @@ internal object Libp2pCallback {
             )
 
             11 -> Libp2pEvent.RelayRegistrationFailed(relayPeerId = peerId, error = value?.decodeToString() ?: "")
+            14 -> Libp2pEvent.AutonatProbeFailed(
+                testedAddr = peerId,
+                server = addr,
+                error = value?.decodeToString() ?: ""
+            )
 
+            15 -> Libp2pEvent.AutonatProbeSucceeded(testedAddr = peerId, server = addr)
+            16 -> Libp2pEvent.UpnpGatewayNotFound
+            17 -> Libp2pEvent.UpnpNonRoutableGateway
+            18 -> Libp2pEvent.UpnpNewExternalAddr(addr = peerId)
+            19 -> Libp2pEvent.UpnpExpiredExternalAddr(addr = peerId)
             else -> return
         }
         handler(event)

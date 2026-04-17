@@ -18,6 +18,12 @@
  *   9 = RelayConnected            (peer_id=relayPeerId)
  *  10 = RelayRegistered           (peer_id=relayPeerId, addr=namespace, value=ttl as decimal string)
  *  11 = RelayRegistrationFailed   (peer_id=relayPeerId, value=error string)
+ *  14 = AutonatProbeFailed        (peer_id=testedAddr, addr=serverPeerId, value=error string)
+ *  15 = AutonatProbeSucceeded     (peer_id=testedAddr, addr=serverPeerId)
+ *  16 = UpnpGatewayNotFound       (no payload)
+ *  17 = UpnpNonRoutableGateway    (no payload)
+ *  18 = UpnpNewExternalAddr       (peer_id=addr)
+ *  19 = UpnpExpiredExternalAddr   (peer_id=addr)
  */
 typedef struct RawLibP2pEvent {
   uint8_t kind;

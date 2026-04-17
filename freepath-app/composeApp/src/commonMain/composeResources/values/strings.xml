@@ -66,6 +66,10 @@
     <string name="dev_libp2p_mdns_peers">mDNS peers</string>
     <string name="dev_libp2p_relay_connected">Relay</string>
     <string name="dev_libp2p_relay_registered">Rendezvous</string>
+    <string name="dev_libp2p_external_addresses">External addresses</string>
+    <string name="dev_libp2p_nat_status">NAT status</string>
+    <string name="dev_libp2p_upnp_status">UPnP status</string>
+    <string name="dev_libp2p_upnp_addresses">UPnP addresses</string>
     <string name="dev_libp2p_none">none</string>
     <string name="dev_libble_metrics_title">libble Metrics</string>
     <string name="dev_libble_discovered_peripherals">Discovered peripherals</string>

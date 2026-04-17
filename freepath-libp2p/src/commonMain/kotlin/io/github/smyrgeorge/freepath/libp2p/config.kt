@@ -10,6 +10,8 @@ val defaultListenAddrs: String = listOf(
 val defaultRelayAddrs: String = listOf(
     "/ip6/2a01:4f8:1c1a:1798::1/tcp/4001/p2p/12D3KooWKMwprgBKPMGA7mTgkhKp3UweX5qDBqVdnAjbpoAxnBX9",
     "/ip6/2a01:4f8:1c1a:1798::1/udp/4001/quic-v1/p2p/12D3KooWKMwprgBKPMGA7mTgkhKp3UweX5qDBqVdnAjbpoAxnBX9",
+    "/ip4/46.224.91.96/tcp/4001/p2p/12D3KooWKMwprgBKPMGA7mTgkhKp3UweX5qDBqVdnAjbpoAxnBX9",
+    "/ip4/46.224.91.96/udp/4001/quic-v1/p2p/12D3KooWKMwprgBKPMGA7mTgkhKp3UweX5qDBqVdnAjbpoAxnBX9",
 ).joinToString("\n")
 
 /**

@@ -17,6 +17,24 @@ sealed class Libp2pEvent {
     /** Failed to register with a rendezvous relay. */
     data class RelayRegistrationFailed(val relayPeerId: String, val error: String) : Libp2pEvent()
 
+    /** AutoNAT v2 probe succeeded — tested addr was verified reachable via the server. */
+    data class AutonatProbeSucceeded(val testedAddr: String, val server: String) : Libp2pEvent()
+
+    /** AutoNAT v2 probe failed — tested addr was not reachable via the server. */
+    data class AutonatProbeFailed(val testedAddr: String, val server: String, val error: String) : Libp2pEvent()
+
+    /** UPnP: no IGD gateway found on the local network. */
+    data object UpnpGatewayNotFound : Libp2pEvent()
+
+    /** UPnP: gateway is not routable (carrier-grade NAT or private IP). */
+    data object UpnpNonRoutableGateway : Libp2pEvent()
+
+    /** UPnP: new external address mapped on the gateway. */
+    data class UpnpNewExternalAddr(val addr: String) : Libp2pEvent()
+
+    /** UPnP: mapped external address expired / was removed. */
+    data class UpnpExpiredExternalAddr(val addr: String) : Libp2pEvent()
+
     data class RequestReceived(
         val reqId: Long,
         val senderId: String,

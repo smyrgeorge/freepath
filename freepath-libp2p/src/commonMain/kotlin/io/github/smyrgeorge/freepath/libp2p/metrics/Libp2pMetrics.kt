@@ -66,6 +66,33 @@ class Libp2pMetrics {
                 registeredRelays = s.registeredRelays - event.relayPeerId,
             )
 
+            is Libp2pEvent.AutonatProbeSucceeded -> s.copy(
+                externalAddresses = s.externalAddresses + event.testedAddr,
+                natStatus = Libp2pMetricsSnapshot.NatStatus.Public,
+            )
+
+            is Libp2pEvent.AutonatProbeFailed -> s.copy(
+                natStatus = if (s.externalAddresses.isEmpty()) Libp2pMetricsSnapshot.NatStatus.NAT else s.natStatus,
+            )
+
+            is Libp2pEvent.UpnpGatewayNotFound,
+            Libp2pEvent.UpnpNonRoutableGateway -> s.copy(
+                upnpStatus = Libp2pMetricsSnapshot.UpnpStatus.Unavailable,
+            )
+
+            is Libp2pEvent.UpnpNewExternalAddr -> s.copy(
+                upnpAddresses = s.upnpAddresses + event.addr,
+                upnpStatus = Libp2pMetricsSnapshot.UpnpStatus.Active,
+            )
+
+            is Libp2pEvent.UpnpExpiredExternalAddr -> {
+                val next = s.upnpAddresses - event.addr
+                s.copy(
+                    upnpAddresses = next,
+                    upnpStatus = if (next.isEmpty()) Libp2pMetricsSnapshot.UpnpStatus.Unavailable else s.upnpStatus,
+                )
+            }
+
             else -> s
         }
 }

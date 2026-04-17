@@ -5,10 +5,11 @@ use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
 use libp2p::{
-    identify, identity, noise, ping, relay, rendezvous, request_response, tcp, yamux, Multiaddr,
-    PeerId, SwarmBuilder,
+    autonat, dcutr, identify, identity, noise, ping, relay, rendezvous, request_response, tcp,
+    upnp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
 use libp2p_swarm::{NetworkBehaviour, SwarmEvent};
+use rand::rngs::OsRng;
 
 use crate::core::event::RawLibP2pEvent;
 use crate::core::messaging::{FreepathCodec, FreepathProtocol};
@@ -32,6 +33,9 @@ pub struct Behaviour {
     pub relay_client: relay::client::Behaviour,
     pub messaging: request_response::Behaviour<FreepathCodec>,
     pub rendezvous: rendezvous::client::Behaviour,
+    pub autonat: autonat::v2::client::Behaviour,
+    pub dcutr: dcutr::Behaviour,
+    pub upnp: upnp::tokio::Behaviour,
 }
 
 /// All mutable state owned exclusively by the swarm task.
@@ -177,6 +181,12 @@ pub fn start_node(
                             request_response::Config::default(),
                         ),
                         rendezvous: rendezvous::client::Behaviour::new(key.clone()),
+                        autonat: autonat::v2::client::Behaviour::new(
+                            OsRng,
+                            autonat::v2::client::Config::default(),
+                        ),
+                        dcutr: dcutr::Behaviour::new(key.public().to_peer_id()),
+                        upnp: upnp::tokio::Behaviour::default(),
                     })
                 })?
                 .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(60)))
@@ -316,7 +326,98 @@ fn handle_swarm_event(
             false
         }
         Some(SwarmEvent::Behaviour(BehaviourEvent::RelayClient(ev))) => {
-            log::info!("relay client event: {ev:?}");
+            log::debug!("relay client event: {ev:?}");
+            false
+        }
+        Some(SwarmEvent::Behaviour(BehaviourEvent::Upnp(ev))) => {
+            match ev {
+                upnp::Event::GatewayNotFound => {
+                    log::info!("upnp: gateway not found");
+                    let raw = RawLibP2pEvent::upnp_gateway_not_found();
+                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+                }
+                upnp::Event::NonRoutableGateway => {
+                    log::info!("upnp: gateway is not routable");
+                    let raw = RawLibP2pEvent::upnp_non_routable_gateway();
+                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+                }
+                upnp::Event::NewExternalAddr(addr) => {
+                    log::info!("upnp: new external addr {addr}");
+                    let raw = RawLibP2pEvent::upnp_new_external_addr(addr.to_string());
+                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+                }
+                upnp::Event::ExpiredExternalAddr(addr) => {
+                    log::info!("upnp: expired external addr {addr}");
+                    let raw = RawLibP2pEvent::upnp_expired_external_addr(addr.to_string());
+                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+                }
+            }
+            false
+        }
+        Some(SwarmEvent::Behaviour(BehaviourEvent::Dcutr(ev))) => {
+            match ev.result {
+                Ok(_) => log::info!(
+                    "dcutr: direct connection upgrade succeeded with {}",
+                    ev.remote_peer_id
+                ),
+                Err(ref e) => log::warn!(
+                    "dcutr: direct connection upgrade failed with {}: {e:?}",
+                    ev.remote_peer_id
+                ),
+            }
+            false
+        }
+        Some(SwarmEvent::Behaviour(BehaviourEvent::Autonat(ev))) => {
+            // Circuit-relayed addresses are not directly reachable — skip them.
+            // Autonat still wastes a probe, but we don't surface the noise to UI.
+            let is_circuit = ev
+                .tested_addr
+                .iter()
+                .any(|p| matches!(p, libp2p::multiaddr::Protocol::P2pCircuit));
+            if is_circuit {
+                log::debug!("autonat: skipping circuit addr {}", ev.tested_addr);
+                return false;
+            }
+            match ev.result {
+                Ok(()) => {
+                    log::info!(
+                        "autonat: {} verified reachable via {} ({} bytes)",
+                        ev.tested_addr,
+                        ev.server,
+                        ev.bytes_sent
+                    );
+                    let raw = RawLibP2pEvent::autonat_probe_succeeded(
+                        ev.tested_addr.to_string(),
+                        ev.server.to_string(),
+                    );
+                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+                }
+                Err(ref e) => {
+                    log::debug!(
+                        "autonat: {} probe via {} failed: {e:?}",
+                        ev.tested_addr,
+                        ev.server
+                    );
+                    let raw = RawLibP2pEvent::autonat_probe_failed(
+                        ev.tested_addr.to_string(),
+                        ev.server.to_string(),
+                        format!("{e:?}"),
+                    );
+                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+                }
+            }
+            false
+        }
+        Some(SwarmEvent::NewExternalAddrCandidate { address }) => {
+            log::info!("NewExternalAddrCandidate: {address}");
+            false
+        }
+        Some(SwarmEvent::ExternalAddrConfirmed { address }) => {
+            log::info!("ExternalAddrConfirmed: {address}");
+            false
+        }
+        Some(SwarmEvent::ExternalAddrExpired { address }) => {
+            log::info!("ExternalAddrExpired: {address}");
             false
         }
         // Only fire peer_disconnected when the last connection to the peer is gone.
@@ -557,15 +658,6 @@ fn handle_event(
     circuit_listening: &mut std::collections::HashSet<PeerId>,
 ) {
     match ev {
-        SwarmEvent::ConnectionEstablished {
-            peer_id, endpoint, ..
-        } => {
-            log::debug!(
-                "Connection established: peer={} addr={}",
-                peer_id,
-                endpoint.get_remote_address()
-            );
-        }
         SwarmEvent::NewListenAddr {
             address,
             listener_id,
@@ -574,15 +666,26 @@ fn handle_event(
             log::info!("NewListenAddr: {address} (listener_id={listener_id:?})");
             let raw = RawLibP2pEvent::new_listen_addr(address.to_string());
             unsafe { (event_cb.fun)(event_cb.ptr, raw) }
-        }
-        SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
-            log::debug!("Outgoing connection error (peer={:?}): {}", peer_id, error);
-        }
-        SwarmEvent::IncomingConnectionError { error, .. } => {
-            log::warn!("TODO: Incoming connection error: {}", error);
-        }
-        SwarmEvent::ExpiredListenAddr { address, .. } => {
-            log::warn!("TODO: Expired listen addr: {}", address);
+
+            // When a circuit relay address appears, re-register with rendezvous
+            // so peers can discover us at the reachable circuit address.
+            let is_circuit = address
+                .iter()
+                .any(|p| matches!(p, libp2p::multiaddr::Protocol::P2pCircuit));
+            if is_circuit {
+                log::info!("relay: circuit address ready, re-registering with rendezvous");
+                for (&relay_id, _) in relay_peer_ids {
+                    if swarm.is_connected(&relay_id) {
+                        if let Err(e) = swarm.behaviour_mut().rendezvous.register(
+                            rendezvous::Namespace::from_static("freepath"),
+                            relay_id,
+                            None,
+                        ) {
+                            log::warn!("rendezvous: re-register after circuit failed: {e}");
+                        }
+                    }
+                }
+            }
         }
         SwarmEvent::ListenerClosed {
             addresses,
@@ -591,21 +694,6 @@ fn handle_event(
             ..
         } => {
             log::warn!("ListenerClosed: listener_id={listener_id:?}, addresses={addresses:?}, reason={reason:?}");
-        }
-        SwarmEvent::ListenerError { error, .. } => {
-            log::error!("TODO: Listener error: {}", error);
-        }
-        SwarmEvent::NewExternalAddrCandidate { address, .. } => {
-            log::debug!("New external addr candidate: {}", address);
-        }
-        SwarmEvent::ExternalAddrConfirmed { address, .. } => {
-            log::info!("TODO: External addr confirmed: {}", address);
-        }
-        SwarmEvent::ExternalAddrExpired { address, .. } => {
-            log::info!("TODO: External addr expired: {}", address);
-        }
-        SwarmEvent::NewExternalAddrOfPeer { peer_id, address } => {
-            log::debug!("New external addr of peer {}: {}", peer_id, address);
         }
         SwarmEvent::Behaviour(BehaviourEvent::Identify(identify::Event::Received {
             peer_id,
@@ -616,13 +704,12 @@ fn handle_event(
                 // If this is a relay peer, register and discover via rendezvous.
                 if relay_peer_ids.contains_key(&peer_id) {
                     log::info!("rendezvous: identified relay {peer_id}, registering + discovering");
-                    // The relay tells us our observed (external) address.
-                    // Add it so the rendezvous client has an externally reachable address to advertise.
-                    log::debug!(
-                        "rendezvous: adding observed external addr {}",
-                        info.observed_addr
-                    );
-                    swarm.add_external_address(info.observed_addr.clone());
+                    log::info!("relay {peer_id} advertises protocols: {:?}", info.protocols);
+                    // Note: identify emits ToSwarm::NewExternalAddrCandidate for info.observed_addr
+                    // automatically. Do NOT call swarm.add_external_address here — that bypasses
+                    // the candidate path and prevents autonat v2 from probing.
+                    // Reachable externals (circuit reservation, autonat-confirmed observed) are
+                    // promoted to confirmed external addrs automatically by the swarm.
 
                     // Listen on the relay's circuit address to make a reservation.
                     // Use the original dial multiaddr (externally reachable), not the relay's

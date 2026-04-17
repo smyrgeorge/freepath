@@ -16,8 +16,10 @@ libp2p = { version = "0.56.0", features = [
     "tcp", "noise", "yamux",
     "identify", "ping", "relay", "tokio",
     "quic", "request-response", "dns",
-    "rendezvous"
+    "rendezvous", "autonat", "dcutr", "upnp"
 ] }
+# https://crates.io/crates/rand
+rand = "0.8"
 # https://crates.io/crates/libp2p-dns
 libp2p-dns = { version = "0.44.0", features = ["tokio"] }
 # https://crates.io/crates/libp2p-swarm

@@ -84,6 +84,10 @@ async fn main() {
                 log::info!("Relay event: {event:?}");
             }
 
+            SwarmEvent::Behaviour(RelayBehaviourEvent::Autonat(event)) => {
+                log::debug!("AutoNAT v2 server event: {event:?}");
+            }
+
             SwarmEvent::Behaviour(RelayBehaviourEvent::Messaging(
                 request_response::Event::Message {
                     peer,

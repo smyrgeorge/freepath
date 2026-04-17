@@ -63,13 +63,17 @@ import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_metrics_ti
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_none
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libble_tx_power
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_connected_peers
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_external_addresses
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_identified_peers
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_listen_addresses
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_mdns_peers
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_metrics_title
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_nat_status
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_none
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_relay_connected
 import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_relay_registered
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_upnp_addresses
+import io.github.smyrgeorge.composeapp.generated.resources.dev_libp2p_upnp_status
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_data
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_data_subtitle
 import io.github.smyrgeorge.composeapp.generated.resources.dev_section_title
@@ -84,11 +88,11 @@ import io.github.smyrgeorge.freepath.contact.ContactSignedCodec
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetricsSnapshot
 import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetricsSnapshot
+import io.github.smyrgeorge.freepath.libp2p.relayPeerIdToHost
 import io.github.smyrgeorge.freepath.state.RandomAvatarGenerator
 import io.github.smyrgeorge.freepath.state.abbrev
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
 import io.github.smyrgeorge.freepath.ui.components.FreepathButton
-import io.github.smyrgeorge.freepath.libp2p.relayPeerIdToHost
 import io.github.smyrgeorge.freepath.ui.components.FreepathDivider
 import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
@@ -368,11 +372,13 @@ private fun Libp2pMetricsPanel(metrics: Libp2pMetricsSnapshot, selfPeerId: Strin
                         val label = if (host != null) "${peerId.abbrev()} @ $host" else peerId.abbrev()
                         "$label (failed: $error)"
                     }
+
                 metrics.connectedRelays.isNotEmpty() ->
                     metrics.connectedRelays.joinToString("\n") { peerId ->
                         val host = relayPeerIdToHost[peerId]
                         if (host != null) "${peerId.abbrev()} @ $host" else peerId.abbrev()
                     }
+
                 else -> none
             },
         )
@@ -382,6 +388,24 @@ private fun Libp2pMetricsPanel(metrics: Libp2pMetricsSnapshot, selfPeerId: Strin
                 ?.entries?.joinToString("\n") { (peerId, reg) ->
                     "${peerId.abbrev()} / ${reg.namespace} (ttl=${reg.ttl}s)"
                 } ?: none,
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libp2p_external_addresses),
+            value = metrics.externalAddresses.takeIf { it.isNotEmpty() }
+                ?.joinToString("\n") ?: none,
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libp2p_nat_status),
+            value = metrics.natStatus.name,
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libp2p_upnp_status),
+            value = metrics.upnpStatus.name,
+        )
+        MetricRow(
+            label = stringResource(Res.string.dev_libp2p_upnp_addresses),
+            value = metrics.upnpAddresses.takeIf { it.isNotEmpty() }
+                ?.joinToString("\n") ?: none,
         )
     }
 }

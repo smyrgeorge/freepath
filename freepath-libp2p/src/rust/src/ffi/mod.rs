@@ -220,13 +220,10 @@ pub extern "C" fn libp2p_event_free(event: *mut RawLibP2pEvent) {
     );
     unsafe {
         let e = Box::from_raw(event);
-        // peer_id is always set by every RawLibP2pEvent constructor — null here is a bug.
-        assert!(
-            !e.peer_id.is_null(),
-            "libp2p_event_free: peer_id must not be null"
-        );
-        Vec::from_raw_parts(e.peer_id, e.peer_id_len, e.peer_id_len);
-        // addr, value, key are optional (null for event kinds that don't use them).
+        // All fields are optional — some event kinds (e.g. UpnpGatewayNotFound) carry no data.
+        if !e.peer_id.is_null() {
+            Vec::from_raw_parts(e.peer_id, e.peer_id_len, e.peer_id_len);
+        }
         if !e.addr.is_null() {
             Vec::from_raw_parts(e.addr, e.addr_len, e.addr_len);
         }
