@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.content
 
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.crypto.KeyPair
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.KeyPair
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -268,16 +268,24 @@ class MessageCodecTest {
     @Test
     fun verify_failsForTamperedSenderId() {
         val (kp, _) = makeKeys()
-        val msg = sealDirect(kp, senderId = "alice")
-        val tampered = msg.copy(senderId = "eve")
+        val msg = sealDirect(kp, senderId = "alice", recipientId = "bob")
+        // Tamper requires rebuilding conversationId so Message init passes;
+        // signature is still bound to the original triplet, so verify must fail.
+        val tampered = msg.copy(
+            senderId = "eve",
+            conversationId = Message.conversationId("eve", "bob"),
+        )
         assertFalse(MessageCodec.verify(tampered, kp.publicKey))
     }
 
     @Test
     fun verify_failsForTamperedRecipientId() {
         val (kp, _) = makeKeys()
-        val msg = sealDirect(kp, recipientId = "bob")
-        val tampered = msg.copy(recipientId = "eve")
+        val msg = sealDirect(kp, senderId = "alice", recipientId = "bob")
+        val tampered = msg.copy(
+            recipientId = "eve",
+            conversationId = Message.conversationId("alice", "eve"),
+        )
         assertFalse(MessageCodec.verify(tampered, kp.publicKey))
     }
 

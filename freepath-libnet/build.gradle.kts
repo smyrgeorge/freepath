@@ -30,7 +30,6 @@ kotlin {
             dependencies {
                 implementation(project(":freepath-contact"))
                 implementation(project(":freepath-content"))
-                implementation(project(":freepath-crypto"))
                 implementation(project(":freepath-libble"))
                 implementation(project(":freepath-libp2p"))
                 implementation(project(":freepath-util"))

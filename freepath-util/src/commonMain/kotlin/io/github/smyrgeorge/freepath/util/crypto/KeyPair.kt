@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.crypto
+package io.github.smyrgeorge.freepath.util.crypto
 
 data class KeyPair(val privateKey: ByteArray, val publicKey: ByteArray) {
     override fun equals(other: Any?): Boolean {

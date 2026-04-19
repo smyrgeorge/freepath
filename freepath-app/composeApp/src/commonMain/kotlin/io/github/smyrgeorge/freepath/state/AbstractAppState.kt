@@ -10,8 +10,8 @@ import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.content.ContentCodec
 import io.github.smyrgeorge.freepath.content.ContentType
 import io.github.smyrgeorge.freepath.content.Message
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.crypto.KeyPair
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.KeyPair
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntry

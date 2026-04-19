@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.contact
 
 import io.github.smyrgeorge.freepath.contact.Contact.Companion.SCHEMA
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable

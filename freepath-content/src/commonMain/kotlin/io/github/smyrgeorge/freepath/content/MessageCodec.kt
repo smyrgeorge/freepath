@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.content
 
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.freepath.util.codec.ProtobufCodec
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer

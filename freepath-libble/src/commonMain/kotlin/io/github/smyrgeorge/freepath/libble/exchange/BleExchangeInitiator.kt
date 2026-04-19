@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.libble.exchange
 
 import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeRunner.ExchangeResult
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeRunner.PIN_CONFIRM_LEN

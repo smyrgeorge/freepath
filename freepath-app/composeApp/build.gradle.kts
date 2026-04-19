@@ -35,7 +35,6 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.ktor.client.core)
             implementation(project(":freepath-contact"))
-            implementation(project(":freepath-crypto"))
             implementation(project(":freepath-content"))
             implementation(project(":freepath-database"))
             implementation(project(":freepath-libble"))

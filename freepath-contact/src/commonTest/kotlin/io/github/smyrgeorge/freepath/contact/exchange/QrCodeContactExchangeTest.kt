@@ -3,8 +3,8 @@ package io.github.smyrgeorge.freepath.contact.exchange
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.ContactSigned
 import io.github.smyrgeorge.freepath.contact.ContactSignedCodec
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.crypto.KeyPair
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.KeyPair
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals

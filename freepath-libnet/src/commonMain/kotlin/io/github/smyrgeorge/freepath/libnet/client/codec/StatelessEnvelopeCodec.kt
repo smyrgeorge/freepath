@@ -2,7 +2,7 @@ package io.github.smyrgeorge.freepath.libnet.client.codec
 
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.libnet.client.model.RelayMetadata
 import io.github.smyrgeorge.freepath.libnet.client.model.RelayOptions
 import io.github.smyrgeorge.freepath.libnet.client.model.SealedPayload

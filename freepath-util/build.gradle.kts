@@ -32,11 +32,29 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.kotlinx.serialization.protobuf)
+                implementation(libs.cryptography.core)
             }
         }
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)
+            }
+        }
+        jvmMain {
+            dependencies {
+                implementation(libs.cryptography.provider.jdk)
+                implementation(libs.bouncycastle)
+            }
+        }
+        androidMain {
+            dependencies {
+                implementation(libs.cryptography.provider.jdk)
+                implementation(libs.bouncycastle)
+            }
+        }
+        iosMain {
+            dependencies {
+                implementation(libs.cryptography.provider.cryptokit)
             }
         }
     }

@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.contact
 
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.freepath.util.codec.ProtobufCodec
 import kotlinx.serialization.ExperimentalSerializationApi

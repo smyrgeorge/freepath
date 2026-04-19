@@ -33,7 +33,6 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(project(":freepath-contact"))
-                implementation(project(":freepath-crypto"))
                 implementation(project(":freepath-util"))
                 implementation(libs.kable.core)
                 implementation(libs.kotlinx.coroutines.core)
@@ -42,7 +41,6 @@ kotlin {
         }
         commonTest {
             dependencies {
-                implementation(project(":freepath-crypto"))
                 implementation(libs.kotlin.test)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.coroutines.test)

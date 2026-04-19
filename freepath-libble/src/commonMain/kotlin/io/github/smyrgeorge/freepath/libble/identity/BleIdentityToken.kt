@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.libble.identity
 
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.libble.identity.BleIdentityToken.ROTATION_INTERVAL_MS
 import io.github.smyrgeorge.freepath.libble.identity.BleIdentityToken.TOKEN_LEN
 

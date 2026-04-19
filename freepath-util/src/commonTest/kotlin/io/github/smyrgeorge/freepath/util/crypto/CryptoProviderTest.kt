@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.crypto
+package io.github.smyrgeorge.freepath.util.crypto
 
 import kotlin.experimental.xor
 import kotlin.test.Test
@@ -163,15 +163,9 @@ class CryptoProviderTest {
         assertEquals(plaintext.size + 16, ct.size)
     }
 
-    @Test
-    fun `chacha20Poly1305 encrypt is deterministic`() {
-        val key = CryptoProvider.randomBytes(32)
-        val nonce = CryptoProvider.randomBytes(12)
-        val plaintext = "deterministic".encodeToByteArray()
-        val ct1 = CryptoProvider.chacha20Poly1305Encrypt(key, nonce, plaintext, ByteArray(0))
-        val ct2 = CryptoProvider.chacha20Poly1305Encrypt(key, nonce, plaintext, ByteArray(0))
-        assertContentEquals(ct1, ct2)
-    }
+    // Note: cryptography-kotlin's JDK provider (BouncyCastle) enforces nonce
+    // non-reuse per key. Same key+nonce pairs must never be encrypted twice.
+    // Callers are responsible for generating unique nonces per encryption.
 
     @Test
     fun `chacha20Poly1305 decrypt fails with wrong key`() {
@@ -266,6 +260,93 @@ class CryptoProviderTest {
         assertFalse(CryptoProvider.ed25519Verify(kp.publicKey, message, sig))
     }
 
+    // ---- SHA-256 -----------------------------------------------------------
+
+    @Test
+    fun `sha256 output is 32 bytes`() {
+        assertEquals(32, CryptoProvider.sha256("data".encodeToByteArray()).size)
+        assertEquals(32, CryptoProvider.sha256(ByteArray(0)).size)
+    }
+
+    @Test
+    fun `sha256 is deterministic`() {
+        val input = "freepath".encodeToByteArray()
+        assertContentEquals(CryptoProvider.sha256(input), CryptoProvider.sha256(input))
+    }
+
+    @Test
+    fun `sha256 different inputs produce different digests`() {
+        assertFalse(
+            CryptoProvider.sha256("a".encodeToByteArray())
+                .contentEquals(CryptoProvider.sha256("b".encodeToByteArray()))
+        )
+    }
+
+    // FIPS 180-4 known answer: SHA-256("") and SHA-256("abc").
+    @Test
+    fun `sha256 matches known test vectors`() {
+        val emptyExpected = hex(
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        )
+        assertContentEquals(emptyExpected, CryptoProvider.sha256(ByteArray(0)))
+
+        val abcExpected = hex(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        )
+        assertContentEquals(abcExpected, CryptoProvider.sha256("abc".encodeToByteArray()))
+    }
+
+    // ---- RFC test vectors: cross-platform wire compatibility ---------------
+
+    // RFC 7748 §5.2 — X25519 test vector #1.
+    @Test
+    fun `x25519DH matches RFC 7748 test vector`() {
+        val scalar = hex("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4")
+        val uCoord = hex("e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c")
+        val expected = hex("c3da55379de9c6908e94ea4df28d084f32eccf03491c71f754b4075577a28552")
+        assertContentEquals(expected, CryptoProvider.x25519DH(scalar, uCoord))
+    }
+
+    // RFC 8032 §7.1 — Ed25519 Test 1 (empty message, all fixed key material).
+    @Test
+    fun `ed25519 matches RFC 8032 test vector 1`() {
+        val privateKey = hex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+        val publicKey = hex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+        val message = ByteArray(0)
+        val expectedSig = hex(
+            "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e06522490155" +
+                    "5fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
+        )
+        // Apple CryptoKit hedges (randomizes) Ed25519 signing — exact signature
+        // bytes are not reproducible. Verify instead via the known-answer signature
+        // and a fresh signature round-trip.
+        assertTrue(CryptoProvider.ed25519Verify(publicKey, message, expectedSig))
+        val freshSig = CryptoProvider.ed25519Sign(privateKey, message)
+        assertTrue(CryptoProvider.ed25519Verify(publicKey, message, freshSig))
+    }
+
+    // RFC 8439 §2.8.2 — ChaCha20-Poly1305 known-answer test.
+    @Test
+    fun `chacha20Poly1305 matches RFC 8439 test vector`() {
+        val key = hex("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f")
+        val nonce = hex("070000004041424344454647")
+        val aad = hex("50515253c0c1c2c3c4c5c6c7")
+        val plaintext = ("Ladies and Gentlemen of the class of '99: If I could offer you " +
+                "only one tip for the future, sunscreen would be it.").encodeToByteArray()
+        val expectedCiphertext = hex(
+            "d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d6" +
+                    "3dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b36" +
+                    "92ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc" +
+                    "3ff4def08e4b7a9de576d26586cec64b6116"
+        )
+        val expectedTag = hex("1ae10b594f09e26a7e902ecbd0600691")
+        val expected = expectedCiphertext + expectedTag
+
+        val ct = CryptoProvider.chacha20Poly1305Encrypt(key, nonce, plaintext, aad)
+        assertContentEquals(expected, ct)
+        assertContentEquals(plaintext, CryptoProvider.chacha20Poly1305Decrypt(key, nonce, ct, aad))
+    }
+
     // ---- Cross-primitive: X25519 + HKDF → ChaCha20 -------------------------
 
     @Test
@@ -285,5 +366,12 @@ class CryptoProviderTest {
         val aad = "header".encodeToByteArray()
         val ct = CryptoProvider.chacha20Poly1305Encrypt(sessionKey, nonce, plaintext, aad)
         assertContentEquals(plaintext, CryptoProvider.chacha20Poly1305Decrypt(sessionKey, nonce, ct, aad))
+    }
+
+    private fun hex(s: String): ByteArray {
+        require(s.length % 2 == 0) { "hex string must have even length" }
+        return ByteArray(s.length / 2) { i ->
+            ((s[i * 2].digitToInt(16) shl 4) or s[i * 2 + 1].digitToInt(16)).toByte()
+        }
     }
 }

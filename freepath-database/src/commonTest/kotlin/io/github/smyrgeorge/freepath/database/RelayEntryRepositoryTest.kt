@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.database
 
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.database.RelayEntry.Companion.toRelayEntry
 import io.github.smyrgeorge.freepath.database.generated.RelayEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.migration.migrations

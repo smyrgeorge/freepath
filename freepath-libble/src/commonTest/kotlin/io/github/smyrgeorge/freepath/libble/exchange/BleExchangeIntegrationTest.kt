@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.libble.exchange
 
 import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel

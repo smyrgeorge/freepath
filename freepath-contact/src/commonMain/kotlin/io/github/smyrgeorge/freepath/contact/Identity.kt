@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.contact
 
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 
 data class Identity(
     /** Raw 32-byte Peer ID: SHA-256(sigKey). */

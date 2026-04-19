@@ -17,6 +17,8 @@ kotlinx-serialization = "1.11.0"
 ktor = "3.4.2"
 # https://www.bouncycastle.org
 bouncycastle = "1.84"
+# https://github.com/whyoleg/cryptography-kotlin
+cryptography-kotlin = "0.6.0"
 # https://github.com/ionspin/kotlin-multiplatform-bignum
 bignum = "0.3.10"
 # https://github.com/InsertKoinIO/koin
@@ -71,6 +73,9 @@ log4k-slf4j = { module = "io.github.smyrgeorge:log4k-slf4j", version.ref = "log4
 actor4k = { module = "io.github.smyrgeorge:actor4k", version.ref = "actor4k" }
 ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography-kotlin" }
+cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "cryptography-kotlin" }
+cryptography-provider-cryptokit = { module = "dev.whyoleg.cryptography:cryptography-provider-cryptokit", version.ref = "cryptography-kotlin" }
 bignum = { module = "com.ionspin.kotlin:bignum", version.ref = "bignum" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }

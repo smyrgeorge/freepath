@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.contact
 
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
-import io.github.smyrgeorge.freepath.crypto.KeyPair
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.KeyPair
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals

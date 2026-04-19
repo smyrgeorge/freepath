@@ -3,7 +3,7 @@ package io.github.smyrgeorge.freepath.libnet.client.codec
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.ContactCodec
 import io.github.smyrgeorge.freepath.contact.Identity
-import io.github.smyrgeorge.freepath.crypto.CryptoProvider
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.libnet.client.model.RelayOptions
 import kotlin.io.encoding.Base64
 import kotlin.test.Test

@@ -46,7 +46,13 @@
       "Bash(./gradlew :freepath-database:compileTestKotlinJvm --info)",
       "Bash(./gradlew :freepath-database:compileKotlinJvm :freepath-app:composeApp:compileKotlinJvm)",
       "Bash(./gradlew :freepath-libnet:compileKotlinJvm :freepath-app:composeApp:compileKotlinJvm)",
-      "Bash(./gradlew :freepath-database:jvmTest :freepath-app:composeApp:compileKotlinJvm)"
+      "Bash(./gradlew :freepath-database:jvmTest :freepath-app:composeApp:compileKotlinJvm)",
+      "Bash(./gradlew compileKotlinJvm)",
+      "Bash(./gradlew :freepath-content:jvmTest :freepath-content:iosSimulatorArm64Test)",
+      "Bash(./gradlew :freepath-util:compileKotlinJvm)",
+      "Bash(./gradlew jvmTest compileKotlinJvm compileKotlinAndroid)",
+      "Bash(./gradlew jvmTest compileKotlinJvm)",
+      "Bash(./gradlew :freepath-util:jvmTest :freepath-util:compileKotlinJvm)"
     ]
   }
 }
