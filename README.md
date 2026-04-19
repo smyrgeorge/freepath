@@ -17,6 +17,8 @@ An information network that lives in your pocket and spreads through human conta
 
 📱 [Wireframes](https://smyrgeorge.github.io/freepath/wireframes)
 
+📄 [README.pdf]((https://smyrgeorge.github.io/freepath/README.pdf)
+
 ---
 
 ## Table of Contents
@@ -56,6 +58,7 @@ An information network that lives in your pocket and spreads through human conta
     - [What this is not](#what-this-is-not)
 - [Where it could work](#where-it-could-work)
 - [Concepts worth exploring](#concepts-worth-exploring)
+    - [Interoperability with existing networks](#interoperability-with-existing-networks)
     - [Presence-based voting](#presence-based-voting)
 - [Get involved](#get-involved)
 
@@ -497,6 +500,41 @@ This list is not exhaustive. Wherever people move, the network can follow.
 
 The ideas below are not part of the core design — they are extensions that feel natural given the foundation Freepath
 builds on. Some overlap with earlier sections; they are collected here because they deserve their own space.
+
+### Interoperability with existing networks
+
+Freepath is not the first attempt at offline, peer-to-peer, or mesh communication. Several projects — some experimental,
+some mature — already explore adjacent pieces of the problem: local-first messaging, Bluetooth mesh chat, peer-to-peer
+social feeds, decentralized identity, delay-tolerant routing. Each made its own choices about what to prioritize and
+what to compromise.
+
+Rather than treat these as competitors, we find it more interesting to ask where they could meet. A network that spreads
+through human contact benefits from *more* entry points, not fewer — and the people already using other tools represent
+real, existing mesh topologies we could plug into rather than duplicate.
+
+Some directions worth exploring:
+
+- **Transport-level bridges** — a Freepath client could speak the link-layer protocol of another mesh network when it
+  encounters one, acting as a bilingual node. Content would cross the boundary as opaque, signed payloads; each network
+  keeps its own routing and trust model.
+- **Identity portability** — a user who already has a cryptographic identity on a compatible network shouldn't need a
+  brand new one. Where key formats are compatible, the same identity could sign content across both systems.
+- **Content gateways** — voluntary nodes running both stacks could relay signed content between networks without
+  collapsing them into one. Each network sees the other as "a very well-connected peer" rather than an upstream source
+  of authority.
+- **Shared conventions for offline messages** — if multiple offline networks converge on common envelope formats,
+  delivery semantics, or deletion signals, content can travel across them without being re-encoded at every hop.
+- **Compatible hub or rendezvous points** — a physical location running one mesh stack could, in principle, also serve
+  content from another, letting visitors collect from both without choosing sides.
+
+None of this is free. Each bridge introduces questions about trust boundaries, signature compatibility, spam vectors,
+and how much of one network's model leaks into another's. We are deliberately vague about specifics here because the
+right answers depend on which other systems are still around when this concept matures — and because we would rather
+collaborate with the communities behind those systems than announce integrations unilaterally.
+
+The underlying instinct is simple: a decentralized network that refuses to talk to *other* decentralized networks has
+reinvented the walled garden. If the goal is information that travels freely through people, then the network itself
+should travel freely between the tools those people already use.
 
 ### Presence-based voting
 
