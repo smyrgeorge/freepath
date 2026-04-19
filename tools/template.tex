@@ -38,6 +38,24 @@ $else$
 $endif$
 $fonts.latex()$
 $font-settings.latex()$
+% Emoji font fallback for Unicode pictographs.
+% XeTeX + xdvipdfmx cannot embed color emoji tables (COLR/sbix) reliably —
+% color fonts load but produce blank glyphs in the PDF. We prefer the
+% monochrome Noto Emoji, which uses plain outlines and renders correctly.
+\usepackage{fontspec}
+\IfFontExistsTF{Noto Emoji}{%
+  \newfontfamily\emojifont{Noto Emoji}[Renderer=Harfbuzz]%
+}{%
+  \IfFontExistsTF{Symbola}{%
+    \newfontfamily\emojifont{Symbola}%
+  }{%
+    \IfFontExistsTF{Noto Color Emoji}{%
+      \newfontfamily\emojifont{Noto Color Emoji}[Renderer=Harfbuzz]%
+    }{%
+      \providecommand{\emojifont}{}%
+    }%
+  }%
+}
 $common.latex()$
 $for(header-includes)$
 $header-includes$
