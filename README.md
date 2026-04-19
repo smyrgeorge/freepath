@@ -17,7 +17,7 @@ An information network that lives in your pocket and spreads through human conta
 
 📱 [Wireframes](https://smyrgeorge.github.io/freepath/wireframes)
 
-📄 [README.pdf]((https://smyrgeorge.github.io/freepath/README.pdf)
+📄 [README.pdf](https://smyrgeorge.github.io/freepath/README.pdf)
 
 ---
 
