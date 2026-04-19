@@ -1,10 +1,11 @@
-package io.github.smyrgeorge.freepath.util
+package io.github.smyrgeorge.freepath.util.codec
 
-import io.github.smyrgeorge.freepath.util.codec.Base58
+import kotlin.experimental.ExperimentalNativeApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class Base58Test {
 
@@ -152,18 +153,14 @@ class Base58Test {
 
     // ---- alphabet: excluded characters -----------------------------------
 
-    @OptIn(kotlin.experimental.ExperimentalNativeApi::class)
+    @OptIn(ExperimentalNativeApi::class)
     @Test
     fun `encoded output never contains excluded characters`() {
         val excluded = setOf('0', 'O', 'I', 'l')
         repeat(50) { i ->
             val input = ByteArray(16) { (it + i).toByte() }
             val encoded = Base58.encode(input)
-            for (ch in encoded) {
-                assert(ch !in excluded) {
-                    "Encoded output '$encoded' contains excluded character '$ch'"
-                }
-            }
+            for (ch in encoded) assertTrue { ch !in excluded }
         }
     }
 

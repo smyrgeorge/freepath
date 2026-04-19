@@ -1,18 +1,16 @@
 package io.github.smyrgeorge.freepath.libble.exchange
 
 import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalEncodingApi::class)
 class BleExchangeIntegrationTest {
 
     @Test
