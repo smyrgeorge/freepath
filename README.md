@@ -25,8 +25,15 @@ An information network that lives in your pocket and spreads through human conta
     - [The name](#the-name)
     - [Why not a social network?](#why-not-a-social-network)
     - [The problem with information today](#the-problem-with-information-today)
-    - [No internet required](#no-internet-required)
+    - [Works without the internet](#works-without-the-internet)
     - [It only needs two people](#it-only-needs-two-people)
+    - [Participate, not consume](#participate-not-consume)
+    - [What makes this different](#what-makes-this-different)
+- [TODO](#todo)
+- [What Freepath does](#what-freepath-does)
+    - [Messaging](#messaging)
+    - [Content sharing](#content-sharing)
+    - [Micro apps](#micro-apps)
 - [You control what you share](#you-control-what-you-share)
     - [No one can collect everything](#no-one-can-collect-everything)
 - [How information travels](#how-information-travels)
@@ -49,30 +56,30 @@ An information network that lives in your pocket and spreads through human conta
     - [What this is not](#what-this-is-not)
 - [Where it could work](#where-it-could-work)
 - [Concepts worth exploring](#concepts-worth-exploring)
-    - [Messaging](#messaging)
     - [Presence-based voting](#presence-based-voting)
 - [Get involved](#get-involved)
 
 ## The idea
 
-Freepath is an information network that requires no internet, no servers, and no central authority of any kind.
+Freepath is an information network that works **both online and offline** — without central servers or any central
+authority. It spreads through the internet when available, and through people when it isn't.
 
 Instead of routing your messages through a data center, Freepath works the way stories and letters worked for thousands
 of years: **person to person, device to device**.
 
-When two phones running Freepath come near each other — at a coffee shop, on a bus, at a concert — they automatically
-and silently exchange content. Posts, messages, updates. Things you wrote. Things people you trust wrote. The network is
-the crowd itself.
+When two phones running Freepath come near each other — at a coffee shop, on a bus, at a concert — they can exchange
+content. Posts, messages, updates. Things you wrote. Things people you trust wrote. The network is the crowd itself.
 
-Your phone becomes a node. You become the infrastructure.
+Your phone becomes a node, becomes a small server. You become the infrastructure.
 
 ### The name
 
 **Free** — because there are no servers, no gatekeepers, no central authority that can grant or revoke access. The
 network belongs to no one, which means it belongs to everyone.
 
-**Path** — because information doesn't travel through cables or data centers. It travels through people. It follows the
-routes that humans walk, the places they gather, the moments they cross paths. The path is physical, human, and alive.
+**Path** — because information doesn't have to travel through cables or data centers. It can travel through people. It
+follows the routes that humans walk, the places they gather, the moments they cross paths. The path is physical, human,
+and alive.
 
 The name is part of this concept and may change as the idea evolves.
 
@@ -103,10 +110,10 @@ people — when the members of a network are themselves the medium — they natu
 carry, what they pass on, and what they leave behind. Curation becomes human again. Evaluation happens at the edges, not
 at the centre.
 
-### No internet required
+### Works without the internet
 
-There is something we find genuinely compelling about a network with no internet backbone: information travels with
-people. It moves because we move. It reaches places because we go there.
+There is something we find genuinely compelling about a network that does not depend on the internet: information
+travels with people. It moves because we move. It reaches places because we go there.
 
 You don't receive anything passively from a server somewhere. You receive because you were present — because you went to
 a place, crossed paths with someone, or chose to visit a [hub](#hubs). This is intentional. We believe access to
@@ -117,15 +124,93 @@ This constraint — that you have to go to the place — is not a limitation we'
 worth exploring. It keeps the network grounded in real communities, real spaces, and real encounters. And it makes
 decentralization not just an architectural choice, but something you can feel.
 
+When the internet is available, Freepath can **optionally** use it as an additional transport — bridging peers who are
+too far apart to meet in person, or reconnecting regions that would otherwise drift. This path is peer-to-peer, end-to-
+end encrypted, and uses no central server; it is an extension of the same mesh, not a fallback to traditional
+infrastructure. The offline path remains primary. Nothing about the network requires connectivity, and nothing about it
+breaks when connectivity disappears.
+
 ### It only needs two people
 
 There is no cold start problem here. The network doesn't need a critical mass of users to become useful. It begins the
 moment two devices running Freepath are in the same place. That's it. Every conversation, every exchange, every
 encounter is already the network working.
 
-This also makes Freepath remarkably cost-effective. There are no servers to run, no infrastructure to maintain, no cloud
-bills to pay. The entire network runs on hardware people already own. Getting started means downloading an application —
-nothing more.
+This also makes Freepath remarkably cost-effective. The core network runs on hardware people already own — no mandatory
+servers, no infrastructure to maintain, no cloud bills to pay. Optional relay nodes, run voluntarily by the community,
+can help bridge peers over the internet when it is available, but the network does not require them to function.
+Getting started means downloading an application — nothing more.
+
+### Participate, not consume
+
+Part of what we find compelling about peer-to-peer networks is that they only work when their users actually
+participate. If everyone only consumed, there would be nothing to relay, nothing to store, no content flowing through
+the network at all. Peer-to-peer systems live because people contribute something back — bandwidth, storage, presence —
+not because a company runs a fleet of servers on their behalf.
+
+We think this is worth treating as more than a technical property. It is also educational. Using Freepath means
+understanding, at some level, that the network is something you help make — not a service that is delivered to you.
+Carrying content, hosting a hub, forwarding a message for a stranger, keeping your device on while you walk past
+someone else — these are small acts of contribution, and added up, they are the network.
+
+In an era where most digital life is something we receive, we find value in building something where being present also
+means being useful.
+
+### What makes this different
+
+Similar ideas are not new. Some apps let people exchange messages over Bluetooth. Others experiment with peer-to-peer
+social feeds, or offline mesh networking in specific settings. Each handles a piece of the problem, and a few do it
+well.
+
+What we haven't seen is all of these combined into a single substrate — **private messaging, open content sharing, and
+a runtime for small third-party applications** — running on the same proximity mesh, the same cryptographic identity,
+both online and offline, with no central authority holding any of it together. Each piece on its own is not novel. The
+combination is what we find worth building.
+
+## TODO
+
+Open project-level tasks, tracked here so the direction is transparent:
+
+- [x] Build the basic networking layer
+- [ ] Move the repository to a different hosting platform
+- [ ] Find a better name for the project
+- [ ] Register a `.org` domain
+- [ ] Design a logo
+- [ ] Build a website
+- [ ] Thoroughly design the app flows
+
+## What Freepath does
+
+Freepath is a substrate, not a single feature. Several distinct kinds of functionality share the same store-carry-
+forward fabric — all running on the same identities, the same cryptography, and the same proximity mesh. The first two
+below are the focus of current development; the third is a direction we find worth building toward.
+
+### Messaging
+
+Private, end-to-end encrypted communication between people. A message is encrypted for its recipient and silently
+forwarded through the network until it arrives — carried by whichever devices happen to cross paths in between. No
+servers hold it, no intermediate carrier can read it, and delivery unfolds at the pace of human movement rather than
+the pace of a data centre.
+
+### Content sharing
+
+The open, broadcast layer of the network. Short posts, longer-form articles, photos, links, small videos — signed by
+their author and carried outward by whoever chooses to pass them along. Anything published here is visible to anyone
+who ends up carrying it, though the author's real-world identity need never be revealed. See [Content](#content) for
+the supported formats and the honest trade-offs around storage.
+
+### Micro apps
+
+A longer-term direction. Beyond messaging and posts, Freepath can host small, sandboxed third-party applications that
+run *inside* the Freepath client and use the same mesh as everything else. A local marketplace, a community bulletin,
+an event board, a reading group, a ticketing tool, a language tutor, a game — each built as a lightweight module, each
+distributed and updated through the network itself, each using the user's existing cryptographic identity instead of
+demanding a new account. Developers get a distribution channel without running servers of their own; users get useful
+tools without leaking yet another data trail. The runtime, permission model, and distribution mechanism are open design
+questions — but the direction is deliberate: one substrate, many apps.
+
+> [!NOTE]
+> Messaging and content sharing are the focus of current development. Micro apps are a longer-term direction.
 
 ## You control what you share
 
@@ -160,7 +245,8 @@ Think of it like seeds carried by the wind — except the wind is people going a
 
 You write a post. Your phone stores it. Later, you walk past someone else using Freepath. Your phones notice each other
 and exchange what each is missing. That person goes home, walks past their neighbor, sits on a train. The post keeps
-spreading — carried physically by humans, hopping from device to device without ever touching a server.
+spreading — carried physically by humans, hopping from device to device, and where the internet is available, from peer
+to peer across it — never through a platform that can control what it carries.
 
 This is called **Store, Carry, Forward**. It's how delay-tolerant networks have operated in research for decades.
 Freepath brings this idea to everyday communication.
@@ -206,6 +292,11 @@ Freepath is designed to work over multiple short-range communication channels, d
   displays a QR code, another scans it. Data can be chunked across multiple codes for larger payloads. See
   [qrt](https://github.com/smyrgeorge/qrt), a project that explores exactly this: encoding data into a sequence of QR
   codes, displaying them as a video on screen, and using a camera to capture and decode the frames.
+- **Internet (optional)** — when devices have connectivity, Freepath can exchange messages over the public internet
+  using a peer-to-peer transport built on [libp2p](https://libp2p.io/). This extends reach beyond physical proximity —
+  bridging distant peers, regions, or hubs — without introducing a central server. Connections are Noise-encrypted at
+  the transport layer and end-to-end encrypted at the application layer; relay nodes that help with NAT traversal see
+  only opaque ciphertext. This path is strictly additive: the network functions fully without it.
 
 ### Hubs
 
@@ -227,6 +318,22 @@ might share its curated reading lists with anyone, or reserve them for members. 
 content does.
 
 This creates a natural layer of physical distribution points — informal, decentralized, and rooted in real places.
+
+```mermaid
+flowchart LR
+    subgraph Place["</br>&nbsp;&nbsp;&nbsp;A place (café, library, square)&nbsp;&nbsp;&nbsp;"]
+        Hub[("Hub always-on node")]
+    end
+
+    V1("Visitor A") <-->|" &nbsp;sync on arrival&nbsp; "| Hub
+    V2("Visitor B") <-->|" &nbsp;sync on arrival&nbsp; "| Hub
+    V3("Visitor C") <-->|" &nbsp;sync on arrival&nbsp; "| Hub
+    V1 -. " &nbsp;carries content outward&nbsp; " .-> Elsewhere[("Other hubs & people")]
+    V3 -. " &nbsp;carries content outward&nbsp; " .-> Elsewhere
+```
+
+The hub itself does not move; people do. Each visitor leaves with whatever the hub shared with them, and becomes a
+carrier for the rest of the network.
 
 #### Governance and participation
 
@@ -290,90 +397,69 @@ because other people decided to keep it — not because a corporation did.
 
 ## Intelligence at the edge
 
-Modern AI models are shrinking. What once required a data center can now run entirely on a phone — no internet
-connection,
-no API key, no data leaving your device. This creates an interesting possibility for Freepath: intelligence that is
-genuinely local, genuinely private, and genuinely yours.
-
-We think AI belongs in Freepath the same way everything else does — at the edge, under your control, serving you rather
-than serving someone's model training pipeline.
+Because there is no server mediating between you and the network, every decision about what to keep, show, filter, or
+forward happens locally — on your device, on your terms. Over time, the client can grow a small toolbox that helps with
+these decisions: filters, summarizers, translators, rankers. Some of it is plain rule-based logic. Some of it may use
+small on-device models where they help. Either way, it runs on your hardware, sends nothing outward, and leaves the
+choices to you.
 
 ### Curation and filtering
 
-The network doesn't impose a global ranking algorithm, and it never will. But that doesn't mean you have to read
-everything. A local model running on your device can help you make sense of what arrives — summarizing long articles,
-flagging content you've already seen in a different form, or surfacing posts that match your interests based on your
-reading patterns. The difference is that this curation happens entirely on your device, with no signal sent outward and
-no company learning from your choices.
+The network doesn't impose a global ranking, and it never will. But that doesn't mean you have to read everything. Your
+client can help you make sense of what arrives — grouping related posts, flagging content you've already seen in a
+different form, or surfacing posts that match interests you've declared. Sorting and filtering happen on your device,
+not on a server somewhere.
 
 ### Smart storage management
 
-Every device has limits. A local model can help decide what's worth keeping when space runs out — not by following a
-platform's opaque policy, but by learning your own priorities over time. What do you tend to read? What do you skip?
-What have you passed on? The model observes locally and acts locally. Nobody else sees any of this.
+Every device has limits. When space runs out, your client can help decide what's worth keeping based on your own
+priorities over time — what you tend to read, what you skip, what you've passed on. These observations stay local and
+act locally. Nobody else sees any of this.
 
 ### Translation and accessibility
 
-Freepath can carry content from communities that don't share your language. A local translation model means that a post
-written in one language can be read in another without routing that text through a cloud translation service. The author
-stays anonymous. The content stays private. The network stays decentralized.
+Freepath can carry content from communities that don't share your language. On-device translation means that a post
+written in one language can be read in another without routing that text through a cloud service. The author stays
+anonymous. The content stays private. The network stays decentralized.
 
 ### Spam and noise reduction
 
-Without a central moderator, every device is responsible for its own signal quality. A local classifier — trained on
-what you've marked as noise, not on what a platform decided was acceptable — can quietly filter out junk before it
-reaches your reading queue. This is moderation that belongs to you, not to a trust-and-safety team in a building
-somewhere.
+Without a central moderator, every device is responsible for its own signal quality. Local filters — built from what
+you've marked as noise, not from what a platform decided was acceptable — can quietly drop junk before it reaches your
+reading queue. Moderation that belongs to you, not to a trust-and-safety team in a building somewhere.
 
 ### Intelligent propagation
 
 Earlier, we described the propagation strategies available to each user — Starred, Last N posts, Everything, and
-whatever else the model allows. These are intentional and human-driven. But AI can make them significantly smarter
-without removing that human intent.
-
-Rather than propagating a fixed window or a manually curated list, a local model can evaluate each piece of content
-against parameters you define: topics you care about, authors you trust, geographic relevance, recency, estimated
-quality, or even how many hops a post has already traveled. From this, it builds a dynamic selection — not a static
-rule, but a live judgment about what is worth carrying right now.
+whatever else the model allows. These are intentional and human-driven. Your client can make them smarter without
+removing that human intent, by ranking content against parameters you define: topics you care about, authors you trust,
+geographic relevance, recency, or how many hops a post has already traveled.
 
 Some examples of what this could look like in practice:
 
-- **Topic-aware carrying** — you set interests (local politics, hiking trails, independent music) and the model
-  prioritizes content that matches, letting unrelated content age out of your store first
+- **Topic-aware carrying** — you set interests (local politics, hiking trails, independent music) and unrelated content
+  ages out of your store first
 - **Trust-weighted propagation** — content from authors you've engaged with before, or that has traveled through people
   you trust, is more likely to be carried forward
-- **Freshness and decay** — the model can factor in how old a post is and how widely it has already spread,
-  deprioritizing content that has likely reached saturation and making room for newer signals
-- **Ethical load** — you can instruct the model to avoid carrying content matching certain patterns you find harmful,
-  without requiring any external moderation infrastructure
-- **Bandwidth sensitivity** — when a sync window is short (a brief encounter on a bus), the model selects only the
-  highest-priority items; when time and proximity allow, it propagates more broadly
+- **Freshness and decay** — old posts that have already spread widely are deprioritized to make room for newer signals
+- **Ethical load** — you can exclude patterns you find harmful, without any external moderation infrastructure
+- **Bandwidth sensitivity** — short encounters sync only high-priority items; longer proximity allows broader
+  propagation
 
-This turns propagation from a blunt instrument into something expressive. The network still carries what people choose
-to carry — the principle doesn't change. But the choice can now be informed by a model that understands your
-preferences,
-applies them consistently, and does so entirely on your device.
-
-The parameters are yours. The model is yours. What travels, travels because you decided it should — just with better
-tools for making that decision.
+The parameters are yours. What travels, travels because you decided it should — just with better tools for making that
+decision.
 
 ### Writing assistance
 
-Composing offline, without connectivity, doesn't mean composing without help. A small model on-device can assist with
-drafting, editing, or translating your own posts before they go anywhere. Nothing leaves your phone until you choose to
-share it.
+Composing offline, without connectivity, doesn't mean composing without help. Lightweight on-device tooling can assist
+with drafting, editing, or translating your own posts before they go anywhere. Nothing leaves your phone until you
+choose to share it.
 
 ### What this is not
 
-Local AI in Freepath is not a recommendation engine optimizing for time-on-screen. It is not a classifier deciding what
-the network is allowed to carry. It is not surveillance dressed up as assistance. There is no training feedback loop
-feeding your behavior back to a model someone else controls.
-
-The models run on your hardware. The outputs stay on your device. The decisions remain yours.
-
-This is still an open area. The models available for on-device inference are improving rapidly, and what is practical
-today will be far more capable in a short time. We think this is a direction worth building toward deliberately — not
-as a feature added later, but as a design principle from the start.
+Intelligence at the edge is not a recommendation engine optimizing for time-on-screen. It is not a classifier deciding
+what the network is allowed to carry. It is not surveillance dressed up as assistance. The outputs stay on your device.
+The decisions remain yours.
 
 ## Where it could work
 
@@ -411,30 +497,6 @@ This list is not exhaustive. Wherever people move, the network can follow.
 
 The ideas below are not part of the core design — they are extensions that feel natural given the foundation Freepath
 builds on. Some overlap with earlier sections; they are collected here because they deserve their own space.
-
-### Messaging
-
-Freepath is described primarily as a broadcast medium — you write something, it travels, people receive it. But the same
-infrastructure can carry private communication.
-
-A messaging subsystem built on Freepath would work the same way: **store, carry, forward**. You send a message to
-someone. Your phone holds it. The next time your device meets another Freepath device — a stranger on the street, a
-friend at a café — that message is silently forwarded, carried one hop closer to its destination. Eventually, through a
-chain of encounters you will never fully know, it arrives.
-
-This is not instant messaging. It makes no such promise. A message might arrive in minutes, or hours, or tomorrow. The
-delivery time depends entirely on the density and movement of the human mesh between sender and recipient.
-
-But this constraint is not a failure — it is a different model of communication. One where presence matters. One where
-the message arrives because people, physically, made it possible.
-
-Privacy is preserved end-to-end. Messages are encrypted for the recipient's public key — readable only by them, even as
-they pass through a dozen unknown devices. Intermediate carriers see nothing. The envelope is opaque. Only the
-destination can open it.
-
-This also changes how conversations feel. There is no read receipt, no typing indicator, no presence dot. You send, and
-then you wait — not anxiously refreshing a screen, but knowing the message is on its way through the world, carried by
-people going about their lives.
 
 ### Presence-based voting
 
