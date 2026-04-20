@@ -424,6 +424,11 @@ fn handle_swarm_event(
         // libp2p can have multiple connections per peer; ConnectionClosed fires per-connection.
         Some(SwarmEvent::ConnectionClosed { peer_id, .. }) => {
             if !swarm.is_connected(&peer_id) {
+                // If this was a relay, clear the circuit-listener marker so the next
+                // identify after reconnect re-establishes the circuit reservation.
+                if relay_peer_ids.contains_key(&peer_id) {
+                    circuit_listening.remove(&peer_id);
+                }
                 let raw = RawLibP2pEvent::peer_disconnected(peer_id.to_string());
                 unsafe { (event_cb.fun)(event_cb.ptr, raw) }
             }
@@ -717,7 +722,6 @@ fn handle_event(
                     // Only do this once per relay (identify fires per-connection: TCP + QUIC).
                     if !circuit_listening.contains(&peer_id) {
                         if let Some(relay_addr) = relay_peer_ids.get(&peer_id) {
-                            circuit_listening.insert(peer_id);
                             // Strip trailing /p2p/<id> if present (already part of the dial addr),
                             // then append /p2p-circuit.
                             let base: Multiaddr = relay_addr
@@ -729,9 +733,12 @@ fn handle_event(
                                 .with(libp2p::multiaddr::Protocol::P2pCircuit);
                             log::info!("relay: listening on circuit address {circuit_addr}");
                             match swarm.listen_on(circuit_addr) {
-                                Ok(id) => log::info!(
-                                    "relay: circuit listener started, listener_id={id:?}"
-                                ),
+                                Ok(id) => {
+                                    circuit_listening.insert(peer_id);
+                                    log::info!(
+                                        "relay: circuit listener started, listener_id={id:?}"
+                                    );
+                                }
                                 Err(e) => log::warn!("relay: listen_on circuit failed: {e}"),
                             }
                         }
