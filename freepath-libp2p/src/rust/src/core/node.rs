@@ -138,62 +138,7 @@ pub fn start_node(
     let (cmd_tx, mut cmd_rx) = mpsc::channel::<SwarmCommand>(64);
 
     runtime.spawn(async move {
-        // Use well-known public DNS resolvers (Quad9, Cloudflare, Google) on all platforms.
-        // with_dns() reads /etc/resolv.conf which doesn't exist on iOS and may be unreliable
-        // on Android. Merging all three providers gives resilience: if one is unreachable
-        // the resolver tries the next.
-        let mut dns_config = libp2p_dns::ResolverConfig::new();
-        for ns in libp2p_dns::ResolverConfig::quad9().name_servers() {
-            dns_config.add_name_server(ns.clone());
-        }
-        for ns in libp2p_dns::ResolverConfig::cloudflare().name_servers() {
-            dns_config.add_name_server(ns.clone());
-        }
-        for ns in libp2p_dns::ResolverConfig::google().name_servers() {
-            dns_config.add_name_server(ns.clone());
-        }
-
-        let swarm_result = (|| -> Result<_, Box<dyn std::error::Error + Send + Sync>> {
-            Ok(SwarmBuilder::with_existing_identity(keypair)
-                .with_tokio()
-                .with_tcp(
-                    tcp::Config::default(),
-                    noise::Config::new,
-                    yamux::Config::default,
-                )?
-                .with_quic()
-                .with_dns_config(dns_config, libp2p_dns::ResolverOpts::default())
-                .with_relay_client(noise::Config::new, yamux::Config::default)?
-                .with_behaviour(|key, relay_client| {
-                    Ok(Behaviour {
-                        identify: identify::Behaviour::new(
-                            identify::Config::new("/freepath/1.0.0".into(), key.public())
-                                .with_agent_version(format!("freepath/{peer_id}")),
-                        ),
-                        ping: ping::Behaviour::default(),
-                        relay_client,
-                        messaging: request_response::Behaviour::with_codec(
-                            FreepathCodec,
-                            std::iter::once((
-                                FreepathProtocol,
-                                request_response::ProtocolSupport::Full,
-                            )),
-                            request_response::Config::default(),
-                        ),
-                        rendezvous: rendezvous::client::Behaviour::new(key.clone()),
-                        autonat: autonat::v2::client::Behaviour::new(
-                            OsRng,
-                            autonat::v2::client::Config::default(),
-                        ),
-                        dcutr: dcutr::Behaviour::new(key.public().to_peer_id()),
-                        upnp: upnp::tokio::Behaviour::default(),
-                    })
-                })?
-                .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(60)))
-                .build())
-        })();
-
-        let mut swarm = match swarm_result {
+        let mut swarm = match build_swarm(keypair, &peer_id) {
             Ok(s) => s,
             Err(e) => {
                 log::error!("failed to build swarm: {e:?}");
@@ -215,13 +160,10 @@ pub fn start_node(
         // Maps relay PeerId → original dial Multiaddr (used for circuit address construction).
         let mut relay_peer_ids: HashMap<PeerId, Multiaddr> = HashMap::new();
         for addr in &relay_multiaddrs {
-            if let Some(pid) = addr
-                .iter()
-                .find_map(|p| match p {
-                    libp2p::multiaddr::Protocol::P2p(id) => Some(id),
-                    _ => None,
-                })
-            {
+            if let Some(pid) = addr.iter().find_map(|p| match p {
+                libp2p::multiaddr::Protocol::P2p(id) => Some(id),
+                _ => None,
+            }) {
                 relay_peer_ids.insert(pid, addr.clone());
             }
             if let Err(e) = swarm.dial(addr.clone()) {
@@ -241,14 +183,29 @@ pub fn start_node(
         // Cookie for progressive discovery per relay.
         let mut rendezvous_cookies: HashMap<PeerId, rendezvous::Cookie> = HashMap::new();
         // Track relays where we already started a circuit listener to avoid duplicates.
-        let mut circuit_listening: std::collections::HashSet<PeerId> = std::collections::HashSet::new();
+        let mut circuit_listening: std::collections::HashSet<PeerId> =
+            std::collections::HashSet::new();
 
         loop {
             tokio::select! {
                 event = futures::StreamExt::next(&mut swarm) => {
-                    if handle_swarm_event(event, &mut swarm, &mut state, &local_peer_id, &event_cb, &contact_cb, &relay_peer_ids, &mut rendezvous_cookies, &mut circuit_listening) {
+                    let Some(event) = event else {
+                        // Swarm stream ended unexpectedly — drain in-flight outbound callers
+                        // so they fail immediately instead of hanging forever.
+                        drain_outbound(&mut state, &local_peer_id, &event_cb);
                         break;
-                    }
+                    };
+                    handle_swarm_event(
+                        event,
+                        &mut swarm,
+                        &mut state,
+                        &local_peer_id,
+                        &event_cb,
+                        &contact_cb,
+                        &relay_peer_ids,
+                        &mut rendezvous_cookies,
+                        &mut circuit_listening,
+                    );
                 }
                 Some(cmd) = cmd_rx.recv() => {
                     if handle_command(cmd, &mut swarm, &mut state, &local_peer_id, &event_cb) {
@@ -290,6 +247,61 @@ pub fn start_node(
     Ok(node)
 }
 
+fn build_swarm(
+    keypair: identity::Keypair,
+    peer_id: &str,
+) -> Result<libp2p::Swarm<Behaviour>, Box<dyn std::error::Error + Send + Sync>> {
+    // Use well-known public DNS resolvers (Quad9, Cloudflare, Google) on all platforms.
+    // with_dns() reads /etc/resolv.conf which doesn't exist on iOS and may be unreliable
+    // on Android. Merging all three providers gives resilience: if one is unreachable
+    // the resolver tries the next.
+    let mut dns_config = libp2p_dns::ResolverConfig::new();
+    for ns in libp2p_dns::ResolverConfig::quad9().name_servers() {
+        dns_config.add_name_server(ns.clone());
+    }
+    for ns in libp2p_dns::ResolverConfig::cloudflare().name_servers() {
+        dns_config.add_name_server(ns.clone());
+    }
+    for ns in libp2p_dns::ResolverConfig::google().name_servers() {
+        dns_config.add_name_server(ns.clone());
+    }
+
+    Ok(SwarmBuilder::with_existing_identity(keypair)
+        .with_tokio()
+        .with_tcp(
+            tcp::Config::default(),
+            noise::Config::new,
+            yamux::Config::default,
+        )?
+        .with_quic()
+        .with_dns_config(dns_config, libp2p_dns::ResolverOpts::default())
+        .with_relay_client(noise::Config::new, yamux::Config::default)?
+        .with_behaviour(|key, relay_client| {
+            Ok(Behaviour {
+                identify: identify::Behaviour::new(
+                    identify::Config::new("/freepath/1.0.0".into(), key.public())
+                        .with_agent_version(format!("freepath/{peer_id}")),
+                ),
+                ping: ping::Behaviour::default(),
+                relay_client,
+                messaging: request_response::Behaviour::with_codec(
+                    FreepathCodec,
+                    std::iter::once((FreepathProtocol, request_response::ProtocolSupport::Full)),
+                    request_response::Config::default(),
+                ),
+                rendezvous: rendezvous::client::Behaviour::new(key.clone()),
+                autonat: autonat::v2::client::Behaviour::new(
+                    OsRng,
+                    autonat::v2::client::Config::default(),
+                ),
+                dcutr: dcutr::Behaviour::new(key.public().to_peer_id()),
+                upnp: upnp::tokio::Behaviour::default(),
+            })
+        })?
+        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(60)))
+        .build())
+}
+
 /// Drains all in-flight outbound requests, firing `request_failed` for each.
 /// Call on both graceful Stop and unexpected swarm stream termination.
 fn drain_outbound(state: &mut NodeState, local_peer_id: &str, event_cb: &EventCallback) {
@@ -304,9 +316,8 @@ fn drain_outbound(state: &mut NodeState, local_peer_id: &str, event_cb: &EventCa
     }
 }
 
-/// Returns `true` if the swarm loop should stop.
 fn handle_swarm_event(
-    event: Option<SwarmEvent<BehaviourEvent>>,
+    event: SwarmEvent<BehaviourEvent>,
     swarm: &mut libp2p::Swarm<Behaviour>,
     state: &mut NodeState,
     local_peer_id: &str,
@@ -315,59 +326,47 @@ fn handle_swarm_event(
     relay_peer_ids: &HashMap<PeerId, Multiaddr>,
     rendezvous_cookies: &mut HashMap<PeerId, rendezvous::Cookie>,
     circuit_listening: &mut std::collections::HashSet<PeerId>,
-) -> bool {
+) {
     match event {
-        Some(SwarmEvent::Behaviour(BehaviourEvent::Messaging(ev))) => {
+        SwarmEvent::Behaviour(BehaviourEvent::Messaging(ev)) => {
             handle_messaging(ev, swarm, state, local_peer_id, event_cb);
-            false
         }
-        Some(SwarmEvent::Behaviour(BehaviourEvent::Rendezvous(ev))) => {
+        SwarmEvent::Behaviour(BehaviourEvent::Rendezvous(ev)) => {
             handle_rendezvous(ev, swarm, event_cb, relay_peer_ids, rendezvous_cookies);
-            false
         }
-        Some(SwarmEvent::Behaviour(BehaviourEvent::RelayClient(ev))) => {
-            log::debug!("relay client event: {ev:?}");
-            false
-        }
-        Some(SwarmEvent::Behaviour(BehaviourEvent::Upnp(ev))) => {
-            match ev {
-                upnp::Event::GatewayNotFound => {
-                    log::info!("upnp: gateway not found");
-                    let raw = RawLibP2pEvent::upnp_gateway_not_found();
-                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
-                }
-                upnp::Event::NonRoutableGateway => {
-                    log::info!("upnp: gateway is not routable");
-                    let raw = RawLibP2pEvent::upnp_non_routable_gateway();
-                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
-                }
-                upnp::Event::NewExternalAddr(addr) => {
-                    log::info!("upnp: new external addr {addr}");
-                    let raw = RawLibP2pEvent::upnp_new_external_addr(addr.to_string());
-                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
-                }
-                upnp::Event::ExpiredExternalAddr(addr) => {
-                    log::info!("upnp: expired external addr {addr}");
-                    let raw = RawLibP2pEvent::upnp_expired_external_addr(addr.to_string());
-                    unsafe { (event_cb.fun)(event_cb.ptr, raw) }
-                }
+        SwarmEvent::Behaviour(BehaviourEvent::Upnp(ev)) => match ev {
+            upnp::Event::GatewayNotFound => {
+                log::info!("upnp: gateway not found");
+                let raw = RawLibP2pEvent::upnp_gateway_not_found();
+                unsafe { (event_cb.fun)(event_cb.ptr, raw) }
             }
-            false
-        }
-        Some(SwarmEvent::Behaviour(BehaviourEvent::Dcutr(ev))) => {
-            match ev.result {
-                Ok(_) => log::info!(
-                    "dcutr: direct connection upgrade succeeded with {}",
-                    ev.remote_peer_id
-                ),
-                Err(ref e) => log::warn!(
-                    "dcutr: direct connection upgrade failed with {}: {e:?}",
-                    ev.remote_peer_id
-                ),
+            upnp::Event::NonRoutableGateway => {
+                log::info!("upnp: gateway is not routable");
+                let raw = RawLibP2pEvent::upnp_non_routable_gateway();
+                unsafe { (event_cb.fun)(event_cb.ptr, raw) }
             }
-            false
-        }
-        Some(SwarmEvent::Behaviour(BehaviourEvent::Autonat(ev))) => {
+            upnp::Event::NewExternalAddr(addr) => {
+                log::info!("upnp: new external addr {addr}");
+                let raw = RawLibP2pEvent::upnp_new_external_addr(addr.to_string());
+                unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+            }
+            upnp::Event::ExpiredExternalAddr(addr) => {
+                log::info!("upnp: expired external addr {addr}");
+                let raw = RawLibP2pEvent::upnp_expired_external_addr(addr.to_string());
+                unsafe { (event_cb.fun)(event_cb.ptr, raw) }
+            }
+        },
+        SwarmEvent::Behaviour(BehaviourEvent::Dcutr(ev)) => match ev.result {
+            Ok(_) => log::info!(
+                "dcutr: direct connection upgrade succeeded with {}",
+                ev.remote_peer_id
+            ),
+            Err(ref e) => log::warn!(
+                "dcutr: direct connection upgrade failed with {}: {e:?}",
+                ev.remote_peer_id
+            ),
+        },
+        SwarmEvent::Behaviour(BehaviourEvent::Autonat(ev)) => {
             // Circuit-relayed addresses are not directly reachable — skip them.
             // Autonat still wastes a probe, but we don't surface the noise to UI.
             let is_circuit = ev
@@ -376,7 +375,7 @@ fn handle_swarm_event(
                 .any(|p| matches!(p, libp2p::multiaddr::Protocol::P2pCircuit));
             if is_circuit {
                 log::debug!("autonat: skipping circuit addr {}", ev.tested_addr);
-                return false;
+                return;
             }
             match ev.result {
                 Ok(()) => {
@@ -393,11 +392,6 @@ fn handle_swarm_event(
                     unsafe { (event_cb.fun)(event_cb.ptr, raw) }
                 }
                 Err(ref e) => {
-                    log::debug!(
-                        "autonat: {} probe via {} failed: {e:?}",
-                        ev.tested_addr,
-                        ev.server
-                    );
                     let raw = RawLibP2pEvent::autonat_probe_failed(
                         ev.tested_addr.to_string(),
                         ev.server.to_string(),
@@ -406,23 +400,16 @@ fn handle_swarm_event(
                     unsafe { (event_cb.fun)(event_cb.ptr, raw) }
                 }
             }
-            false
         }
-        Some(SwarmEvent::NewExternalAddrCandidate { address }) => {
-            log::info!("NewExternalAddrCandidate: {address}");
-            false
-        }
-        Some(SwarmEvent::ExternalAddrConfirmed { address }) => {
+        SwarmEvent::ExternalAddrConfirmed { address } => {
             log::info!("ExternalAddrConfirmed: {address}");
-            false
         }
-        Some(SwarmEvent::ExternalAddrExpired { address }) => {
+        SwarmEvent::ExternalAddrExpired { address } => {
             log::info!("ExternalAddrExpired: {address}");
-            false
         }
         // Only fire peer_disconnected when the last connection to the peer is gone.
         // libp2p can have multiple connections per peer; ConnectionClosed fires per-connection.
-        Some(SwarmEvent::ConnectionClosed { peer_id, .. }) => {
+        SwarmEvent::ConnectionClosed { peer_id, .. } => {
             if !swarm.is_connected(&peer_id) {
                 // If this was a relay, clear the circuit-listener marker so the next
                 // identify after reconnect re-establishes the circuit reservation.
@@ -432,9 +419,8 @@ fn handle_swarm_event(
                 let raw = RawLibP2pEvent::peer_disconnected(peer_id.to_string());
                 unsafe { (event_cb.fun)(event_cb.ptr, raw) }
             }
-            false
         }
-        Some(ev) => {
+        ev => {
             handle_event(
                 ev,
                 swarm,
@@ -444,13 +430,6 @@ fn handle_swarm_event(
                 rendezvous_cookies,
                 circuit_listening,
             );
-            false
-        }
-        None => {
-            // Swarm stream ended unexpectedly — drain in-flight outbound callers
-            // so they fail immediately instead of hanging forever.
-            drain_outbound(state, local_peer_id, event_cb);
-            true
         }
     }
 }
