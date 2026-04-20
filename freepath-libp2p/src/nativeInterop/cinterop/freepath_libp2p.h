@@ -7,6 +7,15 @@
 #include <stdlib.h>
 
 /**
+ * Request/response framing discriminators (first byte of the wire payload).
+ */
+#define REQ_TAG 1
+
+#define RESP_OK 0
+
+#define RESP_ERR 1
+
+/**
  * Event kinds:
  *   0 = PeerConnected             (peer_id + addr)
  *   1 = PeerDisconnected          (peer_id)

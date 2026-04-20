@@ -8,6 +8,19 @@ use std::io;
 
 pub const PROTOCOL_NAME: &str = "/freepath/msg/1.0.0";
 
+/// Request/response framing discriminators (first byte of the wire payload).
+pub const REQ_TAG: u8 = 0x01;
+pub const RESP_OK: u8 = 0x00;
+pub const RESP_ERR: u8 = 0x01;
+
+/// Prepend a single discriminator byte to `payload`.
+pub fn frame(tag: u8, payload: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(1 + payload.len());
+    out.push(tag);
+    out.extend_from_slice(payload);
+    out
+}
+
 #[derive(Clone)]
 pub struct FreepathProtocol;
 

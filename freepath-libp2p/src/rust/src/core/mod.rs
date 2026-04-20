@@ -1,6 +1,8 @@
 pub mod event;
+pub mod handlers;
 pub mod messaging;
 pub mod node;
+pub mod swarm;
 pub mod utils;
 
 pub use event::RawLibP2pEvent;

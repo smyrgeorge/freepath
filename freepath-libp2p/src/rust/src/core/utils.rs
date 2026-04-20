@@ -2,6 +2,8 @@ use std::ffi::c_void;
 use std::sync::OnceLock;
 use tokio::runtime::Runtime;
 
+use libp2p::Multiaddr;
+
 use crate::core::event::RawLibP2pEvent;
 
 pub static RUNTIME: OnceLock<Runtime> = OnceLock::new();
@@ -13,6 +15,12 @@ pub struct EventCallback {
 unsafe impl Send for EventCallback {}
 unsafe impl Sync for EventCallback {}
 
+impl EventCallback {
+    pub fn emit(&self, event: *mut RawLibP2pEvent) {
+        unsafe { (self.fun)(self.ptr, event) }
+    }
+}
+
 /// Synchronous callback invoked from the swarm loop to check whether a peer is a known contact.
 /// The function receives the peer_id as a UTF-8 byte slice and returns `true` if the peer is
 /// present in the caller's contact database.
@@ -22,6 +30,27 @@ pub struct ContactCallback {
 }
 unsafe impl Send for ContactCallback {}
 unsafe impl Sync for ContactCallback {}
+
+impl ContactCallback {
+    pub fn is_known(&self, peer_id: &libp2p::PeerId) -> bool {
+        let pid_str = peer_id.to_string();
+        let bytes = pid_str.as_bytes();
+        unsafe { (self.fun)(self.ptr, bytes.as_ptr(), bytes.len()) }
+    }
+}
+
+/// Parse a newline-separated list of multiaddrs. Panics with `label` on invalid input.
+pub fn parse_multiaddrs(input: &str, label: &str) -> Vec<Multiaddr> {
+    input
+        .lines()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            s.parse()
+                .unwrap_or_else(|e| panic!("invalid {label} '{s}': {e:?}"))
+        })
+        .collect()
+}
 
 pub enum SwarmCommand {
     Stop,
