@@ -1,11 +1,15 @@
 package io.github.smyrgeorge.freepath.rust
 
 import org.gradle.api.DefaultTask
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
 import java.io.File
@@ -21,13 +25,21 @@ abstract class RustBuildTask @Inject constructor(
 
     /**
      * Directory containing Cargo.toml.
-     * Marked @Internal (not @InputDirectory) to avoid Gradle implicit-dependency errors:
-     * all three iOS targets share the same `src/rust` workspace and each target's
-     * outputDir is a subdirectory of this directory, which would create a circular
-     * input/output overlap. Cargo handles its own incremental compilation.
+     * Marked @Internal (not @InputDirectory) to avoid input/output overlap: outputDir is
+     * `<cargoDir>/target/...`. Source tracking for up-to-date checks is done via [sources],
+     * which explicitly excludes `target/`.
      */
     @get:Internal
     abstract val cargoDir: DirectoryProperty
+
+    /**
+     * Rust source files whose changes should invalidate the build (Cargo.toml, Cargo.lock,
+     * build.rs, cbindgen.toml, plus files under src/). Must exclude `target/` to avoid
+     * input/output overlap with [outputDir].
+     */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sources: ConfigurableFileCollection
 
     /** Rust target triple, e.g. `aarch64-apple-ios`. */
     @get:Input
@@ -36,13 +48,6 @@ abstract class RustBuildTask @Inject constructor(
     /** The release output directory: `<cargoDir>/target/<rustTarget>/release`. */
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
-
-    init {
-        // cargoDir is @Internal to avoid input/output overlap (all iOS targets share the same
-        // src/rust workspace). Disable Gradle's up-to-date check entirely and let cargo's own
-        // incremental compilation decide whether to rebuild.
-        outputs.upToDateWhen { false }
-    }
 
     @TaskAction
     fun build() {

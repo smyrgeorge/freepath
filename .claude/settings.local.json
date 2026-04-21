@@ -52,7 +52,8 @@
       "Bash(./gradlew :freepath-util:compileKotlinJvm)",
       "Bash(./gradlew jvmTest compileKotlinJvm compileKotlinAndroid)",
       "Bash(./gradlew jvmTest compileKotlinJvm)",
-      "Bash(./gradlew :freepath-util:jvmTest :freepath-util:compileKotlinJvm)"
+      "Bash(./gradlew :freepath-util:jvmTest :freepath-util:compileKotlinJvm)",
+      "Bash(./gradlew :freepath-libp2p:buildRustJvm --no-daemon)"
     ]
   }
 }

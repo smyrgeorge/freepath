@@ -1,7 +1,6 @@
 import io.github.smyrgeorge.freepath.rust.RustBuildTask
 import io.github.smyrgeorge.freepath.rust.RustGenerateDefFileTask
 import io.github.smyrgeorge.freepath.rust.RustInteropExtension
-import org.gradle.kotlin.dsl.register
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.konan.target.Family
@@ -29,11 +28,9 @@ fun Project.configureRustTarget(
     crateName: String,
 ) {
     val rustTriple = iosRustTarget(target.konanTarget) ?: return
-
     val cargoDir = layout.projectDirectory.dir(extension.cargoDir)
     val rustOutDir = cargoDir.dir("target/$rustTriple/release")
-    val templateDef = extension.templateDefFile
-        ?: "src/nativeInterop/cinterop/${crateName}.def"
+    val templateDef = extension.templateDefFile ?: "src/nativeInterop/cinterop/${crateName}.def"
     val headerDirPath = layout.projectDirectory.dir(extension.headerDir).asFile.absolutePath
 
     val buildRustTask = tasks.register<RustBuildTask>(
@@ -42,6 +39,7 @@ fun Project.configureRustTarget(
         this.cargoDir.set(cargoDir)
         rustTarget.set(rustTriple)
         outputDir.set(rustOutDir)
+        sources.from(rustSourceTree(cargoDir.asFile))
     }
 
     val generateDefTask = tasks.register<RustGenerateDefFileTask>(
@@ -71,4 +69,14 @@ fun iosRustTarget(konanTarget: KonanTarget): String? = when (konanTarget) {
     KonanTarget.IOS_ARM64 -> "aarch64-apple-ios"
     KonanTarget.IOS_SIMULATOR_ARM64 -> "aarch64-apple-ios-sim"
     else -> null
+}
+
+/**
+ * Files whose changes should trigger a Rust rebuild. Must exclude `target/` — that directory
+ * lives inside cargoDir and is the task's output, so including it would create an
+ * input/output overlap error in Gradle.
+ */
+fun Project.rustSourceTree(cargoDir: File) = fileTree(cargoDir) {
+    include("Cargo.toml", "Cargo.lock", "build.rs", "cbindgen.toml")
+    include("src/**")
 }
