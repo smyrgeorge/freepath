@@ -4,6 +4,8 @@ import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.actor4k.system.registry.SimpleActorRegistry
 import io.github.smyrgeorge.actor4k.util.SimpleLoggerFactory
 import io.github.smyrgeorge.freepath.sync.SyncPeerActor
+import io.github.smyrgeorge.freepath.util.InMemoryLoggingAppender
+import io.github.smyrgeorge.log4k.RootLogger
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.hours
@@ -12,6 +14,8 @@ import kotlin.time.Duration.Companion.minutes
 
 object AppHooks {
     fun onCreate() {
+        RootLogger.Logging.appenders.register(InMemoryLoggingAppender)
+
         val conf = ActorSystem.Conf(
             systemCollectStatsEvery = 1.hours, // Intentionally big (disabled)
             systemLogStatsEvery = 1.hours, // Intentionally big (disabled)

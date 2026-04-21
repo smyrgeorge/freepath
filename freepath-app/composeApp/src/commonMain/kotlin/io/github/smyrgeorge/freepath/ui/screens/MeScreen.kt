@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,8 +17,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,9 +40,12 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import io.github.alexzhirkevich.qrose.options.QrBallShape
 import io.github.alexzhirkevich.qrose.options.QrBrush
@@ -97,7 +103,9 @@ import io.github.smyrgeorge.freepath.ui.components.FreepathDivider
 import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
 import io.github.smyrgeorge.freepath.ui.components.SectionTitle
+import io.github.smyrgeorge.freepath.util.InMemoryLoggingAppender
 import io.github.smyrgeorge.freepath.util.toImageBitmap
+import io.github.smyrgeorge.log4k.Level
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -185,6 +193,7 @@ private fun DeveloperSection() {
         SectionTitle(text = stringResource(Res.string.dev_section_title))
         Libp2pMetricsPanel(metrics = libp2pMetrics, selfPeerId = AppState.contact.peerId)
         LibbleMetricsPanel(metrics = libbleMetrics)
+        LogsPanel()
         FreepathButton(
             onClick = { scope.launch { AppState.generateRandomSelfContent() } },
             modifier = Modifier.fillMaxWidth(),
@@ -410,6 +419,86 @@ private fun Libp2pMetricsPanel(metrics: Libp2pMetricsSnapshot, selfPeerId: Strin
     }
 }
 
+
+@Composable
+private fun LogsPanel() {
+    val logs by InMemoryLoggingAppender.logs.collectAsState()
+    val vScroll = rememberScrollState()
+    val hScroll = rememberScrollState()
+
+    val annotated = remember(logs) { buildLogsAnnotatedString(logs) }
+
+    LaunchedEffect(logs.size) {
+        vScroll.scrollTo(vScroll.maxValue)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                RoundedCornerShape(12.dp),
+            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "Logs",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        FreepathDivider()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(260.dp)
+                .background(Color(0xFF111111), RoundedCornerShape(8.dp))
+                .padding(8.dp)
+                .verticalScroll(vScroll)
+                .horizontalScroll(hScroll),
+        ) {
+            Text(
+                text = annotated,
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = Color(0xFFE0E0E0),
+                softWrap = false,
+            )
+        }
+    }
+}
+
+private fun buildLogsAnnotatedString(entries: List<InMemoryLoggingAppender.Entry>): AnnotatedString =
+    buildAnnotatedString {
+        val tsColor = SpanStyle(color = Color(0xFF81C784))
+        val threadColor = SpanStyle(color = Color(0xFFB0BEC5))
+        val loggerColor = SpanStyle(color = Color(0xFF4DD0E1))
+        entries.forEachIndexed { index, e ->
+            withStyle(tsColor) { append(e.timestamp) }
+            append(" [")
+            withStyle(threadColor) { append(e.thread) }
+            append("] ")
+            withStyle(SpanStyle(color = e.level.uiColor())) { append(e.level.name.padEnd(5)) }
+            append(' ')
+            withStyle(loggerColor) { append(e.logger) }
+            append(" - ")
+            append(e.message)
+            if (e.throwable != null) {
+                append('\n')
+                withStyle(SpanStyle(color = Color(0xFFEF5350))) { append(e.throwable) }
+            }
+            if (index < entries.lastIndex) append('\n')
+        }
+    }
+
+private fun Level.uiColor(): Color = when (this) {
+    Level.TRACE, Level.DEBUG -> Color(0xFF9E9E9E)
+    Level.INFO -> Color(0xFF64B5F6)
+    Level.WARN -> Color(0xFFFFB74D)
+    Level.ERROR -> Color(0xFFEF5350)
+    Level.OFF -> Color(0xFFE0E0E0)
+}
 
 @Composable
 private fun MetricRow(label: String, value: String) {

@@ -31,6 +31,19 @@ class SyncPeerActor(
     private val contentRepository: ContentEntryRepository = resources.contentRepository
     private val syncRepository: ContentSyncEntryRepository = resources.contentSyncRepository
 
+    // TODO: Make sync/relay smarter — three flood sources today:
+    //   1. Pass 2 re-forwards the same mesh packets to every reconnecting peer (no per-peer dedup).
+    //   2. sync() walks all content on every reconnect (no per-peer high-water mark or digest).
+    //   3. Connected + Identified both trigger a full pass; Identified follows Connected by seconds.
+    // Target: advertise-then-pull — exchange a compact digest (list of (contentId, version) for
+    // content; bloom/merkle for the relay queue), peer replies with what it wants, push only that.
+    // Essentially gossipsub's IHAVE/IWANT applied point-to-point over request_response.
+    // Cheap pre-protocol-change wins:
+    //   - (relay_entry_id, peer_id) already-offered table → Pass 2 dedup.
+    //   - Drop sync on Connected; keep only Identified (or debounce).
+    //   - Per-peer last_content_sync_at → only walk content modified after it.
+    // Also tighten: unidentified peers currently receive the full mailbox (peerIdHash == null
+    // branch in relay()) — privacy issue, fix when revisiting.
     override suspend fun onReceive(m: SyncPeerProtocol): Behavior<SyncPeerProtocol.Response> {
         when (m) {
             is SyncPeerProtocol.Connected -> {
