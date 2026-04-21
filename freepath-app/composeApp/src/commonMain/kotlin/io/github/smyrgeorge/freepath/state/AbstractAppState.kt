@@ -67,24 +67,39 @@ abstract class AbstractAppState(
     val feedEntries: StateFlow<List<ContentEntry>> = _feedEntries.asStateFlow()
 
     /**
-     * Unified view of contacts reachable via any transport, keyed by peerId.
-     * Value is the set of transports ([ConnectionSource]) on which the peer is currently visible.
-     * A peer reachable on both LAN and BLE appears once with both sources in the set.
+     * Peers physically nearby, keyed by peerId. Value is the set of local transports
+     * ([ConnectionSource]) on which the peer is currently visible. A peer reachable on both
+     * LAN and BLE appears once with both sources in the set. A LAN peer counts as nearby only
+     * if it is also visible on mDNS, so peers reachable only via relay/internet are excluded.
      */
-    val nearbyIdentifiedContacts: StateFlow<Map<String, Set<ConnectionSource>>> =
+    val nearbyPeers: StateFlow<Map<String, Set<ConnectionSource>>> =
         combine(
             resources.libp2p.metrics.value,
             resources.libble.metrics.value,
         ) { lan, ble ->
+            val selfPeerId = if (::identityEntry.isInitialized) identityEntry.peerId else null
             val result = mutableMapOf<String, MutableSet<ConnectionSource>>()
             lan.identifiedPeers
-                .filter { it != identityEntry.peerId }
+                .filter { it != selfPeerId && it in lan.mdnsPeers }
                 .forEach { result.getOrPut(it) { mutableSetOf() }.add(ConnectionSource.LAN) }
             ble.identifiedPeers
-                .filter { it != identityEntry.peerId }
+                .filter { it != selfPeerId }
                 .forEach { result.getOrPut(it) { mutableSetOf() }.add(ConnectionSource.BLE) }
             result.mapValues { it.value.toSet() }
         }.stateIn(emptyMap())
+
+    /**
+     * Peers reachable on any transport, including internet/relay. Used for online indicators
+     * that should light up regardless of whether the peer is physically nearby.
+     */
+    val onlinePeers: StateFlow<Set<String>> =
+        combine(
+            resources.libp2p.metrics.value,
+            resources.libble.metrics.value,
+        ) { lan, ble ->
+            val all = lan.identifiedPeers + ble.identifiedPeers
+            if (::identityEntry.isInitialized) all - identityEntry.peerId else all
+        }.stateIn(emptySet())
 
     lateinit var identity: Identity
     lateinit var identityEntry: IdentityEntry

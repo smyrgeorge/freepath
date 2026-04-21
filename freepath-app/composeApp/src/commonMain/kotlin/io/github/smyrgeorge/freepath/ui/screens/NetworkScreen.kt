@@ -108,6 +108,7 @@ import kotlin.time.Instant
 fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactEntry) -> Unit)? = null) {
     val contacts by AppState.contacts.collectAsState()
     val contactContents by AppState.contactContents.collectAsState()
+    val onlinePeers by AppState.onlinePeers.collectAsState()
 
     val trusted = contacts.filter { it.trustLevel == TrustLevel.TRUSTED }
     val known = contacts.filter { it.trustLevel == TrustLevel.KNOWN }
@@ -149,7 +150,8 @@ fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactEntry)
                     ContactRow(
                         entry,
                         contactContents[entry.peerId],
-                        onContactClick = onContactClick
+                        isOnline = entry.peerId in onlinePeers,
+                        onContactClick = onContactClick,
                     )
                 }
             }
@@ -165,7 +167,8 @@ fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactEntry)
                     ContactRow(
                         entry,
                         contactContents[entry.peerId],
-                        onContactClick = onContactClick
+                        isOnline = entry.peerId in onlinePeers,
+                        onContactClick = onContactClick,
                     )
                 }
             }
@@ -181,7 +184,8 @@ fun NetworkScreen(modifier: Modifier = Modifier, onContactClick: ((ContactEntry)
                     ContactRow(
                         entry,
                         contactContents[entry.peerId],
-                        grayed = true
+                        isOnline = entry.peerId in onlinePeers,
+                        grayed = true,
                     )
                 }
             }
@@ -254,6 +258,7 @@ private fun NetworkSectionHeader(text: String) {
 private fun ContactRow(
     entry: ContactEntry,
     content: io.github.smyrgeorge.freepath.content.ContentBody.Contact?,
+    isOnline: Boolean = false,
     grayed: Boolean = false,
     onContactClick: ((ContactEntry) -> Unit)? = null,
 ) {
@@ -294,14 +299,28 @@ private fun ContactRow(
         )
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = displayName,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Bold,
-                color = onSurface.copy(alpha = contentAlpha),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = displayName,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = onSurface.copy(alpha = contentAlpha),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (!grayed) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (isOnline) Color(0xFF4CAF50) else Color(0xFFBDBDBD))
+                    )
+                }
+            }
             Text(
                 text = when (entry.trustLevel) {
                     TrustLevel.BLOCKED -> stringResource(Res.string.network_section_blocked)
@@ -313,23 +332,7 @@ private fun ContactRow(
         }
 
         when (entry.trustLevel) {
-            TrustLevel.TRUSTED -> {
-                Box(
-                    modifier = Modifier
-                        .border(
-                            1.dp,
-                            MaterialTheme.colorScheme.outlineVariant,
-                            RoundedCornerShape(50.dp),
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        text = stringResource(Res.string.network_section_trusted),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            TrustLevel.TRUSTED -> Unit
 
             TrustLevel.KNOWN -> {
                 FreepathButton(

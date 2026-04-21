@@ -65,7 +65,7 @@ fun ChatScreen(
 ) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
-    val nearbyPeers by AppState.nearbyIdentifiedContacts.collectAsState()
+    val onlinePeers by AppState.onlinePeers.collectAsState()
     val chats by AppState.chats.collectAsState()
     val messages = chats[contact.peerId] ?: emptyList()
     val listState = rememberLazyListState()
@@ -75,7 +75,7 @@ fun ChatScreen(
     val cardName = contact.contact.name?.takeIf { it.isNotBlank() && !it.startsWith("#") }
     val displayName = localName ?: cardName ?: contact.peerId.take(12)
 
-    val isOnline = contact.peerId in nearbyPeers
+    val isOnline = contact.peerId in onlinePeers
 
     // Load chat history from the database when the screen opens
     LaunchedEffect(contact.peerId) {

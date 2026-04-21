@@ -58,6 +58,7 @@ private val APP_SCREENS = setOf(Screen.Nearby, Screen.Network, Screen.Feed, Scre
 fun App() {
     var screen by remember { mutableStateOf(Screen.Splash) }
     var chatContact by remember { mutableStateOf<ContactEntry?>(null) }
+    var chatReturnScreen by remember { mutableStateOf(Screen.Network) }
     var selectedFeedEntry by remember { mutableStateOf<ContentEntry?>(null) }
     val startupRoute by AppViewState.startupRoute.collectAsState()
     val pendingDeepLink by AppViewState.pendingDeepLink.collectAsState()
@@ -96,10 +97,17 @@ fun App() {
                             screen = Screen.Feed
                         }
 
-                        Screen.Nearby -> NearbyScreen()
+                        Screen.Nearby -> NearbyScreen(
+                            onContactClick = { entry ->
+                                chatContact = entry
+                                chatReturnScreen = Screen.Nearby
+                                screen = Screen.Chat
+                            }
+                        )
                         Screen.Network -> NetworkScreen(
                             onContactClick = { entry ->
                                 chatContact = entry
+                                chatReturnScreen = Screen.Network
                                 screen = Screen.Chat
                             }
                         )
@@ -131,7 +139,7 @@ fun App() {
                         Screen.Chat -> chatContact?.let { entry ->
                             ChatScreen(
                                 contact = entry,
-                                onBack = { screen = Screen.Network },
+                                onBack = { screen = chatReturnScreen },
                             )
                         }
                     }
