@@ -230,7 +230,16 @@ abstract class AbstractAppState(
     }
 
     suspend fun updateMessageStatus(entry: MessageEntry, status: MessageStatus) {
-        messageRepository.update(db, entry.copy(status = status)).getOrThrow()
+        val updated = entry.copy(status = status)
+        messageRepository.update(db, updated).getOrThrow()
+
+        val conversationKey =
+            if (entry.senderId == contact.peerId) entry.recipientId ?: entry.senderId
+            else entry.senderId
+        _chats.update { current ->
+            val list = current[conversationKey] ?: return@update current
+            current + (conversationKey to list.map { if (it.id == updated.id) updated else it })
+        }
     }
 
     fun contactLookup(peerId: String): Contact? =

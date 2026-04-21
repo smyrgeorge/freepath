@@ -1,5 +1,6 @@
 package io.github.smyrgeorge.freepath.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -37,7 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -54,6 +60,7 @@ import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.Protocol
 import io.github.smyrgeorge.freepath.database.ContactEntry
+import io.github.smyrgeorge.freepath.database.MessageStatus
 import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
 import io.github.smyrgeorge.freepath.ui.components.FreepathTopBar
 import kotlinx.coroutines.launch
@@ -144,7 +151,11 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(messages) { msg ->
-                    ChatBubble(text = msg.message.body ?: "", fromMe = msg.senderId == AppState.contact.peerId)
+                    ChatBubble(
+                        text = msg.message.body ?: "",
+                        fromMe = msg.senderId == AppState.contact.peerId,
+                        status = msg.status,
+                    )
                 }
             }
         }
@@ -217,7 +228,7 @@ fun ChatScreen(
 }
 
 @Composable
-private fun ChatBubble(text: String, fromMe: Boolean) {
+private fun ChatBubble(text: String, fromMe: Boolean, status: MessageStatus) {
     val bubbleColor = if (fromMe)
         MaterialTheme.colorScheme.primary
     else
@@ -246,12 +257,75 @@ private fun ChatBubble(text: String, fromMe: Boolean) {
                 .background(bubbleColor)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodySmall,
-                color = textColor,
-            )
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = textColor,
+                )
+                if (fromMe) {
+                    MessageStatusIcon(
+                        status = status,
+                        tint = textColor.copy(alpha = 0.85f),
+                    )
+                }
+            }
         }
         if (!fromMe) Spacer(modifier = Modifier.width(48.dp))
+    }
+}
+
+@Composable
+private fun MessageStatusIcon(status: MessageStatus, tint: Color) {
+    if (status == MessageStatus.SENDING || status == MessageStatus.RECEIVED) return
+    Canvas(modifier = Modifier.size(12.dp)) {
+        val w = size.width
+        val h = size.height
+        when (status) {
+            // (not drawn)
+            MessageStatus.SENDING -> Unit
+
+            // ✓
+            MessageStatus.SENT -> {
+                val stroke = 1.6.dp.toPx()
+                val path = Path().apply {
+                    moveTo(w * 0.12f, h * 0.55f)
+                    lineTo(w * 0.42f, h * 0.82f)
+                    lineTo(w * 0.92f, h * 0.22f)
+                }
+                drawPath(
+                    path = path,
+                    color = tint,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                )
+            }
+
+            // ⓘ (red disc with white "!")
+            MessageStatus.FAILED -> {
+                val badge = Color(0xFFEF5350)
+                val r = minOf(w, h) / 2f
+                val cx = w / 2f
+                val cy = h / 2f
+                drawCircle(color = badge, radius = r, center = Offset(cx, cy))
+                drawLine(
+                    color = Color.White,
+                    start = Offset(cx, cy - r * 0.45f),
+                    end = Offset(cx, cy + r * 0.15f),
+                    strokeWidth = 1.6.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = 1.dp.toPx(),
+                    center = Offset(cx, cy + r * 0.55f),
+                )
+            }
+
+            // (not drawn — inbound only)
+            MessageStatus.RECEIVED -> Unit
+        }
     }
 }
