@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
 
+@Suppress("PrivatePropertyName")
 class FeedHelpersTest {
 
     // ContactEntry.init enforces nodeId must be 52-character Base58
