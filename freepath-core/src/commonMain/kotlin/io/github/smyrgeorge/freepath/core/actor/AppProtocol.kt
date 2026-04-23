@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.actor
+package io.github.smyrgeorge.freepath.core.actor
 
 import io.github.smyrgeorge.actor4k.actor.ActorProtocol
 import io.github.smyrgeorge.freepath.contact.Contact

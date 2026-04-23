@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.state.model
+package io.github.smyrgeorge.freepath.core.state.model
 
 enum class StartupRoute {
     Loading,

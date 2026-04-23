@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath
 
-import io.github.smyrgeorge.freepath.actor.AppActor
-import io.github.smyrgeorge.freepath.state.AbstractAppHooks
+import io.github.smyrgeorge.freepath.core.actor.AppActor
+import io.github.smyrgeorge.freepath.core.state.AbstractAppHooks
 
 object AppHooks : AbstractAppHooks(
     actorKey = AppActor.DEFAULT_KEY,

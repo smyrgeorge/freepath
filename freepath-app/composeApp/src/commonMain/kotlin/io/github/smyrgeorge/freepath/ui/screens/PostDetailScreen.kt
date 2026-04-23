@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -112,8 +111,7 @@ fun PostDetailScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Content body
-            val body = entry.content.body
-            when (body) {
+            when (val body = entry.content.body) {
                 is ContentBody.Image -> DetailImage(body)
                 is ContentBody.Article -> {
                     Text(
@@ -133,6 +131,7 @@ fun PostDetailScreen(
                         ),
                     )
                 }
+
                 else -> {
                     Text(
                         text = body.fullText(),

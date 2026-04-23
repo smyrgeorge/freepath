@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.actor
+package io.github.smyrgeorge.freepath.core.actor
 
 import io.github.smyrgeorge.actor4k.actor.Actor
 import io.github.smyrgeorge.actor4k.actor.Behavior
@@ -9,9 +9,9 @@ import io.github.smyrgeorge.freepath.database.ContentSyncEntry
 import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
 import io.github.smyrgeorge.freepath.database.RelayEntryRepository
 import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
-import io.github.smyrgeorge.freepath.state.AbstractAppResources
-import io.github.smyrgeorge.freepath.state.AbstractAppState
-import io.github.smyrgeorge.freepath.state.abbrev
+import io.github.smyrgeorge.freepath.core.state.AbstractAppResources
+import io.github.smyrgeorge.freepath.core.state.AbstractAppState
+import io.github.smyrgeorge.freepath.core.state.abbrev
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlin.time.Clock
 

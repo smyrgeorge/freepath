@@ -1,12 +1,12 @@
-package io.github.smyrgeorge.freepath.state
+package io.github.smyrgeorge.freepath.core.state
 
 import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.actor4k.system.registry.SimpleActorRegistry
 import io.github.smyrgeorge.actor4k.util.SimpleLoggerFactory
-import io.github.smyrgeorge.freepath.actor.AppActor
-import io.github.smyrgeorge.freepath.actor.AppProtocol
-import io.github.smyrgeorge.freepath.actor.SyncPeerActor
-import io.github.smyrgeorge.freepath.util.InMemoryLoggingAppender
+import io.github.smyrgeorge.freepath.core.actor.AppActor
+import io.github.smyrgeorge.freepath.core.actor.AppProtocol
+import io.github.smyrgeorge.freepath.core.actor.SyncPeerActor
+import io.github.smyrgeorge.freepath.core.util.InMemoryLoggingAppender
 import io.github.smyrgeorge.log4k.RootLogger
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.coroutines.runBlocking

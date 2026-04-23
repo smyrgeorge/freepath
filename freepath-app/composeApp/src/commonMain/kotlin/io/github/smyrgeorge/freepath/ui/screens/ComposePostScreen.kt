@@ -19,7 +19,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.draw.scale
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -32,15 +31,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.actor.AppProtocol
 import io.github.smyrgeorge.freepath.content.Author
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.content.ContentType
+import io.github.smyrgeorge.freepath.core.actor.AppProtocol
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant

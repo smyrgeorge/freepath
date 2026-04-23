@@ -54,8 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.actor.AppProtocol
-import io.github.smyrgeorge.freepath.state.model.ExchangeDrawerState
+import io.github.smyrgeorge.freepath.core.actor.AppProtocol
+import io.github.smyrgeorge.freepath.core.state.model.ExchangeDrawerState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -135,7 +135,12 @@ fun ContactExchangeDrawer() {
                         onHeightMeasured = { drawerHeightPx = it },
                         onSubmit = { pin ->
                             scope.launch {
-                                AppResources.system.tell(AppProtocol.BleBeginInitiatorContactExchange(activeState.peripheralId, pin))
+                                AppResources.system.tell(
+                                    AppProtocol.BleBeginInitiatorContactExchange(
+                                        activeState.peripheralId,
+                                        pin
+                                    )
+                                )
                             }
                         },
                         onCancel = { scope.launch { AppResources.system.tell(AppProtocol.BleContactExchangeCancelled) } },

@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.state
+package io.github.smyrgeorge.freepath.core.state
 
 object RandomProfileGenerator {
     data class DefaultProfile(

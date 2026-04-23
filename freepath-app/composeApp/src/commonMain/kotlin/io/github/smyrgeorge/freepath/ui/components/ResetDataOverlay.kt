@@ -24,7 +24,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_overlay_cle
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_overlay_clearing
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_overlay_failed
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.state.model.ResetOverlayState
+import io.github.smyrgeorge.freepath.core.state.model.ResetOverlayState
 import io.github.smyrgeorge.freepath.ui.theme.DarkOnSuccessContainer
 import io.github.smyrgeorge.freepath.ui.theme.DarkSuccessContainer
 import io.github.smyrgeorge.freepath.ui.theme.LightOnSuccessContainer

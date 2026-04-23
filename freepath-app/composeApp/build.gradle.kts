@@ -33,18 +33,14 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.ktor.client.core)
-            implementation(project(":freepath-contact"))
-            implementation(project(":freepath-content"))
-            implementation(project(":freepath-database"))
-            implementation(project(":freepath-libble"))
-            implementation(project(":freepath-libp2p"))
-            implementation(project(":freepath-libnet"))
-            implementation(project(":freepath-util"))
+            // `api` so consumers (androidApp, iosMain/jvmMain entry points) see the
+            // abstract supertypes that AppHooks / AppResources / AppState / AppViewState extend.
+            // This also transitively brings contact/content/database/libble/libp2p/libnet
+            // and actor4k onto the classpath (they're `api` in freepath-core).
+            api(project(":freepath-core"))
 
             implementation(libs.log4k)
             implementation(libs.qrose)
-            implementation(libs.actor4k)
             implementation(libs.material3)
             implementation(libs.compose.ui)
             implementation(libs.compose.runtime)
@@ -53,7 +49,6 @@ kotlin {
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(libs.kotlinx.serialization.protobuf)
             implementation(libs.markdown.renderer)
             implementation(libs.markdown.renderer.m3)
         }
@@ -61,7 +56,6 @@ kotlin {
             implementation(libs.kotlin.test)
         }
         androidMain.dependencies {
-            implementation(libs.ktor.client.cio)
             implementation(libs.log4k.slf4j)
             implementation(libs.androidx.activity.compose)
             // Preview tooling - only needed at compile time
@@ -70,10 +64,8 @@ kotlin {
             compileOnly(libs.androidx.customview.poolingcontainer)
         }
         iosMain.dependencies {
-            implementation(libs.ktor.client.darwin)
         }
         jvmMain.dependencies {
-            implementation(libs.ktor.client.cio)
             implementation(libs.log4k.slf4j)
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)

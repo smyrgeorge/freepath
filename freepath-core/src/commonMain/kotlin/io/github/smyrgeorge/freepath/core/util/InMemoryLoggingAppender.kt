@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.util
+package io.github.smyrgeorge.freepath.core.util
 
 import io.github.smyrgeorge.log4k.Appender
 import io.github.smyrgeorge.log4k.Level

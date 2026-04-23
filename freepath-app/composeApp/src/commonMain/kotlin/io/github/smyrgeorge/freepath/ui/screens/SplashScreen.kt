@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.sp
 import io.github.smyrgeorge.composeapp.generated.resources.Res
 import io.github.smyrgeorge.composeapp.generated.resources.app_name
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.state.model.StartupRoute
+import io.github.smyrgeorge.freepath.core.state.model.StartupRoute
 import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.stringResource
 

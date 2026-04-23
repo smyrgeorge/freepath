@@ -57,8 +57,8 @@ import io.github.smyrgeorge.composeapp.generated.resources.onboarding_random_pro
 import io.github.smyrgeorge.composeapp.generated.resources.profile_title
 import io.github.smyrgeorge.composeapp.generated.resources.security_note
 import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.state.RandomAvatarGenerator
-import io.github.smyrgeorge.freepath.state.RandomProfileGenerator
+import io.github.smyrgeorge.freepath.core.state.RandomAvatarGenerator
+import io.github.smyrgeorge.freepath.core.state.RandomProfileGenerator
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
 import io.github.smyrgeorge.freepath.ui.components.FreepathButton
 import io.github.smyrgeorge.freepath.ui.components.FreepathCard

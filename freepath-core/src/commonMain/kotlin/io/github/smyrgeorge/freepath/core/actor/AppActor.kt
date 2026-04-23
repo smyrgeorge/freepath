@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.actor
+package io.github.smyrgeorge.freepath.core.actor
 
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.actor4k.actor.impl.BehaviorActor
@@ -7,10 +7,10 @@ import io.github.smyrgeorge.freepath.content.Message
 import io.github.smyrgeorge.freepath.content.MessageCodec
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.MessageStatus
-import io.github.smyrgeorge.freepath.state.AbstractAppResources
-import io.github.smyrgeorge.freepath.state.AbstractAppState
-import io.github.smyrgeorge.freepath.state.AbstractViewState
-import io.github.smyrgeorge.freepath.state.model.StartupRoute
+import io.github.smyrgeorge.freepath.core.state.AbstractAppResources
+import io.github.smyrgeorge.freepath.core.state.AbstractAppState
+import io.github.smyrgeorge.freepath.core.state.AbstractViewState
+import io.github.smyrgeorge.freepath.core.state.model.StartupRoute
 import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.impl.extensions.doEvery
 import io.github.smyrgeorge.log4k.impl.extensions.launch

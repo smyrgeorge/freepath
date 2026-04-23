@@ -1,10 +1,10 @@
-package io.github.smyrgeorge.freepath.state
+package io.github.smyrgeorge.freepath.core.state
 
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
-import io.github.smyrgeorge.freepath.state.model.ExchangeDrawerState
-import io.github.smyrgeorge.freepath.state.model.ResetOverlayState
-import io.github.smyrgeorge.freepath.state.model.StartupRoute
+import io.github.smyrgeorge.freepath.core.state.model.ExchangeDrawerState
+import io.github.smyrgeorge.freepath.core.state.model.ResetOverlayState
+import io.github.smyrgeorge.freepath.core.state.model.StartupRoute
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

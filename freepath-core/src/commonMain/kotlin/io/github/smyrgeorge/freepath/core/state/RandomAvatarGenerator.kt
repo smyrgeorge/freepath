@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.state
+package io.github.smyrgeorge.freepath.core.state
 
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get

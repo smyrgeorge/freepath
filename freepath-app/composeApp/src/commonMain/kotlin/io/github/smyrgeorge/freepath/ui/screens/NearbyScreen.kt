@@ -51,13 +51,13 @@ import io.github.smyrgeorge.composeapp.generated.resources.Res
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.libnet.Transport
-import io.github.smyrgeorge.freepath.actor.AppProtocol
 import io.github.smyrgeorge.freepath.content.ContentBody
+import io.github.smyrgeorge.freepath.core.actor.AppProtocol
+import io.github.smyrgeorge.freepath.core.state.abbrev
+import io.github.smyrgeorge.freepath.core.state.model.ConnectionSource
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
-import io.github.smyrgeorge.freepath.state.abbrev
-import io.github.smyrgeorge.freepath.state.model.ConnectionSource
+import io.github.smyrgeorge.freepath.libnet.Transport
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant

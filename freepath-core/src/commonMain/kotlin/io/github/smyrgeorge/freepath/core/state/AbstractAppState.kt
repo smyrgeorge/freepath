@@ -1,6 +1,6 @@
-package io.github.smyrgeorge.freepath.state
+package io.github.smyrgeorge.freepath.core.state
 
-import io.github.smyrgeorge.freepath.actor.AppProtocol
+import io.github.smyrgeorge.freepath.core.actor.AppProtocol
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.ContactCodec
 import io.github.smyrgeorge.freepath.contact.Identity
@@ -26,7 +26,7 @@ import io.github.smyrgeorge.freepath.database.MessageEntry
 import io.github.smyrgeorge.freepath.database.MessageEntryRepository
 import io.github.smyrgeorge.freepath.database.MessageStatus
 import io.github.smyrgeorge.freepath.database.RelayEntryRepository
-import io.github.smyrgeorge.freepath.state.model.ConnectionSource
+import io.github.smyrgeorge.freepath.core.state.model.ConnectionSource
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite

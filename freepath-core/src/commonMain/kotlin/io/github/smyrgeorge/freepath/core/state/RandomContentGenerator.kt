@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.state
+package io.github.smyrgeorge.freepath.core.state
 
 import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.content.ContentBody
@@ -8,7 +8,6 @@ import io.github.smyrgeorge.freepath.content.ImageFormat
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.ContentTrust
-import io.github.smyrgeorge.freepath.util.generateCheckerboardPng
 import kotlin.io.encoding.Base64
 import kotlin.random.Random
 import kotlin.time.Clock
@@ -155,11 +154,25 @@ Vel illum qui dolorem eum fugiat quo voluptas nulla pariatur.""",
             "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua, consectetur adipiscing elit amet.",
         )
         return ContentBody.Image(
-            data = Base64.encode(generateCheckerboardPng()),
+            data = Base64.encode(PLACEHOLDER_PNG),
             format = ImageFormat.PNG,
-            width = 512,
-            height = 512,
+            width = 1,
+            height = 1,
             caption = captions.random(),
         )
     }
+
+    // Minimal valid 1x1 transparent PNG used as a placeholder image for dev-generated content.
+    // Keeps this module free of platform-specific image-encoding dependencies.
+    private val PLACEHOLDER_PNG: ByteArray = byteArrayOf(
+        -119, 80, 78, 71, 13, 10, 26, 10,
+        0, 0, 0, 13, 73, 72, 68, 82,
+        0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0,
+        31, 21, -60, -119,
+        0, 0, 0, 13, 73, 68, 65, 84,
+        120, -100, 99, 96, 0, 2, 0, 0, 5, 0, 1,
+        -30, 38, 5, -5,
+        0, 0, 0, 0, 73, 69, 78, 68,
+        -82, 66, 96, -126,
+    )
 }

@@ -1,7 +1,7 @@
-package io.github.smyrgeorge.freepath.state
+package io.github.smyrgeorge.freepath.core.state
 
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
-import io.github.smyrgeorge.freepath.actor.AppProtocol
+import io.github.smyrgeorge.freepath.core.actor.AppProtocol
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository

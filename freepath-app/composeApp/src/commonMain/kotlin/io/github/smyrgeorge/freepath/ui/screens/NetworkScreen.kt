@@ -84,10 +84,10 @@ import io.github.smyrgeorge.composeapp.generated.resources.node_id_label
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.actor.AppProtocol
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
+import io.github.smyrgeorge.freepath.core.actor.AppProtocol
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant

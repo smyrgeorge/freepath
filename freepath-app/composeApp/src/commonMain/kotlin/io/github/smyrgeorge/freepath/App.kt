@@ -19,12 +19,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import io.github.smyrgeorge.freepath.core.state.model.StartupRoute
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
-import io.github.smyrgeorge.freepath.state.model.StartupRoute
+import io.github.smyrgeorge.freepath.ui.components.ContactExchangeDrawer
 import io.github.smyrgeorge.freepath.ui.components.DeleteContentDrawer
 import io.github.smyrgeorge.freepath.ui.components.FreepathTabBar
-import io.github.smyrgeorge.freepath.ui.components.ContactExchangeDrawer
 import io.github.smyrgeorge.freepath.ui.components.ResetDataDrawer
 import io.github.smyrgeorge.freepath.ui.components.ResetDataOverlay
 import io.github.smyrgeorge.freepath.ui.components.TabItem
@@ -104,6 +104,7 @@ fun App() {
                                 screen = Screen.Chat
                             }
                         )
+
                         Screen.Network -> NetworkScreen(
                             onContactClick = { entry ->
                                 chatContact = entry

@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.state.model
+package io.github.smyrgeorge.freepath.core.state.model
 
 sealed class ResetOverlayState {
     data object Hidden : ResetOverlayState()
