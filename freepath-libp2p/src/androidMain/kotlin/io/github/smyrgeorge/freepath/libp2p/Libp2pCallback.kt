@@ -11,7 +11,7 @@ internal object Libp2pCallback {
         key: ByteArray,
         value: ByteArray,
     ) {
-        val handler = Libp2pModule.getEventHandler(eventHandle) ?: return
+        val handler = Libp2pModuleImpl.getEventHandler(eventHandle) ?: return
         val event = when (kind.toInt()) {
             0 -> Libp2pEvent.PeerConnected(peerId, addr)
             1 -> Libp2pEvent.PeerDisconnected(peerId)
@@ -46,5 +46,5 @@ internal object Libp2pCallback {
 
     @JvmStatic
     fun isKnownContact(handlerId: Long, peerId: String): Boolean =
-        Libp2pModule.isKnownContact(handlerId, peerId)
+        Libp2pModuleImpl.isKnownContact(handlerId, peerId)
 }

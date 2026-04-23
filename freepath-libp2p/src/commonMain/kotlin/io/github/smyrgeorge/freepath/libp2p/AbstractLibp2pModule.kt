@@ -18,18 +18,18 @@ import kotlin.time.Duration.Companion.seconds
 
 abstract class AbstractLibp2pModule(
     requestTimeout: Duration = 30.seconds
-) {
+) : Libp2pModule {
     private val log = Logger.of(this::class)
     private val rpc = RpcManager<Libp2pEvent.Response>(requestTimeout)
 
     val dispatcher = Dispatchers.IO
     val scope = CoroutineScope(dispatcher + SupervisorJob())
-    val requests: Channel<Libp2pEvent.RequestReceived> = Channel(
+    override val requests: Channel<Libp2pEvent.RequestReceived> = Channel(
         capacity = 1000,
         onBufferOverflow = BufferOverflow.DROP_LATEST
     )
 
-    val metrics: Libp2pMetrics = Libp2pMetrics()
+    override val metrics: Libp2pMetrics = Libp2pMetrics()
 
     @Volatile
     protected lateinit var appHandler: suspend (Libp2pEvent) -> Unit
@@ -64,22 +64,28 @@ abstract class AbstractLibp2pModule(
         }
     }
 
+    override fun setEventHandler(handler: suspend (Libp2pEvent) -> Unit): Libp2pModule {
+        appHandler = handler
+        return this
+    }
+
     protected abstract fun onFirstListenAddr(port: Int)
-    abstract suspend fun start(
+
+    abstract override suspend fun start(
         peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
         relayAddrs: String,
-        contactLookup: (String) -> Boolean = { false },
+        contactLookup: (String) -> Boolean,
     )
 
-    abstract suspend fun stop()
-    abstract suspend fun dial(multiaddr: String)
-    abstract suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray)
-    abstract suspend fun sendResponse(reqId: Long, payload: ByteArray)
-    abstract suspend fun sendResponseFailed(reqId: Long, error: String)
+    abstract override suspend fun stop()
+    abstract override suspend fun dial(multiaddr: String)
+    abstract override suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray)
+    abstract override suspend fun sendResponse(reqId: Long, payload: ByteArray)
+    abstract override suspend fun sendResponseFailed(reqId: Long, error: String)
 
-    suspend fun request(timeout: Duration, peerId: String, payload: ByteArray): Libp2pEvent.Response =
+    override suspend fun request(timeout: Duration, peerId: String, payload: ByteArray): Libp2pEvent.Response =
         rpc.request(timeout) { sendRequest(peerId, it, payload) }
 
     protected fun dispatch(event: Libp2pEvent) {

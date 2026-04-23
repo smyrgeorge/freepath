@@ -92,7 +92,7 @@ internal object Libp2pCallback {
 
     /**
      * C FFI entry point: checks whether a peer is a known contact.
-     * ctx is a StableRef<AtomicReference<((String) -> Boolean)?>> pinned in [Libp2pModule].
+     * ctx is a StableRef<AtomicReference<((String) -> Boolean)?>> pinned in [Libp2pModuleImpl].
      */
     val contactDispatcher: CPointer<CFunction<(COpaquePointer?, CPointer<UByteVar>?, ULong) -> Boolean>> =
         staticCFunction { ctx, peerIdPtr, peerIdLen ->

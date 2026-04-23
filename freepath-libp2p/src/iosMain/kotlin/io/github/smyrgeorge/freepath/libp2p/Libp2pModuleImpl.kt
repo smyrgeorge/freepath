@@ -23,7 +23,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.AtomicReference
 
-actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
+class Libp2pModuleImpl : AbstractLibp2pModule() {
 
     init {
         libp2p_set_log_callback(Libp2pLogger.iosLogDispatcher)
@@ -43,12 +43,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
     // null = not started, non-null = started (CAS from null → Unit)
     private val mdnsStarted = AtomicReference<Unit?>(null)
 
-    actual fun setEventHandler(handler: suspend (Libp2pEvent) -> Unit): Libp2pModule {
-        appHandler = handler
-        return this
-    }
-
-    actual override suspend fun start(
+    override suspend fun start(
         peerId: String,
         sigKeyPrivate: ByteArray,
         listenAddrs: String,
@@ -91,7 +86,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
         }
     }
 
-    actual override suspend fun stop() {
+    override suspend fun stop() {
         mutex.withLock {
             val ptr = nodePtr ?: return
             nodePtr = null
@@ -111,12 +106,12 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
         }
     }
 
-    actual override suspend fun dial(multiaddr: String) {
+    override suspend fun dial(multiaddr: String) {
         val ptr = mutex.withLock { nodePtr } ?: return
         withContext(dispatcher) { libp2p_dial(ptr, multiaddr) }
     }
 
-    actual override suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray) {
+    override suspend fun sendRequest(peerId: String, reqId: Long, payload: ByteArray) {
         val ptr = mutex.withLock { nodePtr } ?: return
         payload.usePinned { pinned ->
             withContext(dispatcher) {
@@ -131,7 +126,7 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
         }
     }
 
-    actual override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
+    override suspend fun sendResponse(reqId: Long, payload: ByteArray) {
         val ptr = mutex.withLock { nodePtr } ?: return
         payload.usePinned { pinned ->
             withContext(dispatcher) {
@@ -145,12 +140,12 @@ actual class Libp2pModule actual constructor() : AbstractLibp2pModule() {
         }
     }
 
-    actual override suspend fun sendResponseFailed(reqId: Long, error: String) {
+    override suspend fun sendResponseFailed(reqId: Long, error: String) {
         val ptr = mutex.withLock { nodePtr } ?: return
         withContext(dispatcher) { libp2p_send_response_failed(node = ptr, req_id = reqId.toULong(), error = error) }
     }
 
-    actual override fun onFirstListenAddr(port: Int) {
+    override fun onFirstListenAddr(port: Int) {
         // Only start mDNS once, using the first IPv4 listen address with a real port.
         if (!mdnsStarted.compareAndSet(null, Unit)) return
         val m = mdns ?: return

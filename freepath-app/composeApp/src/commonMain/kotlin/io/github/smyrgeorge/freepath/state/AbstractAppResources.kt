@@ -23,9 +23,12 @@ import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.LibbleModule
+import io.github.smyrgeorge.freepath.libble.LibbleModuleImpl
 import io.github.smyrgeorge.freepath.libnet.LibnetModule
+import io.github.smyrgeorge.freepath.libnet.LibnetModuleImpl
 import io.github.smyrgeorge.freepath.libnet.Transport
 import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
+import io.github.smyrgeorge.freepath.libnet.client.LibnetClientImpl
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
 import io.github.smyrgeorge.freepath.libp2p.defaultListenAddrs
@@ -78,7 +81,7 @@ abstract class AbstractAppResources(
         }
     }
 
-    val libble: LibbleModule = LibbleModule().setEventHandler { event ->
+    val libble: LibbleModule = LibbleModuleImpl().setEventHandler { event ->
         log.info { "LIBBLE Event: $event" }
         when (event) {
             is LibbleEvent.ContactExchange.Failed -> {
@@ -92,7 +95,7 @@ abstract class AbstractAppResources(
         }
     }
 
-    val libnet: LibnetModule = LibnetModule(libble, libp2p)
+    val libnet: LibnetModule = LibnetModuleImpl(libble, libp2p)
 
     fun initialize(system: ActorRef) {
         this.system = system
@@ -134,7 +137,7 @@ abstract class AbstractAppResources(
         if (Transport.LIBBLE.isSupported) startLibble()
 
         libnet.start(peerId = identity.peerId)
-        client = LibnetClient(
+        client = LibnetClientImpl(
             identity = identity,
             libnet = libnet,
             contactLookup = contactLookup,
