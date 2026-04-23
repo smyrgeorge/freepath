@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.state
 
-import io.github.smyrgeorge.freepath.Protocol
+import io.github.smyrgeorge.freepath.actor.AppProtocol
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.ContactCodec
 import io.github.smyrgeorge.freepath.contact.Identity
@@ -130,7 +130,7 @@ abstract class AbstractAppState(
         loadContacts(db)
     }
 
-    suspend fun acceptContact(res: Protocol.BleContactExchangeSucceeded) {
+    suspend fun acceptContact(res: AppProtocol.BleContactExchangeSucceeded) {
         val contact = res.contact
         val identitySecretB64 = Base64.encode(res.identitySecret)
         db.transaction {

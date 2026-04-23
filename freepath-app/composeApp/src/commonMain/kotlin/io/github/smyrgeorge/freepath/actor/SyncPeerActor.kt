@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath.sync
+package io.github.smyrgeorge.freepath.actor
 
 import io.github.smyrgeorge.actor4k.actor.Actor
 import io.github.smyrgeorge.actor4k.actor.Behavior

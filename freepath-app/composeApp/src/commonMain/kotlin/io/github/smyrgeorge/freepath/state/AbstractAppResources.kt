@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.state
 
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
-import io.github.smyrgeorge.freepath.Protocol
+import io.github.smyrgeorge.freepath.actor.AppProtocol
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.Identity
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository
@@ -66,12 +66,12 @@ abstract class AbstractAppResources(
         log.info { "LIBP2P Event: $event" }
         when (event) {
             is Libp2pEvent.PeerConnected -> {
-                val cmd = Protocol.PeerConnected(event.peerId)
+                val cmd = AppProtocol.PeerConnected(event.peerId)
                 system.tell(cmd)
             }
 
             is Libp2pEvent.PeerIdentified -> {
-                val cmd = Protocol.PeerIdentified(event.peerId)
+                val cmd = AppProtocol.PeerIdentified(event.peerId)
                 system.tell(cmd)
             }
 
@@ -142,11 +142,11 @@ abstract class AbstractAppResources(
             libnet = libnet,
             contactLookup = contactLookup,
             onMessageReceived = { msg ->
-                val cmd = Protocol.MessageReceived(msg)
+                val cmd = AppProtocol.MessageReceived(msg)
                 system.tell(cmd)
             },
             onContentReceived = { content ->
-                val cmd = Protocol.ContentReceived(content)
+                val cmd = AppProtocol.ContentReceived(content)
                 system.tell(cmd)
             },
             onRelayPacket = { envelope ->

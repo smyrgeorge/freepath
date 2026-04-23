@@ -84,7 +84,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.node_id_label
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.Protocol
+import io.github.smyrgeorge.freepath.actor.AppProtocol
 import io.github.smyrgeorge.freepath.contact.Contact
 import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
@@ -337,7 +337,7 @@ private fun ContactRow(
             TrustLevel.KNOWN -> {
                 FreepathButton(
                     onClick = {
-                        scope.launch { AppResources.system.tell(Protocol.SetTrustLevel(entry, TrustLevel.TRUSTED)) }
+                        scope.launch { AppResources.system.tell(AppProtocol.SetTrustLevel(entry, TrustLevel.TRUSTED)) }
                     },
                     modifier = Modifier.width(72.dp),
                     variant = ButtonVariant.Outline,
@@ -634,7 +634,7 @@ fun ContactDrawerOverlay() {
     }
 
     fun acceptAnimated(contact: Contact) {
-        scope.launch { AppResources.system.tell(Protocol.AcceptContact(contact)) }
+        scope.launch { AppResources.system.tell(AppProtocol.AcceptContact(contact)) }
         dismissAnimated()
     }
 

@@ -1,4 +1,4 @@
-package io.github.smyrgeorge.freepath
+package io.github.smyrgeorge.freepath.actor
 
 import io.github.smyrgeorge.actor4k.actor.ActorProtocol
 import io.github.smyrgeorge.freepath.contact.Contact
@@ -6,10 +6,9 @@ import io.github.smyrgeorge.freepath.contact.TrustLevel
 import io.github.smyrgeorge.freepath.content.Content
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContactEntry
-import io.github.smyrgeorge.freepath.content.Message as ChatMessage
 
-sealed interface Protocol : ActorProtocol {
-    sealed class Message<R : ActorProtocol.Response> : Protocol, ActorProtocol.Message<R>()
+sealed interface AppProtocol : ActorProtocol {
+    sealed class Message<R : ActorProtocol.Response> : AppProtocol, ActorProtocol.Message<R>()
     sealed class Response : ActorProtocol.Response()
 
     // Generic fire-and-forget ack
@@ -37,7 +36,7 @@ sealed interface Protocol : ActorProtocol {
 
     // Chat
     data class SendMessage(val peerId: String, val text: String) : Message<Ok>()
-    data class MessageReceived(val msg: ChatMessage) : Message<Ok>()
+    data class MessageReceived(val msg: io.github.smyrgeorge.freepath.content.Message) : Message<Ok>()
 
     // Content
     data class ContentReceived(val envelope: Content) : Message<Ok>()

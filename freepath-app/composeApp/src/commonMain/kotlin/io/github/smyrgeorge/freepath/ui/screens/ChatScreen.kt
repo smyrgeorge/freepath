@@ -58,7 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.Protocol
+import io.github.smyrgeorge.freepath.actor.AppProtocol
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.MessageStatus
 import io.github.smyrgeorge.freepath.ui.components.FreepathFingerprint
@@ -99,7 +99,7 @@ fun ChatScreen(
         if (text.isBlank()) return
         inputText = ""
         scope.launch {
-            AppResources.system.tell(Protocol.SendMessage(contact.peerId, text))
+            AppResources.system.tell(AppProtocol.SendMessage(contact.peerId, text))
         }
     }
 

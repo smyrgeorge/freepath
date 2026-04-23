@@ -49,7 +49,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_confirm_but
 import io.github.smyrgeorge.composeapp.generated.resources.dev_reset_confirm_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.Protocol
+import io.github.smyrgeorge.freepath.actor.AppProtocol
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -158,7 +158,7 @@ fun ResetDataDrawer() {
                         onClick = {
                             scope.launch {
                                 AppViewState.hideResetDataConfirmation()
-                                AppResources.system.tell(Protocol.ResetData)
+                                AppResources.system.tell(AppProtocol.ResetData)
                             }
                         },
                         modifier = Modifier.weight(1f),

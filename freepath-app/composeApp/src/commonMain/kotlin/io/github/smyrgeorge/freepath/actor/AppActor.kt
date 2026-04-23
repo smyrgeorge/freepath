@@ -1,6 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
-package io.github.smyrgeorge.freepath
+package io.github.smyrgeorge.freepath.actor
 
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.actor4k.actor.impl.BehaviorActor
@@ -9,8 +7,6 @@ import io.github.smyrgeorge.freepath.content.Message
 import io.github.smyrgeorge.freepath.content.MessageCodec
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.MessageStatus
-import io.github.smyrgeorge.freepath.sync.SyncPeerActor
-import io.github.smyrgeorge.freepath.sync.SyncPeerProtocol
 import io.github.smyrgeorge.freepath.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.state.AbstractAppState
 import io.github.smyrgeorge.freepath.state.AbstractViewState
@@ -29,21 +25,21 @@ class AppActor(
     private val state: AbstractAppState,
     private val viewState: AbstractViewState,
     private val resources: AbstractAppResources,
-) : BehaviorActor<Protocol, Protocol.Response>(key) {
+) : BehaviorActor<AppProtocol, AppProtocol.Response>(key) {
     /** Tracks the currently running exchange coroutine so it can be cancelled on dismiss. */
     private var exchangeJob: Job? = null
 
     private val timer: Job = doEvery(5.seconds) {
         // Keep the actor alive.
-        tell(Protocol.Ping).getOrElse { log.error("Failed to ping: ${it.message}") }
+        tell(AppProtocol.Ping).getOrElse { log.error("Failed to ping: ${it.message}") }
     }
 
     override suspend fun onBeforeActivate() {
         // Trigger activation.
-        tell(Protocol.Ping).getOrElse { log.error("Failed to ping: ${it.message}") }
+        tell(AppProtocol.Ping).getOrElse { log.error("Failed to ping: ${it.message}") }
     }
 
-    override suspend fun onActivate(m: Protocol) {
+    override suspend fun onActivate(m: AppProtocol) {
         log.info("[onActivate] Activating... ($m)")
         val time = measureTime {
             resources.initializeDatabase()
@@ -86,21 +82,21 @@ class AppActor(
     companion object {
         const val DEFAULT_KEY = "system"
 
-        private val normal: suspend (AppActor, Protocol) -> Behavior<Protocol.Response> = normal@{ ctx, m ->
+        private val normal: suspend (AppActor, AppProtocol) -> Behavior<AppProtocol.Response> = normal@{ ctx, m ->
             val log = ctx.log
             val state = ctx.state
             val viewState = ctx.viewState
             val resources = ctx.resources
             when (m) {
-                is Protocol.Ping -> return@normal Behavior.Reply(Protocol.Pong)
-                is Protocol.AcceptContact -> state.acceptContact(m.contact)
-                is Protocol.SetTrustLevel -> state.setTrustLevel(m.entry, m.level)
-                is Protocol.BleInitiateContactExchange -> {
+                is AppProtocol.Ping -> return@normal Behavior.Reply(AppProtocol.Pong)
+                is AppProtocol.AcceptContact -> state.acceptContact(m.contact)
+                is AppProtocol.SetTrustLevel -> state.setTrustLevel(m.entry, m.level)
+                is AppProtocol.BleInitiateContactExchange -> {
                     viewState.showRequestorEnterPin(m.peripheralId)
                     ctx.become(exchange)
                 }
 
-                is Protocol.BleInitiateResponderContactExchange -> {
+                is AppProtocol.BleInitiateResponderContactExchange -> {
                     val pin = (0 until 4).map { ('0'..'9').random() }.joinToString("")
                     viewState.showResponderWaiting(pin)
                     ctx.become(exchange)
@@ -111,15 +107,23 @@ class AppActor(
                             sigKeyPrivate = state.identity.sigKeyPrivate,
                         )
                         result.onSuccess { r ->
-                            ctx.tell(Protocol.BleContactExchangeSucceeded(r.contact, r.peripheralId, r.identitySecret))
+                            ctx.tell(
+                                AppProtocol.BleContactExchangeSucceeded(
+                                    r.contact,
+                                    r.peripheralId,
+                                    r.identitySecret
+                                )
+                            )
                                 .getOrThrow()
                         }.onFailure { e ->
-                            ctx.tell(Protocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed")).getOrThrow()
+                            ctx.tell(AppProtocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed"))
+                                .getOrThrow()
                         }
                     }
                 }
 
-                is Protocol.SendMessage -> {
+                is AppProtocol.SendMessage -> {
+                    @OptIn(ExperimentalUuidApi::class)
                     val message = MessageCodec.seal(
                         sigKeyPrivate = state.identity.sigKeyPrivate,
                         conversationId = Message.conversationId(state.identityEntry.peerId, m.peerId),
@@ -136,22 +140,22 @@ class AppActor(
                         }
                 }
 
-                is Protocol.MessageReceived -> state.saveMessage(m.msg, MessageStatus.RECEIVED)
-                is Protocol.ContentReceived -> state.receiveContent(m.envelope)
-                is Protocol.PublishContent -> state.publishContent(m.body)
-                is Protocol.PeerConnected -> {
+                is AppProtocol.MessageReceived -> state.saveMessage(m.msg, MessageStatus.RECEIVED)
+                is AppProtocol.ContentReceived -> state.receiveContent(m.envelope)
+                is AppProtocol.PublishContent -> state.publishContent(m.body)
+                is AppProtocol.PeerConnected -> {
                     ActorSystem.get(SyncPeerActor::class, m.peerId)
                         .tell(SyncPeerProtocol.Connected)
                         .onFailure { log.warn("[PeerConnected] Failed to trigger for ${m.peerId}: ${it.message}") }
                 }
 
-                is Protocol.PeerIdentified -> {
+                is AppProtocol.PeerIdentified -> {
                     ActorSystem.get(SyncPeerActor::class, m.peerId)
                         .tell(SyncPeerProtocol.Identified)
                         .onFailure { log.warn("[PeerIdentified] Failed to trigger for ${m.peerId}: ${it.message}") }
                 }
 
-                is Protocol.ResetData -> {
+                is AppProtocol.ResetData -> {
                     log.info("[normal] Resetting app data...")
                     ctx.become(reset)
                     val success = state.resetData()
@@ -163,7 +167,7 @@ class AppActor(
 
                 else -> log.warn("[normal] (ignored $m)")
             }
-            Behavior.Reply(Protocol.Ok)
+            Behavior.Reply(AppProtocol.Ok)
         }
 
         //
@@ -176,16 +180,16 @@ class AppActor(
         //   exchange ──► BleContactExchangeFailed            ──► exchange  (shows Failed drawer)
         //   exchange ──► BleContactExchangeCancelled         ──► normal    (hides drawer — also handles Dismiss)
         //
-        private val exchange: suspend (AppActor, Protocol) -> Behavior<Protocol.Response> = exchange@{ ctx, m ->
+        private val exchange: suspend (AppActor, AppProtocol) -> Behavior<AppProtocol.Response> = exchange@{ ctx, m ->
             val log = ctx.log
             val state = ctx.state
             val viewState = ctx.viewState
             val resources = ctx.resources
             when (m) {
-                is Protocol.Ping -> return@exchange Behavior.Reply(Protocol.Pong)
-                is Protocol.AcceptContact -> state.acceptContact(m.contact)
+                is AppProtocol.Ping -> return@exchange Behavior.Reply(AppProtocol.Pong)
+                is AppProtocol.AcceptContact -> state.acceptContact(m.contact)
 
-                is Protocol.BleBeginInitiatorContactExchange -> {
+                is AppProtocol.BleBeginInitiatorContactExchange -> {
                     viewState.hideExchangeDrawer()
                     ctx.exchangeJob = launch {
                         val result = resources.libble.beginInitiatorExchange(
@@ -195,49 +199,56 @@ class AppActor(
                             sigKeyPrivate = state.identity.sigKeyPrivate,
                         )
                         result.onSuccess { r ->
-                            ctx.tell(Protocol.BleContactExchangeSucceeded(r.contact, r.peripheralId, r.identitySecret))
+                            ctx.tell(
+                                AppProtocol.BleContactExchangeSucceeded(
+                                    r.contact,
+                                    r.peripheralId,
+                                    r.identitySecret
+                                )
+                            )
                                 .getOrThrow()
                         }.onFailure { e ->
-                            ctx.tell(Protocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed")).getOrThrow()
+                            ctx.tell(AppProtocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed"))
+                                .getOrThrow()
                         }
                     }
                 }
 
-                is Protocol.BleContactExchangeCancelled -> {
+                is AppProtocol.BleContactExchangeCancelled -> {
                     ctx.exchangeJob?.cancel()
                     ctx.exchangeJob = null
                     state.cancelContactExchange()
                     ctx.become(normal)
                 }
 
-                is Protocol.BleContactExchangeSucceeded -> {
+                is AppProtocol.BleContactExchangeSucceeded -> {
                     ctx.exchangeJob = null
                     state.acceptContact(m)
                     state.cancelContactExchange()
                     ctx.become(normal)
                 }
 
-                is Protocol.BleContactExchangeFailed -> {
+                is AppProtocol.BleContactExchangeFailed -> {
                     log.warn("[exchange] Exchange failed: ${m.reason}")
                     val userReason = friendlyBleError(m.reason)
                     viewState.exchangeFailed(userReason)
                     // Stay in exchange until user dismisses the Failed drawer via BleContactExchangeCancelled
                 }
 
-                is Protocol.MessageReceived -> state.saveMessage(m.msg, MessageStatus.RECEIVED)
-                is Protocol.ContentReceived -> state.receiveContent(m.envelope)
+                is AppProtocol.MessageReceived -> state.saveMessage(m.msg, MessageStatus.RECEIVED)
+                is AppProtocol.ContentReceived -> state.receiveContent(m.envelope)
                 else -> log.warn("[exchange] Contact exchange in process.. (ignored $m)")
             }
-            Behavior.Reply(Protocol.Ok)
+            Behavior.Reply(AppProtocol.Ok)
         }
 
-        private val reset: suspend (AppActor, Protocol) -> Behavior<Protocol.Response> = reset@{ ctx, m ->
+        private val reset: suspend (AppActor, AppProtocol) -> Behavior<AppProtocol.Response> = reset@{ ctx, m ->
             val log = ctx.log
             when (m) {
-                is Protocol.Ping -> return@reset Behavior.Reply(Protocol.Pong)
+                is AppProtocol.Ping -> return@reset Behavior.Reply(AppProtocol.Pong)
                 else -> log.warn("[reset] Resetting app data... (ignored $m)")
             }
-            Behavior.Reply(Protocol.Ok)
+            Behavior.Reply(AppProtocol.Ok)
         }
 
         private fun friendlyBleError(reason: String): String = when {

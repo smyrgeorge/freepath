@@ -37,7 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.Protocol
+import io.github.smyrgeorge.freepath.actor.AppProtocol
 import io.github.smyrgeorge.freepath.content.Author
 import io.github.smyrgeorge.freepath.content.ContentBody
 import io.github.smyrgeorge.freepath.content.ContentType
@@ -103,7 +103,7 @@ fun ComposePostScreen(
             else -> return // IMAGE not yet implemented
         }
         scope.launch {
-            AppResources.system.tell(Protocol.PublishContent(contentBody))
+            AppResources.system.tell(AppProtocol.PublishContent(contentBody))
             onPublished()
         }
     }
