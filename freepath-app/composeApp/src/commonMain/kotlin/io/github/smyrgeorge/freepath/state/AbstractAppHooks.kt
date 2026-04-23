@@ -3,9 +3,6 @@ package io.github.smyrgeorge.freepath.state
 import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.actor4k.system.registry.SimpleActorRegistry
 import io.github.smyrgeorge.actor4k.util.SimpleLoggerFactory
-import io.github.smyrgeorge.freepath.AppResources
-import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.AppViewState
 import io.github.smyrgeorge.freepath.actor.AppActor
 import io.github.smyrgeorge.freepath.actor.AppProtocol
 import io.github.smyrgeorge.freepath.actor.SyncPeerActor
@@ -18,7 +15,10 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 
 abstract class AbstractAppHooks(
-    private val actorKey: String
+    private val actorKey: String,
+    private val resources: AbstractAppResources,
+    private val state: AbstractAppState,
+    private val viewState: AbstractViewState,
 ) {
     fun onCreate() {
         RootLogger.Logging.appenders.register(InMemoryLoggingAppender)
@@ -34,13 +34,13 @@ abstract class AbstractAppHooks(
             .factoryFor(AppActor::class) {
                 AppActor(
                     key = actorKey,
-                    state = AppState,
-                    viewState = AppViewState,
-                    resources = AppResources,
+                    state = state,
+                    viewState = viewState,
+                    resources = resources,
                 )
             }
             .factoryFor(SyncPeerActor::class) { key ->
-                SyncPeerActor(key = key, state = AppState, resources = AppResources)
+                SyncPeerActor(key = key, state = state, resources = resources)
             }
 
         ActorSystem
@@ -51,7 +51,7 @@ abstract class AbstractAppHooks(
 
         launch {
             val system = ActorSystem.get(AppActor::class, actorKey)
-            AppResources.initialize(system)
+            resources.initialize(system)
         }
     }
 
