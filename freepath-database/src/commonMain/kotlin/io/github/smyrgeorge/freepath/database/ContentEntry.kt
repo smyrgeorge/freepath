@@ -1,10 +1,10 @@
 package io.github.smyrgeorge.freepath.database
 
-import io.github.smyrgeorge.freepath.model.content.Content
-import io.github.smyrgeorge.freepath.model.content.ContentType
 import io.github.smyrgeorge.freepath.database.util.Auditable
 import io.github.smyrgeorge.freepath.database.util.ContentConverter
 import io.github.smyrgeorge.freepath.database.util.InstantConverter
+import io.github.smyrgeorge.freepath.model.content.Content
+import io.github.smyrgeorge.freepath.model.content.ContentType
 import io.github.smyrgeorge.sqlx4k.annotation.Column
 import io.github.smyrgeorge.sqlx4k.annotation.Converter
 import io.github.smyrgeorge.sqlx4k.annotation.Id
@@ -35,7 +35,11 @@ data class ContentEntry(
     val content: Content,
 ) : Auditable<Int> {
     companion object {
-        fun from(content: Content, id: Int = 0, trust: ContentTrust = ContentTrust.UNKNOWN): ContentEntry =
+        fun from(
+            content: Content,
+            id: Int = 0,
+            trust: ContentTrust = ContentTrust.UNKNOWN
+        ): ContentEntry =
             ContentEntry(
                 id = id,
                 contentId = content.id,

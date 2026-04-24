@@ -90,14 +90,14 @@ import io.github.smyrgeorge.composeapp.generated.resources.me_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.model.contact.ContactSignedCodec
-import io.github.smyrgeorge.freepath.model.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.core.state.RandomAvatarGenerator
 import io.github.smyrgeorge.freepath.core.state.abbrev
 import io.github.smyrgeorge.freepath.core.util.InMemoryLoggingAppender
 import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetricsSnapshot
 import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetricsSnapshot
 import io.github.smyrgeorge.freepath.libp2p.relayPeerIdToHost
+import io.github.smyrgeorge.freepath.model.contact.ContactSignedCodec
+import io.github.smyrgeorge.freepath.model.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.ui.components.ButtonVariant
 import io.github.smyrgeorge.freepath.ui.components.FreepathButton
 import io.github.smyrgeorge.freepath.ui.components.FreepathDivider
@@ -146,10 +146,8 @@ fun MeScreen(modifier: Modifier = Modifier) {
                 scope.launch {
                     isRefreshingAvatar = true
                     val b64 = RandomAvatarGenerator.randomAvatar(name)
-                    if (b64 != null) {
-                        AppState.updateAvatar(b64)
-                        avatarBitmap = runCatching { Base64.decode(b64).toImageBitmap() }.getOrNull()
-                    }
+                    AppState.updateOwnAvatar(b64)
+                    avatarBitmap = runCatching { Base64.decode(b64).toImageBitmap() }.getOrNull()
                     isRefreshingAvatar = false
                 }
             }

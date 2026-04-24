@@ -10,12 +10,12 @@ import kotlin.random.Random
 object RandomAvatarGenerator {
     private val httpClient = HttpClient()
 
-    suspend fun randomAvatar(name: String): String? = runCatching {
+    suspend fun randomAvatar(name: String): String {
         val seed = "$name ${Random.nextInt(1, 10000)}"
         val bytes = httpClient.get("https://api.dicebear.com/9.x/bottts/png") {
             parameter("seed", seed)
             parameter("size", 128)
         }.readRawBytes()
-        Base64.encode(bytes)
-    }.getOrNull()
+        return Base64.encode(bytes)
+    }
 }

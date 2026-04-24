@@ -20,6 +20,8 @@ data class Content(
     @ProtoNumber(8) val signature: String,
     @ProtoNumber(9) val body: ContentBody,
 ) {
+    val isContact = type == ContentType.CONTACT
+
     init {
         require(schema == SCHEMA) { "Unsupported schema version: $schema (expected $SCHEMA)" }
         require(

@@ -2,8 +2,11 @@ package io.github.smyrgeorge.freepath.core.state
 
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
 import io.github.smyrgeorge.freepath.core.actor.AppProtocol
-import io.github.smyrgeorge.freepath.model.contact.Contact
-import io.github.smyrgeorge.freepath.model.contact.Identity
+import io.github.smyrgeorge.freepath.core.state.service.ContactService
+import io.github.smyrgeorge.freepath.core.state.service.ContentService
+import io.github.smyrgeorge.freepath.core.state.service.IdentityService
+import io.github.smyrgeorge.freepath.core.state.service.MessageService
+import io.github.smyrgeorge.freepath.core.state.service.RelayService
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
@@ -33,6 +36,8 @@ import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
 import io.github.smyrgeorge.freepath.libp2p.defaultListenAddrs
 import io.github.smyrgeorge.freepath.libp2p.defaultRelayAddrs
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.Identity
 import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.log4k.impl.extensions.launch
@@ -61,6 +66,40 @@ abstract class AbstractAppResources(
     val contactRoutingRepository: ContactRoutingEntryRepository = ContactRoutingEntryRepositoryImpl
     val messageRepository: MessageEntryRepository = MessageEntryRepositoryImpl
     val relayRepository: RelayEntryRepository = RelayEntryRepositoryImpl
+
+    val contactService: ContactService by lazy {
+        ContactService(
+            db = db,
+            contactRepository = contactRepository,
+            contactRoutingRepository = contactRoutingRepository,
+        )
+    }
+    val contentService: ContentService by lazy {
+        ContentService(
+            db = db,
+            contactService = contactService,
+            contentRepository = contentRepository,
+            contentSyncRepository = contentSyncRepository,
+        )
+    }
+    val identityService: IdentityService by lazy {
+        IdentityService(
+            db = db,
+            identityRepository = identityRepository,
+        )
+    }
+    val messageService: MessageService by lazy {
+        MessageService(
+            db = db,
+            messageRepository = messageRepository,
+        )
+    }
+    val relayService: RelayService by lazy {
+        RelayService(
+            db = db,
+            relayRepository = relayRepository,
+        )
+    }
 
     val libp2p: Libp2pModule = Libp2pModule().setEventHandler { event ->
         log.info { "LIBP2P Event: $event" }
