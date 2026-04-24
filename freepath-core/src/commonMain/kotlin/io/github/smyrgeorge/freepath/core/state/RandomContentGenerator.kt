@@ -1,10 +1,10 @@
 package io.github.smyrgeorge.freepath.core.state
 
-import io.github.smyrgeorge.freepath.content.Content
-import io.github.smyrgeorge.freepath.content.ContentBody
-import io.github.smyrgeorge.freepath.content.ContentCodec
-import io.github.smyrgeorge.freepath.content.ContentType
-import io.github.smyrgeorge.freepath.content.ImageFormat
+import io.github.smyrgeorge.freepath.model.content.Content
+import io.github.smyrgeorge.freepath.model.content.ContentBody
+import io.github.smyrgeorge.freepath.model.content.ContentCodec
+import io.github.smyrgeorge.freepath.model.content.ContentType
+import io.github.smyrgeorge.freepath.model.content.ImageFormat
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.ContentTrust

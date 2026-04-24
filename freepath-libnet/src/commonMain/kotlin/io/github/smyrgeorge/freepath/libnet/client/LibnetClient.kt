@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.libnet.client
 
-import io.github.smyrgeorge.freepath.content.Content
-import io.github.smyrgeorge.freepath.content.Message
+import io.github.smyrgeorge.freepath.model.content.Content
+import io.github.smyrgeorge.freepath.model.content.Message
 import kotlin.random.Random
 
 interface LibnetClient {

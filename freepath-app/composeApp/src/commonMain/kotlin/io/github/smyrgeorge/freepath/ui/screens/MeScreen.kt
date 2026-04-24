@@ -90,8 +90,8 @@ import io.github.smyrgeorge.composeapp.generated.resources.me_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.contact.ContactSignedCodec
-import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
+import io.github.smyrgeorge.freepath.model.contact.ContactSignedCodec
+import io.github.smyrgeorge.freepath.model.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.core.state.RandomAvatarGenerator
 import io.github.smyrgeorge.freepath.core.state.abbrev
 import io.github.smyrgeorge.freepath.core.util.InMemoryLoggingAppender

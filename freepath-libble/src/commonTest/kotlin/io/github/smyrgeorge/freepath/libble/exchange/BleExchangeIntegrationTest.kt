@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.libble.exchange
 
-import io.github.smyrgeorge.freepath.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.Contact
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import kotlinx.coroutines.async

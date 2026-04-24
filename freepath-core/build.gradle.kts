@@ -30,8 +30,7 @@ kotlin {
             dependencies {
                 // `api` on modules whose types appear in this module's public signatures
                 // (AbstractAppResources/AbstractAppState/AppProtocol surface).
-                api(project(":freepath-contact"))
-                api(project(":freepath-content"))
+                api(project(":freepath-model"))
                 api(project(":freepath-database"))
                 api(project(":freepath-libble"))
                 api(project(":freepath-libnet"))

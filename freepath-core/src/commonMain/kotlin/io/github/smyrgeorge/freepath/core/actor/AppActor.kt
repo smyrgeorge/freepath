@@ -3,8 +3,8 @@ package io.github.smyrgeorge.freepath.core.actor
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.actor4k.actor.impl.BehaviorActor
 import io.github.smyrgeorge.actor4k.system.ActorSystem
-import io.github.smyrgeorge.freepath.content.Message
-import io.github.smyrgeorge.freepath.content.MessageCodec
+import io.github.smyrgeorge.freepath.model.content.Message
+import io.github.smyrgeorge.freepath.model.content.MessageCodec
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.MessageStatus
 import io.github.smyrgeorge.freepath.core.state.AbstractAppResources

@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.database
 
-import io.github.smyrgeorge.freepath.content.Content
-import io.github.smyrgeorge.freepath.content.ContentType
+import io.github.smyrgeorge.freepath.model.content.Content
+import io.github.smyrgeorge.freepath.model.content.ContentType
 import io.github.smyrgeorge.freepath.database.util.Auditable
 import io.github.smyrgeorge.freepath.database.util.ContentConverter
 import io.github.smyrgeorge.freepath.database.util.InstantConverter

@@ -51,7 +51,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.Res
 import io.github.smyrgeorge.composeapp.generated.resources.nearby_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.content.ContentBody
+import io.github.smyrgeorge.freepath.model.content.ContentBody
 import io.github.smyrgeorge.freepath.core.actor.AppProtocol
 import io.github.smyrgeorge.freepath.core.state.abbrev
 import io.github.smyrgeorge.freepath.core.state.model.ConnectionSource

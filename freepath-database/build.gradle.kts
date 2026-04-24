@@ -32,8 +32,7 @@ kotlin {
         }
         commonMain {
             dependencies {
-                implementation(project(":freepath-contact"))
-                implementation(project(":freepath-content"))
+                implementation(project(":freepath-model"))
                 implementation(project(":freepath-libnet"))
                 implementation(project(":freepath-util"))
                 api(libs.sqlx4k.sqlite)

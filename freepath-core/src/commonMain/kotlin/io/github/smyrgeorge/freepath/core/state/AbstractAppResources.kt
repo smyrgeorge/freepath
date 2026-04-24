@@ -2,8 +2,8 @@ package io.github.smyrgeorge.freepath.core.state
 
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
 import io.github.smyrgeorge.freepath.core.actor.AppProtocol
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.Identity
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.Identity
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository

@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.libnet.client.codec
 
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.Identity
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.Identity
 import io.github.smyrgeorge.freepath.libnet.client.model.RelayOptions
 import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
 import kotlin.time.Clock

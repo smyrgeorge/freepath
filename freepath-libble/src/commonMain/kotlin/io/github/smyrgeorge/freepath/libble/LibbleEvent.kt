@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.libble
 
-import io.github.smyrgeorge.freepath.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.Contact
 import kotlin.time.Instant
 
 sealed class LibbleEvent {

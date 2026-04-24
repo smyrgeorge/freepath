@@ -41,8 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.smyrgeorge.freepath.AppState
-import io.github.smyrgeorge.freepath.contact.TrustLevel
-import io.github.smyrgeorge.freepath.content.ContentBody
+import io.github.smyrgeorge.freepath.model.contact.TrustLevel
+import io.github.smyrgeorge.freepath.model.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize

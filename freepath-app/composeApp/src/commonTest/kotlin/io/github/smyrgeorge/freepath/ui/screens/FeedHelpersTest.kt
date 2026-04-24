@@ -1,9 +1,9 @@
 package io.github.smyrgeorge.freepath.ui.screens
 
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.TrustLevel
-import io.github.smyrgeorge.freepath.content.ContentBody
-import io.github.smyrgeorge.freepath.content.ImageFormat
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.TrustLevel
+import io.github.smyrgeorge.freepath.model.content.ContentBody
+import io.github.smyrgeorge.freepath.model.content.ImageFormat
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals

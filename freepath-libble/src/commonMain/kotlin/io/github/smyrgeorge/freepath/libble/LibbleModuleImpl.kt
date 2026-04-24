@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.libble
 
 import com.juul.kable.Scanner
-import io.github.smyrgeorge.freepath.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.Contact
 import io.github.smyrgeorge.freepath.libble.BleConstants.FREEPATH_SERVICE_UUID
 import io.github.smyrgeorge.freepath.libble.BleConstants.fromHex
 import io.github.smyrgeorge.freepath.libble.BleConstants.toHex

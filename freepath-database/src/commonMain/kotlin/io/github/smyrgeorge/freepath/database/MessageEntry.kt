@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.database
 
-import io.github.smyrgeorge.freepath.content.Message
+import io.github.smyrgeorge.freepath.model.content.Message
 import io.github.smyrgeorge.freepath.database.util.Auditable
 import io.github.smyrgeorge.freepath.database.util.InstantConverter
 import io.github.smyrgeorge.freepath.database.util.MessageConverter

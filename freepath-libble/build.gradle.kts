@@ -32,7 +32,7 @@ kotlin {
         }
         commonMain {
             dependencies {
-                implementation(project(":freepath-contact"))
+                implementation(project(":freepath-model"))
                 implementation(project(":freepath-util"))
                 implementation(libs.kable.core)
                 implementation(libs.kotlinx.coroutines.core)

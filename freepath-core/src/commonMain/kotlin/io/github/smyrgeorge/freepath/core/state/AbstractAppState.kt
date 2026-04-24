@@ -1,15 +1,15 @@
 package io.github.smyrgeorge.freepath.core.state
 
 import io.github.smyrgeorge.freepath.core.actor.AppProtocol
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.ContactCodec
-import io.github.smyrgeorge.freepath.contact.Identity
-import io.github.smyrgeorge.freepath.contact.TrustLevel
-import io.github.smyrgeorge.freepath.content.Content
-import io.github.smyrgeorge.freepath.content.ContentBody
-import io.github.smyrgeorge.freepath.content.ContentCodec
-import io.github.smyrgeorge.freepath.content.ContentType
-import io.github.smyrgeorge.freepath.content.Message
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.ContactCodec
+import io.github.smyrgeorge.freepath.model.contact.Identity
+import io.github.smyrgeorge.freepath.model.contact.TrustLevel
+import io.github.smyrgeorge.freepath.model.content.Content
+import io.github.smyrgeorge.freepath.model.content.ContentBody
+import io.github.smyrgeorge.freepath.model.content.ContentCodec
+import io.github.smyrgeorge.freepath.model.content.ContentType
+import io.github.smyrgeorge.freepath.model.content.Message
 import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.crypto.KeyPair
 import io.github.smyrgeorge.freepath.database.ContactEntry

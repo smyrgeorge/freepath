@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.libble
 
-import io.github.smyrgeorge.freepath.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.Contact
 import io.github.smyrgeorge.freepath.libble.LibbleEvent.Response
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeResult
 import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetrics

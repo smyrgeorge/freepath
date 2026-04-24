@@ -1,8 +1,8 @@
 package io.github.smyrgeorge.freepath.libnet.client.codec
 
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.ContactCodec
-import io.github.smyrgeorge.freepath.contact.Identity
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.ContactCodec
+import io.github.smyrgeorge.freepath.model.contact.Identity
 import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import kotlin.io.encoding.Base64
 import kotlin.test.Test

@@ -1,10 +1,10 @@
 package io.github.smyrgeorge.freepath.core.actor
 
 import io.github.smyrgeorge.actor4k.actor.ActorProtocol
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.TrustLevel
-import io.github.smyrgeorge.freepath.content.Content
-import io.github.smyrgeorge.freepath.content.ContentBody
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.TrustLevel
+import io.github.smyrgeorge.freepath.model.content.Content
+import io.github.smyrgeorge.freepath.model.content.ContentBody
 import io.github.smyrgeorge.freepath.database.ContactEntry
 
 sealed interface AppProtocol : ActorProtocol {
@@ -36,7 +36,7 @@ sealed interface AppProtocol : ActorProtocol {
 
     // Chat
     data class SendMessage(val peerId: String, val text: String) : Message<Ok>()
-    data class MessageReceived(val msg: io.github.smyrgeorge.freepath.content.Message) : Message<Ok>()
+    data class MessageReceived(val msg: io.github.smyrgeorge.freepath.model.content.Message) : Message<Ok>()
 
     // Content
     data class ContentReceived(val envelope: Content) : Message<Ok>()

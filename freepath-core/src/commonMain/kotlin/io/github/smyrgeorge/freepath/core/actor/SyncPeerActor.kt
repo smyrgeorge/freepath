@@ -2,7 +2,7 @@ package io.github.smyrgeorge.freepath.core.actor
 
 import io.github.smyrgeorge.actor4k.actor.Actor
 import io.github.smyrgeorge.actor4k.actor.Behavior
-import io.github.smyrgeorge.freepath.content.Content
+import io.github.smyrgeorge.freepath.model.content.Content
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentSyncEntry

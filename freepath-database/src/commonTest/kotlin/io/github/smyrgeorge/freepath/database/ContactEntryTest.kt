@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.database
 
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.TrustLevel
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.TrustLevel
 import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import kotlin.io.encoding.Base64
 import kotlin.test.Test

@@ -1,11 +1,11 @@
 package io.github.smyrgeorge.freepath.libnet.client
 
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.Identity
-import io.github.smyrgeorge.freepath.content.Content
-import io.github.smyrgeorge.freepath.content.ContentCodec
-import io.github.smyrgeorge.freepath.content.Message
-import io.github.smyrgeorge.freepath.content.MessageCodec
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.Identity
+import io.github.smyrgeorge.freepath.model.content.Content
+import io.github.smyrgeorge.freepath.model.content.ContentCodec
+import io.github.smyrgeorge.freepath.model.content.Message
+import io.github.smyrgeorge.freepath.model.content.MessageCodec
 import io.github.smyrgeorge.freepath.libnet.LibnetModule
 import io.github.smyrgeorge.freepath.libnet.NetRequest
 import io.github.smyrgeorge.freepath.libnet.client.codec.LibnetClientCodec

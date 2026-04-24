@@ -1,6 +1,6 @@
 package io.github.smyrgeorge.freepath.database
 
-import io.github.smyrgeorge.freepath.contact.Identity
+import io.github.smyrgeorge.freepath.model.contact.Identity
 import io.github.smyrgeorge.freepath.database.util.Auditable
 import io.github.smyrgeorge.freepath.database.util.IdentityConverter
 import io.github.smyrgeorge.freepath.database.util.InstantConverter

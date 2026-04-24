@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.libble.exchange
 
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.ContactSignedCodec
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.ContactSignedCodec
 import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 
 internal object BleExchangeCrypto {

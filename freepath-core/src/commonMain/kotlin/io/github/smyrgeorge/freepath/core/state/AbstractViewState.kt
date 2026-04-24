@@ -1,7 +1,7 @@
 package io.github.smyrgeorge.freepath.core.state
 
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.core.state.model.ExchangeDrawerState
 import io.github.smyrgeorge.freepath.core.state.model.ResetOverlayState
 import io.github.smyrgeorge.freepath.core.state.model.StartupRoute

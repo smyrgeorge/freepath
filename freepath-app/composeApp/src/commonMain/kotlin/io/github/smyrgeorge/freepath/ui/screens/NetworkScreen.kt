@@ -84,9 +84,9 @@ import io.github.smyrgeorge.composeapp.generated.resources.node_id_label
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.contact.Contact
-import io.github.smyrgeorge.freepath.contact.TrustLevel
-import io.github.smyrgeorge.freepath.contact.exchange.QrCodeContactExchange
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.TrustLevel
+import io.github.smyrgeorge.freepath.model.contact.exchange.QrCodeContactExchange
 import io.github.smyrgeorge.freepath.core.actor.AppProtocol
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.ui.components.AvatarSize
@@ -257,7 +257,7 @@ private fun NetworkSectionHeader(text: String) {
 @Composable
 private fun ContactRow(
     entry: ContactEntry,
-    content: io.github.smyrgeorge.freepath.content.ContentBody.Contact?,
+    content: io.github.smyrgeorge.freepath.model.content.ContentBody.Contact?,
     isOnline: Boolean = false,
     grayed: Boolean = false,
     onContactClick: ((ContactEntry) -> Unit)? = null,
