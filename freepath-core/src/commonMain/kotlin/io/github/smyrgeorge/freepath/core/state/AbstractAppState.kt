@@ -227,9 +227,6 @@ abstract class AbstractAppState(
         val entry = identityService.geOwnIdentity()
         identity = entry.identity
         identityEntry = entry
-        contactService.initialize(identity)
-        contentService.initialize(identity)
-        messageService.initialize(identity)
     }
 
     suspend fun updateOwnAvatar(avatar: String) {

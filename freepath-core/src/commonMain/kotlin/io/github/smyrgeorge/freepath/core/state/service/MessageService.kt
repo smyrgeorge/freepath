@@ -3,7 +3,6 @@ package io.github.smyrgeorge.freepath.core.state.service
 import io.github.smyrgeorge.freepath.database.MessageEntry
 import io.github.smyrgeorge.freepath.database.MessageEntryRepository
 import io.github.smyrgeorge.freepath.database.MessageStatus
-import io.github.smyrgeorge.freepath.model.contact.Identity
 import io.github.smyrgeorge.freepath.model.content.Message
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
 import io.github.smyrgeorge.sqlx4k.Transaction
@@ -12,15 +11,10 @@ import kotlin.uuid.ExperimentalUuidApi
 
 class MessageService(
     private val db: ISQLite,
+    private val identityService: IdentityService,
     private val messageRepository: MessageEntryRepository,
 ) {
-    lateinit var peerId: String
-    lateinit var identity: Identity
-
-    fun initialize(identity: Identity) {
-        this.identity = identity
-        this.peerId = identity.peerId
-    }
+    private val peerId: String get() = identityService.peerId
 
     suspend fun save(message: Message, status: MessageStatus): MessageEntry = save(db, message, status)
     suspend fun save(db: QueryExecutor, message: Message, status: MessageStatus): MessageEntry {

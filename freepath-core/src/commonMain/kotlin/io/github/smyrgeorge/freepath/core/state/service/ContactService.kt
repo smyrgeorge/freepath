@@ -15,16 +15,12 @@ import kotlin.time.Clock
 
 class ContactService(
     private val db: ISQLite,
+    private val identityService: IdentityService,
     private val contactRepository: ContactEntryRepository,
     private val contactRoutingRepository: ContactRoutingEntryRepository,
 ) {
-    lateinit var peerId: String
-    lateinit var identity: Identity
-
-    fun initialize(identity: Identity) {
-        this.identity = identity
-        this.peerId = identity.peerId
-    }
+    private val peerId: String get() = identityService.peerId
+    private val identity: Identity get() = identityService.identity
 
     suspend fun getContacts(): List<ContactEntry> = getContacts(db)
     suspend fun getContacts(db: QueryExecutor): List<ContactEntry> =
@@ -76,14 +72,8 @@ class ContactService(
         db.transaction {
             save(this, contact)
             val existing = contactRoutingRepository.findOneByPeerId(this, peerId).getOrNull()
-            val entry = existing?.copy(
-                bleUpdatedAt = now,
-                bleIdentitySecret = bleIdentitySecretB64,
-            ) ?: ContactRoutingEntry(
-                peerId = peerId,
-                bleUpdatedAt = now,
-                bleIdentitySecret = bleIdentitySecretB64,
-            )
+            val entry = existing?.copy(bleUpdatedAt = now, bleIdentitySecret = bleIdentitySecretB64)
+                ?: ContactRoutingEntry(peerId = peerId, bleUpdatedAt = now, bleIdentitySecret = bleIdentitySecretB64)
             contactRoutingRepository.save(this, entry).getOrThrow()
         }
     }

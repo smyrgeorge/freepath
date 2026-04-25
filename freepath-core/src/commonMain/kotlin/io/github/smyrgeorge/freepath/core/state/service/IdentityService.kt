@@ -13,10 +13,16 @@ class IdentityService(
     private val db: ISQLite,
     private val identityRepository: IdentityEntryRepository,
 ) {
+    lateinit var peerId: String
+    lateinit var identity: Identity
+
     suspend fun geOwnIdentity(): IdentityEntry {
         val existing = identityRepository.findAll(db).getOrThrow()
         require(existing.size <= 1) { "Expected at most one identity entry, got $existing" }
-        return existing.firstOrNull() ?: createIdentity()
+        return (existing.firstOrNull() ?: createIdentity()).also {
+            peerId = it.peerId
+            identity = it.identity
+        }
     }
 
     private suspend fun createIdentity(): IdentityEntry {

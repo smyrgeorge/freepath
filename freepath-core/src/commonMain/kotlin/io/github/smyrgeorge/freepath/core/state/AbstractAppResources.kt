@@ -67,9 +67,16 @@ abstract class AbstractAppResources(
     val messageRepository: MessageEntryRepository = MessageEntryRepositoryImpl
     val relayRepository: RelayEntryRepository = RelayEntryRepositoryImpl
 
+    val identityService: IdentityService by lazy {
+        IdentityService(
+            db = db,
+            identityRepository = identityRepository,
+        )
+    }
     val contactService: ContactService by lazy {
         ContactService(
             db = db,
+            identityService = identityService,
             contactRepository = contactRepository,
             contactRoutingRepository = contactRoutingRepository,
         )
@@ -77,20 +84,16 @@ abstract class AbstractAppResources(
     val contentService: ContentService by lazy {
         ContentService(
             db = db,
+            identityService = identityService,
             contactService = contactService,
             contentRepository = contentRepository,
             contentSyncRepository = contentSyncRepository,
         )
     }
-    val identityService: IdentityService by lazy {
-        IdentityService(
-            db = db,
-            identityRepository = identityRepository,
-        )
-    }
     val messageService: MessageService by lazy {
         MessageService(
             db = db,
+            identityService = identityService,
             messageRepository = messageRepository,
         )
     }

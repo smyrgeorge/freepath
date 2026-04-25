@@ -16,17 +16,13 @@ import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 
 class ContentService(
     private val db: ISQLite,
+    private val identityService: IdentityService,
     private val contactService: ContactService,
     private val contentRepository: ContentEntryRepository,
     private val contentSyncRepository: ContentSyncEntryRepository,
 ) {
-    lateinit var peerId: String
-    lateinit var identity: Identity
-
-    fun initialize(identity: Identity) {
-        this.identity = identity
-        this.peerId = identity.peerId
-    }
+    private val peerId: String get() = identityService.peerId
+    private val identity: Identity get() = identityService.identity
 
     suspend fun getFeed(limit: Int = 50, offset: Int = 0): List<ContentEntry> =
         contentRepository.findAllByLimitAndOffset(db, limit, offset).getOrThrow()
