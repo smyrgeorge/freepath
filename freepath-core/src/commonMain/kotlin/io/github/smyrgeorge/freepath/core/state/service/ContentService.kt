@@ -3,6 +3,7 @@ package io.github.smyrgeorge.freepath.core.state.service
 import io.github.smyrgeorge.freepath.core.state.RandomContentGenerator
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
+import io.github.smyrgeorge.freepath.database.ContentSyncEntry
 import io.github.smyrgeorge.freepath.database.ContentSyncEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentTrust
 import io.github.smyrgeorge.freepath.model.contact.Identity
@@ -114,6 +115,12 @@ class ContentService(
         val entry = ContentEntry.from(sealed, id = existing.id, trust = sealed.trust(db))
         return contentRepository.save(db, entry).getOrThrow() to body
     }
+
+    suspend fun getSyncEntry(peerId: String, contentId: String): ContentSyncEntry? =
+        contentSyncRepository.findOneByPeerIdAndContentId(db, peerId, contentId).getOrThrow()
+
+    suspend fun saveSyncEntry(entry: ContentSyncEntry): ContentSyncEntry =
+        contentSyncRepository.save(db, entry).getOrThrow()
 
     suspend fun deleteAll() {
         contentRepository.deleteAll(db).getOrThrow()

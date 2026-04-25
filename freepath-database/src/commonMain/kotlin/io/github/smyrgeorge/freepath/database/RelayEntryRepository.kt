@@ -7,7 +7,6 @@ import io.github.smyrgeorge.sqlx4k.annotation.Repository
 
 @Repository
 interface RelayEntryRepository : AuditableRepository<RelayEntry> {
-    /** Fetches up to [limit] entries ordered by insertion time. */
     @Query("SELECT * FROM relay ORDER BY id ASC LIMIT :limit")
     suspend fun findAllByLimit(context: QueryExecutor, limit: Int): Result<List<RelayEntry>>
 

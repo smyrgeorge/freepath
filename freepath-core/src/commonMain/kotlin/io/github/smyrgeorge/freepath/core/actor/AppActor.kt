@@ -3,14 +3,14 @@ package io.github.smyrgeorge.freepath.core.actor
 import io.github.smyrgeorge.actor4k.actor.Behavior
 import io.github.smyrgeorge.actor4k.actor.impl.BehaviorActor
 import io.github.smyrgeorge.actor4k.system.ActorSystem
-import io.github.smyrgeorge.freepath.model.content.Message
-import io.github.smyrgeorge.freepath.model.content.MessageCodec
-import io.github.smyrgeorge.freepath.database.ContactEntry
-import io.github.smyrgeorge.freepath.database.MessageStatus
 import io.github.smyrgeorge.freepath.core.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.core.state.AbstractAppState
 import io.github.smyrgeorge.freepath.core.state.AbstractViewState
 import io.github.smyrgeorge.freepath.core.state.model.StartupRoute
+import io.github.smyrgeorge.freepath.database.ContactEntry
+import io.github.smyrgeorge.freepath.database.MessageStatus
+import io.github.smyrgeorge.freepath.model.content.Message
+import io.github.smyrgeorge.freepath.model.content.MessageCodec
 import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.impl.extensions.doEvery
 import io.github.smyrgeorge.log4k.impl.extensions.launch
@@ -199,17 +199,15 @@ class AppActor(
                             sigKeyPrivate = state.identity.sigKeyPrivate,
                         )
                         result.onSuccess { r ->
-                            ctx.tell(
-                                AppProtocol.BleContactExchangeSucceeded(
-                                    r.contact,
-                                    r.peripheralId,
-                                    r.identitySecret
-                                )
+                            val cmd = AppProtocol.BleContactExchangeSucceeded(
+                                contact = r.contact,
+                                peripheralId = r.peripheralId,
+                                identitySecret = r.identitySecret
                             )
-                                .getOrThrow()
+                            ctx.tell(cmd).getOrThrow()
                         }.onFailure { e ->
-                            ctx.tell(AppProtocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed"))
-                                .getOrThrow()
+                            val cmd = AppProtocol.BleContactExchangeFailed(e.message ?: "BLE exchange failed")
+                            ctx.tell(cmd).getOrThrow()
                         }
                     }
                 }
