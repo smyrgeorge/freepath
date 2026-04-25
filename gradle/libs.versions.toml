@@ -47,7 +47,7 @@ androidx-lifecycle = "2.10.0"
 android-compileSdk = "36"
 android-minSdk = "26"
 android-targetSdk = "36"
-uiTooling = "1.10.6"
+uiTooling = "1.11.0"
 customview-poolingcontainer = "1.1.0"
 androidx-emoji2 = "1.6.0"
 # https://github.com/mikepenz/multiplatform-markdown-renderer
