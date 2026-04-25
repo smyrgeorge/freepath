@@ -5,9 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertNotEquals
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalUuidApi::class)
 class MessageTest {
 
     // ── conversationId ────────────────────────────────────────────────────────

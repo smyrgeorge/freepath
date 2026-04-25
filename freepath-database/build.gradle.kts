@@ -29,6 +29,9 @@ kotlin {
         configureEach {
             languageSettings.progressiveMode = true
             languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+            if (name.startsWith("ios") || name.startsWith("apple") || name.startsWith("native")) {
+                languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
+            }
         }
         commonMain {
             dependencies {

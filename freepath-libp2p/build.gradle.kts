@@ -27,7 +27,12 @@ kotlin {
     }
 
     sourceSets {
-        configureEach { languageSettings.progressiveMode = true }
+        configureEach {
+            languageSettings.progressiveMode = true
+            if (name.startsWith("ios") || name.startsWith("apple") || name.startsWith("native")) {
+                languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
+            }
+        }
         commonMain {
             dependencies {
                 implementation(project(":freepath-util"))

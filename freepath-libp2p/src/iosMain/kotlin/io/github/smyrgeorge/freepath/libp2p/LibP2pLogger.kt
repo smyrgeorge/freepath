@@ -1,11 +1,8 @@
-@file:OptIn(ExperimentalForeignApi::class)
-
 package io.github.smyrgeorge.freepath.libp2p
 
 import io.github.smyrgeorge.log4k.Logger
 import kotlinx.cinterop.CFunction
 import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.get
 import kotlinx.cinterop.staticCFunction

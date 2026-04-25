@@ -3,12 +3,10 @@ package io.github.smyrgeorge.freepath.model.contact
 import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.freepath.util.codec.ProtobufCodec
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlin.io.encoding.Base64
 
-@OptIn(ExperimentalSerializationApi::class)
 object ContactCodec {
     const val SCHEMA = 1
 

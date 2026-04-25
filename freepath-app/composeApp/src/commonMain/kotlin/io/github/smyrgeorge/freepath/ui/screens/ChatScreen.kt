@@ -99,7 +99,7 @@ fun ChatScreen(
         if (text.isBlank()) return
         inputText = ""
         scope.launch {
-            AppResources.system.tell(AppProtocol.SendMessage(contact.peerId, text))
+            AppResources.app.tell(AppProtocol.SendMessage(contact.peerId, text))
         }
     }
 

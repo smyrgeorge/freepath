@@ -3,14 +3,12 @@ package io.github.smyrgeorge.freepath.model.contact
 import io.github.smyrgeorge.freepath.model.contact.Contact.Companion.SCHEMA
 import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class Contact(
     /** Schema version. Always [SCHEMA] for contacts produced by this implementation. */

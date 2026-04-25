@@ -1,14 +1,12 @@
 package io.github.smyrgeorge.freepath.model.content
 
 import io.github.smyrgeorge.freepath.util.codec.ProtobufCodec
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalSerializationApi::class)
 class ContentBodyCodecTest {
 
     private fun articleBody(text: String = "hello") = ContentBody.Article("Title $text", text)

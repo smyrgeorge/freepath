@@ -1,10 +1,8 @@
 package io.github.smyrgeorge.freepath.model.content
 
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class Author(
     @ProtoNumber(1) val name: String? = null,     // Max 128 chars

@@ -1,9 +1,7 @@
 package io.github.smyrgeorge.freepath.libble
 
 import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
-@OptIn(ExperimentalAtomicApi::class)
 actual class LibbleAdvertiser actual constructor() {
 
     private val advertising = AtomicBoolean(false)

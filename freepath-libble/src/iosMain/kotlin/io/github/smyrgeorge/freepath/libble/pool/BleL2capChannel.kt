@@ -2,7 +2,6 @@ package io.github.smyrgeorge.freepath.libble.pool
 
 import io.github.smyrgeorge.freepath.libble.CentralManagerHolder
 import io.github.smyrgeorge.log4k.Logger
-import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.reinterpret
@@ -25,7 +24,6 @@ import platform.darwin.dispatch_get_global_queue
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-@OptIn(ExperimentalForeignApi::class)
 actual class BleL2capChannel(
     actual val peripheralId: String,
     private val nativeChannel: CBL2CAPChannel,

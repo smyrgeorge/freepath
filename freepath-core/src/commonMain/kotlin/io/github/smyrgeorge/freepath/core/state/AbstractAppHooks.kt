@@ -5,6 +5,7 @@ import io.github.smyrgeorge.actor4k.system.registry.SimpleActorRegistry
 import io.github.smyrgeorge.actor4k.util.SimpleLoggerFactory
 import io.github.smyrgeorge.freepath.core.actor.AppActor
 import io.github.smyrgeorge.freepath.core.actor.AppProtocol
+import io.github.smyrgeorge.freepath.core.actor.ContactExchangeActor
 import io.github.smyrgeorge.freepath.core.actor.SyncPeerActor
 import io.github.smyrgeorge.freepath.core.util.InMemoryLoggingAppender
 import io.github.smyrgeorge.log4k.RootLogger
@@ -39,6 +40,14 @@ abstract class AbstractAppHooks(
                     resources = resources,
                 )
             }
+            .factoryFor(ContactExchangeActor::class) {
+                ContactExchangeActor(
+                    key = ContactExchangeActor.DEFAULT_KEY,
+                    state = state,
+                    viewState = viewState,
+                    resources = resources,
+                )
+            }
             .factoryFor(SyncPeerActor::class) { key ->
                 SyncPeerActor(key = key, state = state, resources = resources)
             }
@@ -50,8 +59,9 @@ abstract class AbstractAppHooks(
             .start(registerShutdownHook = false)
 
         launch {
-            val system = ActorSystem.get(AppActor::class, actorKey)
-            resources.initialize(system)
+            val app = ActorSystem.get(AppActor::class, actorKey)
+            val contactExchange = ActorSystem.get(ContactExchangeActor::class, ContactExchangeActor.DEFAULT_KEY)
+            resources.initialize(app, contactExchange)
         }
     }
 

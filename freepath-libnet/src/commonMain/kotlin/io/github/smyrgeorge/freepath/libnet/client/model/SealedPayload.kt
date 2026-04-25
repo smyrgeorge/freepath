@@ -1,6 +1,5 @@
 package io.github.smyrgeorge.freepath.libnet.client.model
 
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 
@@ -11,7 +10,6 @@ import kotlinx.serialization.protobuf.ProtoNumber
  * learn nothing about the sender, the message category, or the authentication proof —
  * all three are only visible to the intended recipient after decryption.
  */
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 class SealedPayload(
     /** Sender's peerId (Base58 multihash). Used by the recipient to look up the contact for signature verification. */

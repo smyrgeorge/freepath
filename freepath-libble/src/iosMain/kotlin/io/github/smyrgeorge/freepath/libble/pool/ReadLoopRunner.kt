@@ -1,7 +1,6 @@
 package io.github.smyrgeorge.freepath.libble.pool
 
 import io.github.smyrgeorge.log4k.Logger
-import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
@@ -11,7 +10,6 @@ import platform.Foundation.NSStreamStatusAtEnd
 import platform.Foundation.NSStreamStatusClosed
 import platform.darwin.NSObject
 
-@OptIn(ExperimentalForeignApi::class)
 internal class ReadLoopRunner(
     private val sink: MutableSharedFlow<BleFrame>,
     private val stream: NSInputStream,

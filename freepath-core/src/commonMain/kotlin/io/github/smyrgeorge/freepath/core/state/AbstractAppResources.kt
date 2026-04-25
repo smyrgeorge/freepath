@@ -53,7 +53,8 @@ abstract class AbstractAppResources(
     private val log = Logger.of(this::class)
 
     lateinit var db: ISQLite private set
-    lateinit var system: ActorRef private set
+    lateinit var app: ActorRef private set
+    lateinit var contactExchange: ActorRef private set
     lateinit var client: LibnetClient private set
 
     lateinit var identity: Identity
@@ -109,12 +110,12 @@ abstract class AbstractAppResources(
         when (event) {
             is Libp2pEvent.PeerConnected -> {
                 val cmd = AppProtocol.PeerConnected(event.peerId)
-                system.tell(cmd)
+                app.tell(cmd)
             }
 
             is Libp2pEvent.PeerIdentified -> {
                 val cmd = AppProtocol.PeerIdentified(event.peerId)
-                system.tell(cmd)
+                app.tell(cmd)
             }
 
             else -> Result.success(Unit)
@@ -139,8 +140,9 @@ abstract class AbstractAppResources(
 
     val libnet: LibnetModule = LibnetModuleImpl(libble, libp2p)
 
-    fun initialize(system: ActorRef) {
-        this.system = system
+    fun initialize(app: ActorRef, contactExchange: ActorRef) {
+        this.app = app
+        this.contactExchange = contactExchange
     }
 
     fun initialize(identity: Identity, contactLookup: (String) -> Contact?) {
@@ -185,11 +187,11 @@ abstract class AbstractAppResources(
             contactLookup = contactLookup,
             onMessageReceived = { msg ->
                 val cmd = AppProtocol.MessageReceived(msg)
-                system.tell(cmd)
+                app.tell(cmd)
             },
             onContentReceived = { content ->
                 val cmd = AppProtocol.ContentReceived(content)
-                system.tell(cmd)
+                app.tell(cmd)
             },
             onRelayPacket = { envelope ->
                 if (envelope.relay == null) {

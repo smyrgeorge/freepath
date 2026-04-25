@@ -14,10 +14,8 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 @SuppressLint("NewApi")
-@OptIn(ExperimentalAtomicApi::class)
 actual class BleL2capServer actual constructor() {
 
     private val log = Logger.of(this::class)

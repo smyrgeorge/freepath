@@ -4,7 +4,6 @@ import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.codec.Base58
 import io.github.smyrgeorge.freepath.util.codec.ProtobufCodec
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -12,10 +11,8 @@ import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalSerializationApi::class, ExperimentalUuidApi::class)
 object MessageCodec {
 
     fun sign(message: Message, sigKeyPrivate: ByteArray): ByteArray {

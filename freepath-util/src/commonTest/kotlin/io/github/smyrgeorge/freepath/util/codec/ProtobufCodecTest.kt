@@ -1,6 +1,5 @@
 package io.github.smyrgeorge.freepath.util.codec
 
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -10,7 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalSerializationApi::class)
 class ProtobufCodecTest {
 
     @Serializable

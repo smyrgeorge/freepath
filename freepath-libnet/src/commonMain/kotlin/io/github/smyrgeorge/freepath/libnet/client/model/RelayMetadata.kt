@@ -1,11 +1,9 @@
 package io.github.smyrgeorge.freepath.libnet.client.model
 
 import kotlinx.serialization.Contextual
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class RelayMetadata(
     /** Remaining hops. Decremented by each relay node. NOT bound to AAD — mutable by design. */

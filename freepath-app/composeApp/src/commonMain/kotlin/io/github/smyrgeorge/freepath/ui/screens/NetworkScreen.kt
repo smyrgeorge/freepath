@@ -337,7 +337,7 @@ private fun ContactRow(
             TrustLevel.KNOWN -> {
                 FreepathButton(
                     onClick = {
-                        scope.launch { AppResources.system.tell(AppProtocol.SetTrustLevel(entry, TrustLevel.TRUSTED)) }
+                        scope.launch { AppResources.app.tell(AppProtocol.SetTrustLevel(entry, TrustLevel.TRUSTED)) }
                     },
                     modifier = Modifier.width(72.dp),
                     variant = ButtonVariant.Outline,
@@ -634,7 +634,7 @@ fun ContactDrawerOverlay() {
     }
 
     fun acceptAnimated(contact: Contact) {
-        scope.launch { AppResources.system.tell(AppProtocol.AcceptContact(contact)) }
+        scope.launch { AppResources.app.tell(AppProtocol.AcceptContact(contact)) }
         dismissAnimated()
     }
 

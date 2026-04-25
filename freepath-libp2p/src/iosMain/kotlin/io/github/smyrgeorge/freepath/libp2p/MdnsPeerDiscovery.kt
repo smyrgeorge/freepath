@@ -1,9 +1,6 @@
-@file:OptIn(ExperimentalForeignApi::class)
-
 package io.github.smyrgeorge.freepath.libp2p
 
 import io.github.smyrgeorge.log4k.Logger
-import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.readBytes

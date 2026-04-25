@@ -103,7 +103,7 @@ fun ComposePostScreen(
             else -> return // IMAGE not yet implemented
         }
         scope.launch {
-            AppResources.system.tell(AppProtocol.PublishContent(contentBody))
+            AppResources.app.tell(AppProtocol.PublishContent(contentBody))
             onPublished()
         }
     }

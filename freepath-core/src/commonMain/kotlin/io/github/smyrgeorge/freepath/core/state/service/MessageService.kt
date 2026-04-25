@@ -7,7 +7,6 @@ import io.github.smyrgeorge.freepath.model.content.Message
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
 import io.github.smyrgeorge.sqlx4k.Transaction
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
-import kotlin.uuid.ExperimentalUuidApi
 
 class MessageService(
     private val db: ISQLite,
@@ -22,11 +21,9 @@ class MessageService(
         return messageRepository.insert(db, entry).getOrThrow()
     }
 
-    @OptIn(ExperimentalUuidApi::class)
     suspend fun getChat(otherPeerId: String, limit: Int = 50, offset: Int = 0): List<MessageEntry> =
         getChat(db, otherPeerId, limit, offset)
 
-    @OptIn(ExperimentalUuidApi::class)
     suspend fun getChat(
         db: QueryExecutor,
         otherPeerId: String,

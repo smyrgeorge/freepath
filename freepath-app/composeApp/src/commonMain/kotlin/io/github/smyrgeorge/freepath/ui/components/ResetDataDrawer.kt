@@ -158,7 +158,7 @@ fun ResetDataDrawer() {
                         onClick = {
                             scope.launch {
                                 AppViewState.hideResetDataConfirmation()
-                                AppResources.system.tell(AppProtocol.ResetData)
+                                AppResources.app.tell(AppProtocol.ResetData)
                             }
                         },
                         modifier = Modifier.weight(1f),

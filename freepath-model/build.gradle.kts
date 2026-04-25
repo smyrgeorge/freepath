@@ -25,6 +25,8 @@ kotlin {
     sourceSets {
         configureEach {
             languageSettings.progressiveMode = true
+            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+            languageSettings.optIn("kotlinx.serialization.ExperimentalSerializationApi")
         }
         commonMain {
             dependencies {

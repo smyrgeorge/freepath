@@ -3,7 +3,6 @@ package io.github.smyrgeorge.freepath.model.content
 import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.codec.ProtobufCodec
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -11,7 +10,6 @@ import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.io.encoding.Base64
 import kotlin.time.Instant
 
-@OptIn(ExperimentalSerializationApi::class)
 object ContentCodec {
 
     fun sign(envelope: Content, sigKeyPrivate: ByteArray): ByteArray {

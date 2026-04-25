@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalForeignApi::class)
-
 package io.github.smyrgeorge.freepath.libp2p
 
 import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_dial
@@ -10,7 +8,6 @@ import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_set_log_callback
 import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_start
 import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_stop
 import kotlinx.cinterop.COpaquePointer
-import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert

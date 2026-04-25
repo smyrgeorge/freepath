@@ -1,12 +1,10 @@
 package io.github.smyrgeorge.freepath.model.contact
 
 import io.github.smyrgeorge.freepath.util.codec.ProtobufCodec
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlin.io.encoding.Base64
 
-@OptIn(ExperimentalSerializationApi::class)
 object ContactSignedCodec {
     /** Creates a [ContactSigned] by signing [contact] with [sigKeyPrivate]. */
     fun seal(contact: Contact, sigKeyPrivate: ByteArray): ContactSigned =

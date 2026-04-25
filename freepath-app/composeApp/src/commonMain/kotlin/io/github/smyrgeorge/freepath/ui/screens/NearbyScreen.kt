@@ -52,7 +52,7 @@ import io.github.smyrgeorge.composeapp.generated.resources.nearby_title
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppState
 import io.github.smyrgeorge.freepath.model.content.ContentBody
-import io.github.smyrgeorge.freepath.core.actor.AppProtocol
+import io.github.smyrgeorge.freepath.core.actor.ContactExchangeProtocol
 import io.github.smyrgeorge.freepath.core.state.abbrev
 import io.github.smyrgeorge.freepath.core.state.model.ConnectionSource
 import io.github.smyrgeorge.freepath.database.ContactEntry
@@ -110,7 +110,7 @@ fun NearbyScreen(
                         FreepathButton(
                             onClick = {
                                 scope.launch {
-                                    AppResources.system.tell(AppProtocol.BleInitiateResponderContactExchange)
+                                    AppResources.contactExchange.tell(ContactExchangeProtocol.InitiateResponder)
                                 }
                             },
                             variant = ButtonVariant.Outline,
@@ -508,7 +508,7 @@ private fun BlePeerCard(peer: LibbleEvent.PeripheralDiscovered) {
             FreepathButton(
                 onClick = {
                     scope.launch {
-                        AppResources.system.tell(AppProtocol.BleInitiateContactExchange(peer.peripheralId))
+                        AppResources.contactExchange.tell(ContactExchangeProtocol.Initiate(peer.peripheralId))
                     }
                 },
                 variant = ButtonVariant.Outline,

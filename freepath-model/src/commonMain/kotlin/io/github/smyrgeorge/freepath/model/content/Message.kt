@@ -2,14 +2,11 @@ package io.github.smyrgeorge.freepath.model.content
 
 import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalSerializationApi::class, ExperimentalUuidApi::class)
 @Serializable
 data class Message(
     @ProtoNumber(1) val id: String,

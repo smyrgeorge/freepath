@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.smyrgeorge.freepath.AppResources
 import io.github.smyrgeorge.freepath.AppViewState
-import io.github.smyrgeorge.freepath.core.actor.AppProtocol
+import io.github.smyrgeorge.freepath.core.actor.ContactExchangeProtocol
 import io.github.smyrgeorge.freepath.core.state.model.ExchangeDrawerState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -119,7 +119,7 @@ fun ContactExchangeDrawer() {
                         Modifier.clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = { scope.launch { AppResources.system.tell(AppProtocol.BleContactExchangeCancelled) } },
+                            onClick = { scope.launch { AppResources.contactExchange.tell(ContactExchangeProtocol.Cancelled) } },
                         )
                     } else {
                         Modifier
@@ -135,15 +135,15 @@ fun ContactExchangeDrawer() {
                         onHeightMeasured = { drawerHeightPx = it },
                         onSubmit = { pin ->
                             scope.launch {
-                                AppResources.system.tell(
-                                    AppProtocol.BleBeginInitiatorContactExchange(
+                                AppResources.contactExchange.tell(
+                                    ContactExchangeProtocol.BeginInitiator(
                                         activeState.peripheralId,
                                         pin
                                     )
                                 )
                             }
                         },
-                        onCancel = { scope.launch { AppResources.system.tell(AppProtocol.BleContactExchangeCancelled) } },
+                        onCancel = { scope.launch { AppResources.contactExchange.tell(ContactExchangeProtocol.Cancelled) } },
                     )
                 }
 
@@ -152,7 +152,7 @@ fun ContactExchangeDrawer() {
                         state = activeState,
                         offsetProvider = { offsetAnim.value.roundToInt() },
                         onHeightMeasured = { drawerHeightPx = it },
-                        onCancel = { scope.launch { AppResources.system.tell(AppProtocol.BleContactExchangeCancelled) } },
+                        onCancel = { scope.launch { AppResources.contactExchange.tell(ContactExchangeProtocol.Cancelled) } },
                     )
                 }
 
@@ -161,7 +161,7 @@ fun ContactExchangeDrawer() {
                         state = activeState,
                         offsetProvider = { offsetAnim.value.roundToInt() },
                         onHeightMeasured = { drawerHeightPx = it },
-                        onDismiss = { scope.launch { AppResources.system.tell(AppProtocol.BleContactExchangeCancelled) } },
+                        onDismiss = { scope.launch { AppResources.contactExchange.tell(ContactExchangeProtocol.Cancelled) } },
                     )
                 }
 

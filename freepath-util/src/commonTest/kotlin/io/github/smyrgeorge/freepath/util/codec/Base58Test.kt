@@ -1,6 +1,5 @@
 package io.github.smyrgeorge.freepath.util.codec
 
-import kotlin.experimental.ExperimentalNativeApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -153,7 +152,6 @@ class Base58Test {
 
     // ---- alphabet: excluded characters -----------------------------------
 
-    @OptIn(ExperimentalNativeApi::class)
     @Test
     fun `encoded output never contains excluded characters`() {
         val excluded = setOf('0', 'O', 'I', 'l')

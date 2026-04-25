@@ -14,9 +14,7 @@ import platform.CoreBluetooth.CBUUID
 import platform.Foundation.NSArray
 import platform.Foundation.arrayWithObject
 import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
-@OptIn(ExperimentalAtomicApi::class)
 actual class LibbleAdvertiser actual constructor() {
 
     private val log = Logger.of(this::class)

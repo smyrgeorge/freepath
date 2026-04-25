@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalForeignApi::class)
-
 package io.github.smyrgeorge.freepath.libp2p
 
 import io.github.smyrgeorge.freepath.libp2p.Libp2pCallback.onEvent
@@ -8,7 +6,6 @@ import io.github.smyrgeorge.freepath.libp2p.cinterop.libp2p_event_free
 import kotlinx.cinterop.CFunction
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.get

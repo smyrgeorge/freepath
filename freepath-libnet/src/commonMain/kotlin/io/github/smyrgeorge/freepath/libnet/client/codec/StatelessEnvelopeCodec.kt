@@ -1,13 +1,12 @@
 package io.github.smyrgeorge.freepath.libnet.client.codec
 
-import io.github.smyrgeorge.freepath.model.contact.Contact
-import io.github.smyrgeorge.freepath.model.contact.Identity
-import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.libnet.client.model.RelayMetadata
 import io.github.smyrgeorge.freepath.libnet.client.model.RelayOptions
 import io.github.smyrgeorge.freepath.libnet.client.model.SealedPayload
 import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
-import kotlinx.serialization.ExperimentalSerializationApi
+import io.github.smyrgeorge.freepath.model.contact.Contact
+import io.github.smyrgeorge.freepath.model.contact.Identity
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -17,19 +16,6 @@ object StatelessEnvelopeCodec {
     const val SCHEMA = 2
     private val HKDF_INFO_PREFIX = "freepath-stateless-v1".encodeToByteArray()
 
-    /**
-     * Seals [plaintext] for the node identified by [receiverIdRaw].
-     *
-     * - [receiverIdRaw] is hashed (sha256) before being placed in the envelope so relay nodes
-     *   cannot learn the receiver's peerId from the wire format.
-     * - An ephemeral X25519 key pair is generated per envelope for forward secrecy.
-     * - If [relay] is non-null, [RelayMetadata] is constructed with
-     *   `messageId = sha256(nonce + ephemeralKey)` and appended to the AAD so that
-     *   [messageId] and [priority] are tamper-evident. [ttl] is excluded from AAD
-     *   so relay nodes may legitimately decrement it.
-     * - The signature covers `AAD ∥ plaintext`, binding receiver, timestamp, nonce,
-     *   and immutable relay fields to the content.
-     */
     fun seal(
         sender: Identity,
         receiverIdRaw: ByteArray,
@@ -47,7 +33,6 @@ object StatelessEnvelopeCodec {
         // Generate ephKeyPair before buildAad so messageId = sha256(nonce + ephemeralKey)
         // can be included in the AAD alongside other immutable relay fields.
         val ephKeyPair = CryptoProvider.generateX25519KeyPair()
-
         val receiverIdHash = CryptoProvider.sha256(receiverIdRaw)
 
         val relayMetadata = relay?.let {
@@ -83,19 +68,6 @@ object StatelessEnvelopeCodec {
         )
     }
 
-    /**
-     * Opens and authenticates [envelope] for [receiver].
-     *
-     * Steps:
-     * 1. Verify schema is supported.
-     * 2. Verify [envelope.receiverIdHash] matches sha256([receiver.peerIdRaw]).
-     * 3. Rebuild AAD (including immutable relay fields if present).
-     * 4. Derive message key and AEAD-decrypt — this also authenticates the AAD,
-     *    so tampered [messageId] or [priority] cause decryption to fail automatically.
-     * 5. Deserialize the [SealedPayload] and verify the Ed25519 signature.
-     *
-     * Returns `(type, plaintext)` on success; throws on any failure.
-     */
     fun open(
         envelope: StatelessEnvelope,
         receiver: Identity,
@@ -129,10 +101,7 @@ object StatelessEnvelopeCodec {
         return sealed.type.toByte() to sealed.payload
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
     fun encode(envelope: StatelessEnvelope): ByteArray = ProtoBuf.encodeToByteArray(envelope)
-
-    @OptIn(ExperimentalSerializationApi::class)
     fun decode(bytes: ByteArray): StatelessEnvelope = ProtoBuf.decodeFromByteArray(bytes)
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -183,9 +152,6 @@ object StatelessEnvelopeCodec {
         return buf
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
     private fun encodeSealedPayload(payload: SealedPayload): ByteArray = ProtoBuf.encodeToByteArray(payload)
-
-    @OptIn(ExperimentalSerializationApi::class)
     private fun decodeSealedPayload(bytes: ByteArray): SealedPayload = ProtoBuf.decodeFromByteArray(bytes)
 }

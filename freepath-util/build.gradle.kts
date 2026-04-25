@@ -25,6 +25,8 @@ kotlin {
     sourceSets {
         configureEach {
             languageSettings.progressiveMode = true
+            languageSettings.optIn("kotlinx.serialization.ExperimentalSerializationApi")
+            languageSettings.optIn("kotlin.concurrent.atomics.ExperimentalAtomicApi")
         }
         commonMain {
             dependencies {

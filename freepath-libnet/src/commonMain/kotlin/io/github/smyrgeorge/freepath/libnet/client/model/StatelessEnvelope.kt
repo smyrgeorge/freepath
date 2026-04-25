@@ -2,7 +2,6 @@ package io.github.smyrgeorge.freepath.libnet.client.model
 
 import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
 import kotlinx.serialization.Contextual
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.time.Instant
@@ -13,7 +12,6 @@ import kotlin.time.Instant
  * sender identity, message type, and signature are all sealed inside [payload].
  * [relay] is null for direct peer-to-peer messages.
  */
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class StatelessEnvelope(
     /** Schema version. Receivers MUST reject unsupported values without parsing [payload]. */

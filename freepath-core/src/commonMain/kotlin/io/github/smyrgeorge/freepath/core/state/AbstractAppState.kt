@@ -1,6 +1,5 @@
 package io.github.smyrgeorge.freepath.core.state
 
-import io.github.smyrgeorge.freepath.core.actor.AppProtocol
 import io.github.smyrgeorge.freepath.core.state.model.ConnectionSource
 import io.github.smyrgeorge.freepath.core.state.service.ContactService
 import io.github.smyrgeorge.freepath.core.state.service.ContentService
@@ -108,8 +107,8 @@ abstract class AbstractAppState(
         loadContacts(db)
     }
 
-    suspend fun acceptContact(res: AppProtocol.BleContactExchangeSucceeded) {
-        contactService.saveBleContactExchange(res.contact, res.identitySecret)
+    suspend fun acceptBleContact(contact: Contact, identitySecret: ByteArray) {
+        contactService.saveBleContactExchange(contact, identitySecret)
         loadContacts()
     }
 
