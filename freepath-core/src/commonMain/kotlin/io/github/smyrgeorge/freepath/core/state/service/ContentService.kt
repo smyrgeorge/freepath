@@ -15,37 +15,30 @@ import io.github.smyrgeorge.sqlx4k.Transaction
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 
 class ContentService(
-    private val db: ISQLite,
+    override val db: ISQLite,
     private val identityService: IdentityService,
     private val contactService: ContactService,
     private val contentRepository: ContentEntryRepository,
     private val contentSyncRepository: ContentSyncEntryRepository,
-) {
+) : Service {
     private val peerId: String get() = identityService.peerId
     private val identity: Identity get() = identityService.identity
 
+    context(db: QueryExecutor)
     suspend fun getFeed(limit: Int = 50, offset: Int = 0): List<ContentEntry> =
-        contentRepository.findAllByLimitAndOffset(db, limit, offset).getOrThrow()
+        contentRepository.findAllByLimitAndOffset(limit, offset).getOrThrow()
 
-    suspend fun getContactContent(peerId: String): ContentEntry = getContactContent(db, peerId)
-    suspend fun getContactContent(db: QueryExecutor, peerId: String): ContentEntry =
+    context(db: QueryExecutor)
+    suspend fun getContactContent(peerId: String): ContentEntry =
         contentRepository
-            .findOneByAuthorIdAndTypeContact(db, peerId)
+            .findOneByAuthorIdAndTypeContact(peerId)
             .getOrNull() ?: error("No contact content found for peer $peerId")
 
-    private fun getContactContentBody(entry: ContentEntry): ContentBody.Contact =
-        with(entry) {
-            content.body as? ContentBody.Contact
-                ?: error("Contact content expected, got ${content.body::class.simpleName}")
-        }
-
-    suspend fun getContactContentBody(peerId: String): ContentBody.Contact =
-        with(getContactContent(peerId)) { getContactContentBody(this) }
-
+    context(db: QueryExecutor)
     suspend fun getOwnContactContent(): Pair<ContentEntry, ContentBody.Contact> {
-        val existing = contentRepository.findOneByAuthorIdAndTypeContact(db, peerId).getOrThrow()
+        val existing = contentRepository.findOneByAuthorIdAndTypeContact(peerId).getOrThrow()
         if (existing != null) {
-            return existing to getContactContentBody(existing)
+            return existing to existing.contact()
         }
 
         val body = ContentBody.Contact(bio = null, avatar = null, location = null)
@@ -55,9 +48,10 @@ class ContentService(
             sigKeyPrivate = identity.sigKeyPrivate,
         )
         val entry = ContentEntry.from(envelope, trust = ContentTrust.VERIFIED)
-        return contentRepository.insert(db, entry).getOrThrow() to body
+        return contentRepository.insert(entry).getOrThrow() to body
     }
 
+    context(db: Transaction)
     suspend fun save(body: ContentBody): ContentEntry {
         val envelope = ContentCodec.seal(
             body = body,
@@ -67,11 +61,12 @@ class ContentService(
         return save(envelope)
     }
 
+    context(db: Transaction)
     suspend fun save(content: Content): ContentEntry {
         // Contact content is keyed by authorId (peerId) in the DB, all other content by envelope.id.
         val contentId = if (content.isContact) content.authorId else content.id
 
-        val existing = contentRepository.findOneByContentId(db, contentId).getOrNull()
+        val existing = contentRepository.findOneByContentId(contentId).getOrNull()
         // For non-contact content, skip if we already have this version or newer.
         // For contact content, always accept — the peer is the authoritative source for their own profile.
         if (!content.isContact
@@ -82,76 +77,77 @@ class ContentService(
         return ContentEntry
             .from(content, existing?.id ?: 0, content.trust())
             .also {
-                contentRepository.save(db, it).getOrThrow()
+                contentRepository.save(it).getOrThrow()
             }
     }
 
+    context(db: Transaction)
     suspend fun updateAvatar(avatar: String): ContentEntry {
-        val body = getContactContentBody(peerId).copy(avatar = avatar)
-        val existing = getContactContent(db, peerId)
-        val sealed = ContentCodec.edit(existing.content, body, identity.sigKeyPrivate)
-        val entry = ContentEntry.from(sealed, id = existing.id, trust = sealed.trust(db))
-        return contentRepository.save(db, entry).getOrThrow()
+        val entry = getContactContent(peerId)
+        val body = entry.contact().copy(avatar = avatar)
+        val sealed = ContentCodec.edit(entry.content, body, identity.sigKeyPrivate)
+        val updated = ContentEntry.from(sealed, id = entry.id, trust = sealed.trust())
+        return contentRepository.save(updated).getOrThrow()
     }
 
+    context(db: Transaction)
     suspend fun completeOnboarding(
-        db: QueryExecutor,
         bio: String?,
         location: String?,
         avatar: String?
-    ): Pair<ContentEntry, ContentBody.Contact> {
+    ): Pair<ContentEntry, ContentBody.Contact> = with(db) {
         val body = ContentBody.Contact(
             bio = bio?.takeIf { it.isNotBlank() },
             avatar = avatar?.takeIf { it.length <= ContentBody.Contact.MAX_AVATAR_SIZE },
             location = location?.takeIf { it.isNotBlank() },
         )
 
-        val existing = getContactContent(db, peerId)
+        val existing = getContactContent(peerId)
         val sealed = ContentCodec.edit(existing.content, body, identity.sigKeyPrivate)
-        val entry = ContentEntry.from(sealed, id = existing.id, trust = sealed.trust(db))
-        return contentRepository.save(db, entry).getOrThrow() to body
+        val entry = ContentEntry.from(sealed, id = existing.id, trust = sealed.trust())
+        contentRepository.save(entry).getOrThrow() to body
     }
 
+    context(db: QueryExecutor)
     suspend fun getSyncEntry(peerId: String, contentId: String): ContentSyncEntry? =
-        contentSyncRepository.findOneByPeerIdAndContentId(db, peerId, contentId).getOrThrow()
+        contentSyncRepository.findOneByPeerIdAndContentId(peerId, contentId).getOrThrow()
 
+    context(db: Transaction)
     suspend fun saveSyncEntry(entry: ContentSyncEntry): ContentSyncEntry =
-        contentSyncRepository.save(db, entry).getOrThrow()
+        contentSyncRepository.save(entry).getOrThrow()
 
-    suspend fun deleteAll() {
-        contentRepository.deleteAll(db).getOrThrow()
-        contentSyncRepository.deleteAll(db).getOrThrow()
-    }
-
-    suspend fun deleteAll(tx: Transaction) {
-        contentRepository.deleteAll(tx).getOrThrow()
-        contentSyncRepository.deleteAll(tx).getOrThrow()
-    }
-
+    context(db: Transaction)
     suspend fun generateRandomSelfContent(): List<ContentEntry> {
         val entries = RandomContentGenerator.generateSelfContent(
             selfPeerId = peerId,
             selfSigKeyPrivate = identity.sigKeyPrivate,
         )
-        entries.forEach { contentRepository.insert(db, it).getOrThrow() }
+        entries.forEach { contentRepository.insert(it).getOrThrow() }
         return entries
     }
 
+    context(db: Transaction)
     suspend fun generateRandomContactContent(): List<ContentEntry> {
         val entries = RandomContentGenerator.generateContactContent(
             contacts = contactService.getContacts(),
         )
-        entries.forEach { contentRepository.insert(db, it).getOrThrow() }
+        entries.forEach { contentRepository.insert(it).getOrThrow() }
         return entries
     }
 
-    private suspend fun Content.trust(): ContentTrust = trust(db)
-    private suspend fun Content.trust(db: QueryExecutor): ContentTrust {
-        val contact = contactService.getByPeerId(db, authorId)
+    context(db: QueryExecutor)
+    private suspend fun Content.trust(): ContentTrust {
+        val contact = contactService.getByPeerId(authorId)
         return when {
             contact == null -> ContentTrust.UNKNOWN
             ContentCodec.verify(this, contact.contact.sigKey) -> ContentTrust.VERIFIED
             else -> ContentTrust.FAILED
         }
+    }
+
+    context(db: Transaction)
+    suspend fun deleteAll() {
+        contentRepository.deleteAll().getOrThrow()
+        contentSyncRepository.deleteAll().getOrThrow()
     }
 }

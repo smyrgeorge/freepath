@@ -7,6 +7,8 @@ import io.github.smyrgeorge.freepath.core.state.service.ContentService
 import io.github.smyrgeorge.freepath.core.state.service.IdentityService
 import io.github.smyrgeorge.freepath.core.state.service.MessageService
 import io.github.smyrgeorge.freepath.core.state.service.RelayService
+import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.db
+import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.tx
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
@@ -197,8 +199,9 @@ abstract class AbstractAppResources(
                 if (envelope.relay == null) {
                     log.warn { "Received relay packet without relay metadata, dropping" }
                 } else {
-                    relayRepository.save(db, envelope.toRelayEntry())
-                        .onFailure { log.error { "Failed to store relay packet: ${it.message}" } }
+                    runCatching {
+                        relayService.tx { save(envelope.toRelayEntry()) }
+                    }.onFailure { log.error { "Failed to store relay packet: ${it.message}" } }
                 }
             },
         ).apply {
@@ -227,13 +230,11 @@ abstract class AbstractAppResources(
         libble.start(
             localPeerId = identity.peerId,
             contactSecretsLookup = {
-                contactRoutingRepository.findAllByIdentitySecretNotNull(db)
-                    .getOrDefault(emptyList())
-                    .mapNotNull { entry ->
-                        entry.bleIdentitySecret?.let { b64 ->
-                            runCatching { entry.peerId to Base64.decode(b64) }.getOrNull()
-                        }
-                    }.toMap()
+                contactService.db { getAllBleContactRouting() }.mapNotNull { entry ->
+                    entry.bleIdentitySecret?.let { b64 ->
+                        runCatching { entry.peerId to Base64.decode(b64) }.getOrNull()
+                    }
+                }.toMap()
             },
         )
     }

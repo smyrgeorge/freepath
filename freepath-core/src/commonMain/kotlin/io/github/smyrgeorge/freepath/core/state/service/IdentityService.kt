@@ -10,14 +10,15 @@ import io.github.smyrgeorge.sqlx4k.Transaction
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 
 class IdentityService(
-    private val db: ISQLite,
+    override val db: ISQLite,
     private val identityRepository: IdentityEntryRepository,
-) {
+) : Service {
     lateinit var peerId: String
     lateinit var identity: Identity
 
+    context(db: Transaction)
     suspend fun geOwnIdentity(): IdentityEntry {
-        val existing = identityRepository.findAll(db).getOrThrow()
+        val existing = identityRepository.findAll().getOrThrow()
         require(existing.size <= 1) { "Expected at most one identity entry, got $existing" }
         return (existing.firstOrNull() ?: createIdentity()).also {
             peerId = it.peerId
@@ -25,6 +26,7 @@ class IdentityService(
         }
     }
 
+    context(db: Transaction)
     private suspend fun createIdentity(): IdentityEntry {
         val sigKeyPair: KeyPair = CryptoProvider.generateEd25519KeyPair()
         val encKeyPair: KeyPair = CryptoProvider.generateX25519KeyPair()
@@ -40,10 +42,11 @@ class IdentityService(
         )
 
         val entry = IdentityEntry(peerId = peerId, identity = identity)
-        return identityRepository.insert(db, entry).getOrThrow()
+        return identityRepository.insert(entry).getOrThrow()
     }
 
-    suspend fun deleteAll(tx: Transaction) {
-        identityRepository.deleteAll(tx).getOrThrow()
+    context(db: Transaction)
+    suspend fun deleteAll() {
+        identityRepository.deleteAll().getOrThrow()
     }
 }

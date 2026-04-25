@@ -9,13 +9,14 @@ import kotlin.uuid.Uuid
 @Repository
 interface MessageEntryRepository : AuditableRepository<MessageEntry> {
     @Query("SELECT * FROM message WHERE conversation_id = :conversationId ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
+    context(context: QueryExecutor)
     suspend fun findAllByConversationId(
-        context: QueryExecutor,
         conversationId: Uuid,
         limit: Int,
         offset: Int
     ): Result<List<MessageEntry>>
 
     @Query("DELETE FROM message")
-    suspend fun deleteAll(context: QueryExecutor): Result<Long>
+    context(context: QueryExecutor)
+    suspend fun deleteAll(): Result<Long>
 }

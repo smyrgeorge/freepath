@@ -1,10 +1,10 @@
 package io.github.smyrgeorge.freepath.database.util
 
-import io.github.smyrgeorge.sqlx4k.CrudRepository
+import io.github.smyrgeorge.sqlx4k.ContextCrudRepository
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
 import kotlin.time.Clock
 
-interface AuditableRepository<T : Auditable<*>> : CrudRepository<T> {
+interface AuditableRepository<T : Auditable<*>> : ContextCrudRepository<T> {
     override suspend fun preInsertHook(context: QueryExecutor, entity: T): T {
         entity.createdAt = Clock.System.now()
         entity.updatedAt = entity.createdAt

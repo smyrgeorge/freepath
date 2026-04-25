@@ -4,6 +4,7 @@ import io.github.smyrgeorge.freepath.database.util.Auditable
 import io.github.smyrgeorge.freepath.database.util.ContentConverter
 import io.github.smyrgeorge.freepath.database.util.InstantConverter
 import io.github.smyrgeorge.freepath.model.content.Content
+import io.github.smyrgeorge.freepath.model.content.ContentBody
 import io.github.smyrgeorge.freepath.model.content.ContentType
 import io.github.smyrgeorge.sqlx4k.annotation.Column
 import io.github.smyrgeorge.sqlx4k.annotation.Converter
@@ -34,6 +35,11 @@ data class ContentEntry(
     @Converter(ContentConverter::class)
     val content: Content,
 ) : Auditable<Int> {
+
+    fun contact(): ContentBody.Contact =
+        content.body as? ContentBody.Contact
+            ?: error("Contact content expected, got ${content.body::class.simpleName}")
+
     companion object {
         fun from(
             content: Content,

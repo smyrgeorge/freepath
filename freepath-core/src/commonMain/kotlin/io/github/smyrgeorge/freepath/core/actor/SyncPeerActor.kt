@@ -8,6 +8,8 @@ import io.github.smyrgeorge.freepath.core.state.abbrev
 import io.github.smyrgeorge.freepath.core.state.service.ContactService
 import io.github.smyrgeorge.freepath.core.state.service.ContentService
 import io.github.smyrgeorge.freepath.core.state.service.RelayService
+import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.db
+import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.tx
 import io.github.smyrgeorge.freepath.database.ContentSyncEntry
 import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
 import io.github.smyrgeorge.freepath.model.content.Content
@@ -57,14 +59,14 @@ class SyncPeerActor(
     }
 
     private suspend fun relay() {
-        val entries = runCatching { relayService.findAll(RELAY_FETCH_LIMIT) }
+        val entries = runCatching { relayService.db { findAll(RELAY_FETCH_LIMIT) } }
             .getOrElse {
                 log.error("[${peerId.abbrev()}] Failed to load relay queue: ${it.message}")
                 return
             }
 
         // Look up this peer's receiverIdHash to distinguish Pass 1 (for them) vs Pass 2 (mesh hops).
-        val peerIdHash: ByteArray? = runCatching { contactService.getByPeerId(peerId) }
+        val peerIdHash: ByteArray? = runCatching { contactService.db { getByPeerId(peerId) } }
             .getOrNull()?.contact?.peerIdHash
 
         // Pass 1: deliver packets intended for this peer.
@@ -75,7 +77,9 @@ class SyncPeerActor(
                 .forEach { entry ->
                     client.relay(entry.toWireBytes(), peerId)
                         .onSuccess {
-                            runCatching { relayService.deleteById(entry.id) }.onFailure {
+                            runCatching {
+                                relayService.db { deleteById(entry.id) }
+                            }.onFailure {
                                 log.error("[${peerId.abbrev()}] Failed to delete relay entry ${entry.id}: ${it.message}")
                             }
                             log.info("[${peerId.abbrev()}] Delivered relay packet ${entry.id}")
@@ -94,7 +98,7 @@ class SyncPeerActor(
                 val ttl = entry.ttl
                 if (ttl <= 0) {
                     // TTL expired — discard.
-                    runCatching { relayService.deleteById(entry.id) }.onFailure {
+                    runCatching { relayService.db { deleteById(entry.id) } }.onFailure {
                         log.error("[${peerId.abbrev()}] Failed to delete expired relay entry ${entry.id}: ${it.message}")
                     }
                     return@forEach
@@ -106,7 +110,7 @@ class SyncPeerActor(
                 val updated = entry.copy(
                     envelope = entry.envelope.copy(relay = entry.envelope.relay!!.copy(ttl = ttl - 1))
                 )
-                runCatching { relayService.save(updated) }.onFailure {
+                runCatching { relayService.db { save(updated) } }.onFailure {
                     log.error("[${peerId.abbrev()}] Failed to update TTL for relay entry ${entry.id}: ${it.message}")
                     return@forEach
                 }
@@ -118,7 +122,7 @@ class SyncPeerActor(
 
     private suspend fun sync() {
         // Contact should exist at this point (peer was identified), but guard defensively.
-        runCatching { contactService.getByPeerId(peerId) }.getOrNull() ?: run {
+        runCatching { contactService.db { getByPeerId(peerId) } }.getOrNull() ?: run {
             log.warn("[${peerId.abbrev()}] Sync skipped — no contact entry found after Identified")
             return
         }
@@ -127,7 +131,7 @@ class SyncPeerActor(
         var offset = 0
         val pageSize = 50
         while (true) {
-            val page = runCatching { contentService.getFeed(pageSize, offset) }.getOrElse {
+            val page = runCatching { contentService.db { getFeed(pageSize, offset) } }.getOrElse {
                 log.error("[${peerId.abbrev()}] Failed to load content page at offset $offset: ${it.message}")
                 break
             }
@@ -139,7 +143,7 @@ class SyncPeerActor(
     }
 
     private suspend fun sync(content: Content) {
-        val existing = runCatching { contentService.getSyncEntry(peerId, content.id) }.getOrNull()
+        val existing = runCatching { contentService.db { getSyncEntry(peerId, content.id) } }.getOrNull()
         if (existing != null && existing.version >= content.version) return
 
         client.send(content, peerId)
@@ -147,7 +151,7 @@ class SyncPeerActor(
                 val entry = existing
                     ?.copy(version = content.version, syncedAt = Clock.System.now())
                     ?: ContentSyncEntry(peerId = peerId, contentId = content.id, version = content.version)
-                runCatching { contentService.saveSyncEntry(entry) }
+                runCatching { contentService.tx { saveSyncEntry(entry) } }
                     .onSuccess { log.info("[${peerId.abbrev()}] Synced ${content.id} v${content.version}") }
                     .onFailure { log.error("[${peerId.abbrev()}] Failed to save sync entry: ${it.message}") }
             }

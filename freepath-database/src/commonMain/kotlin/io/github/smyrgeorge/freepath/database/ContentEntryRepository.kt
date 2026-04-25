@@ -8,14 +8,18 @@ import io.github.smyrgeorge.sqlx4k.annotation.Repository
 @Repository
 interface ContentEntryRepository : AuditableRepository<ContentEntry> {
     @Query("SELECT * FROM content WHERE content_id = :contentId")
-    suspend fun findOneByContentId(context: QueryExecutor, contentId: String): Result<ContentEntry?>
+    context(context: QueryExecutor)
+    suspend fun findOneByContentId(contentId: String): Result<ContentEntry?>
 
     @Query("SELECT * FROM content WHERE author_id = :authorId AND type = 'CONTACT' ORDER BY id DESC LIMIT 1")
-    suspend fun findOneByAuthorIdAndTypeContact(context: QueryExecutor, authorId: String): Result<ContentEntry?>
+    context(context: QueryExecutor)
+    suspend fun findOneByAuthorIdAndTypeContact(authorId: String): Result<ContentEntry?>
 
     @Query("SELECT * FROM content WHERE type NOT IN ('CONTACT') ORDER BY id DESC LIMIT :limit OFFSET :offset")
-    suspend fun findAllByLimitAndOffset(context: QueryExecutor, limit: Int, offset: Int): Result<List<ContentEntry>>
+    context(context: QueryExecutor)
+    suspend fun findAllByLimitAndOffset(limit: Int, offset: Int): Result<List<ContentEntry>>
 
     @Query("DELETE FROM content")
-    suspend fun deleteAll(context: QueryExecutor): Result<Long>
+    context(context: QueryExecutor)
+    suspend fun deleteAll(): Result<Long>
 }

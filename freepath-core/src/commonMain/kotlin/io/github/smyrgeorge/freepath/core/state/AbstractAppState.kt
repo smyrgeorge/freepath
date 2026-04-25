@@ -6,6 +6,8 @@ import io.github.smyrgeorge.freepath.core.state.service.ContentService
 import io.github.smyrgeorge.freepath.core.state.service.IdentityService
 import io.github.smyrgeorge.freepath.core.state.service.MessageService
 import io.github.smyrgeorge.freepath.core.state.service.RelayService
+import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.db
+import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.tx
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntry
@@ -18,7 +20,6 @@ import io.github.smyrgeorge.freepath.model.content.Content
 import io.github.smyrgeorge.freepath.model.content.ContentBody
 import io.github.smyrgeorge.freepath.model.content.Message
 import io.github.smyrgeorge.log4k.Logger
-import io.github.smyrgeorge.sqlx4k.QueryExecutor
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -101,33 +102,31 @@ abstract class AbstractAppState(
         loadContacts()
     }
 
-    suspend fun acceptContact(contact: Contact) = acceptContact(db, contact)
-    suspend fun acceptContact(db: QueryExecutor, contact: Contact) {
-        contactService.save(db, contact)
-        loadContacts(db)
+    suspend fun acceptContact(contact: Contact) {
+        contactService.tx { save(contact) }
+        loadContacts()
     }
 
     suspend fun acceptBleContact(contact: Contact, identitySecret: ByteArray) {
-        contactService.saveBleContactExchange(contact, identitySecret)
+        contactService.tx { saveBleContactExchange(contact, identitySecret) }
         loadContacts()
     }
 
     suspend fun setTrustLevel(entry: ContactEntry, level: TrustLevel) {
-        contactService.setTrustLevel(entry, level)
+        contactService.tx { setTrustLevel(entry, level) }
         loadContacts()
     }
 
-    suspend fun loadContacts() = loadContacts(db)
-    suspend fun loadContacts(db: QueryExecutor) {
-        val contacts = contactService.getContacts(db)
+    suspend fun loadContacts() {
+        val contacts = contactService.db { getContacts() }
         _contacts.value = contacts
         _contactContents.value = contacts.associate { entry ->
-            entry.peerId to contentService.getContactContentBody(entry.peerId)
+            entry.peerId to contentService.db { getContactContent(entry.peerId).contact() }
         }
     }
 
     suspend fun loadFeed(limit: Int = 50, offset: Int = 0) {
-        contentService.getFeed(limit, offset).also {
+        contentService.db { getFeed(limit, offset) }.also {
             val feed = it.filter { c -> c.authorId != identityEntry.peerId }
             _feedEntries.value = feed
         }
@@ -139,25 +138,25 @@ abstract class AbstractAppState(
 
     suspend fun completeOnboarding(name: String?, bio: String?, location: String?, avatar: String?) {
         db.transaction {
-            contactService.completeOnboarding(this, name)
-            contentService.completeOnboarding(this, bio, location, avatar)
+            contactService.completeOnboarding(name)
+            contentService.completeOnboarding(bio, location, avatar)
         }
         loadOwnContact()
     }
 
     suspend fun loadChat(peerId: String, limit: Int = 50) {
-        val messages = messageService.getChat(peerId, limit)
+        val messages = messageService.db { getConversation(peerId, limit) }
         _chats.update { current -> current + (peerId to messages) }
     }
 
     suspend fun saveMessage(message: Message, status: MessageStatus): MessageEntry {
-        val saved = messageService.save(message, status)
+        val saved = messageService.db { save(message, status) }
         upsertMessage(saved)
         return saved
     }
 
     suspend fun updateMessageStatus(entry: MessageEntry, status: MessageStatus) {
-        val updated = messageService.updateStatus(entry, status)
+        val updated = messageService.db { save(entry, status) }
         upsertMessage(updated)
     }
 
@@ -183,11 +182,11 @@ abstract class AbstractAppState(
         viewState.showResetClearing()
         return runCatching {
             db.transaction {
-                contactService.deleteAll(this)
-                contentService.deleteAll(this)
-                identityService.deleteAll(this)
-                messageService.deleteAll(this)
-                relayService.deleteAll(this)
+                contactService.deleteAll()
+                contentService.deleteAll()
+                identityService.deleteAll()
+                messageService.deleteAll()
+                relayService.deleteAll()
             }
         }.onSuccess {
             log.info("[dev] All data deleted.")
@@ -199,46 +198,49 @@ abstract class AbstractAppState(
     }
 
     suspend fun deleteAllContent() {
-        contentService.deleteAll()
+        contentService.tx { deleteAll() }
         loadFeed()
     }
 
     suspend fun generateRandomSelfContent() {
-        contentService.generateRandomSelfContent()
+        contentService.tx { generateRandomSelfContent() }
         loadFeed()
     }
 
     suspend fun generateRandomContactContent() {
-        contentService.generateRandomContactContent()
+        contentService.tx { generateRandomContactContent() }
         loadFeed()
     }
 
     suspend fun receiveContent(content: Content) {
-        val saved = contentService.save(content)
+        val saved = contentService.tx { save(content) }
         if (saved.content.isContact) loadContacts() else loadFeed()
     }
 
     suspend fun publishContent(body: ContentBody) {
-        contentService.save(body)
+        contentService.tx { save(body) }
     }
 
     private suspend fun loadOwnIdentity() {
-        val entry = identityService.geOwnIdentity()
+        val entry = identityService.tx { geOwnIdentity() }
         identity = entry.identity
         identityEntry = entry
     }
 
     suspend fun updateOwnAvatar(avatar: String) {
-        contentService.updateAvatar(avatar)
+        contentService.tx { updateAvatar(avatar) }
         loadOwnContact()
     }
 
     private suspend fun loadOwnContact() {
-        contactEntry = contactService.getOwnContact()
-        contact = contactEntry.contact
-        val (entry, body) = contentService.getOwnContactContent()
-        contactContentEntry = entry
-        contactContent = entry.content
-        contactContentBody = body
+        contactService.tx {
+            contactEntry = getOwnContact()
+            contact = contactEntry.contact
+
+            val (entry, body) = contentService.getOwnContactContent()
+            contactContentEntry = entry
+            contactContent = entry.content
+            contactContentBody = body
+        }
     }
 }

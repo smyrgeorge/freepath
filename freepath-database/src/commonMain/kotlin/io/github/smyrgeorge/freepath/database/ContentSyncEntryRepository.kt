@@ -8,15 +8,13 @@ import io.github.smyrgeorge.sqlx4k.annotation.Repository
 @Repository
 interface ContentSyncEntryRepository : AuditableRepository<ContentSyncEntry> {
     @Query("SELECT * FROM content_sync WHERE peer_id = :peerId AND content_id = :contentId LIMIT 1")
+    context(context: QueryExecutor)
     suspend fun findOneByPeerIdAndContentId(
-        context: QueryExecutor,
         peerId: String,
         contentId: String
     ): Result<ContentSyncEntry?>
 
-    @Query("SELECT content_id FROM content_sync WHERE peer_id = :peerId")
-    suspend fun findAllByContentIdsByPeerId(context: QueryExecutor, peerId: String): Result<List<ContentSyncEntry>>
-
     @Query("DELETE FROM content_sync")
-    suspend fun deleteAll(context: QueryExecutor): Result<Long>
+    context(context: QueryExecutor)
+    suspend fun deleteAll(): Result<Long>
 }

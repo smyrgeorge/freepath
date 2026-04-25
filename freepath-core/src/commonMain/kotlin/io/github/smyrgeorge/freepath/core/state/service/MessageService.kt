@@ -9,38 +9,42 @@ import io.github.smyrgeorge.sqlx4k.Transaction
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 
 class MessageService(
-    private val db: ISQLite,
+    override val db: ISQLite,
     private val identityService: IdentityService,
     private val messageRepository: MessageEntryRepository,
-) {
+) : Service {
     private val peerId: String get() = identityService.peerId
 
-    suspend fun save(message: Message, status: MessageStatus): MessageEntry = save(db, message, status)
-    suspend fun save(db: QueryExecutor, message: Message, status: MessageStatus): MessageEntry {
-        val entry = MessageEntry.from(message = message, status = status)
-        return messageRepository.insert(db, entry).getOrThrow()
-    }
-
-    suspend fun getChat(otherPeerId: String, limit: Int = 50, offset: Int = 0): List<MessageEntry> =
-        getChat(db, otherPeerId, limit, offset)
-
-    suspend fun getChat(
-        db: QueryExecutor,
+    context(db: QueryExecutor)
+    suspend fun getConversation(
         otherPeerId: String,
         limit: Int = 50,
         offset: Int = 0,
     ): List<MessageEntry> {
         val conversationId = Message.conversationId(peerId, otherPeerId)
-        return messageRepository.findAllByConversationId(db, conversationId, limit, offset).getOrThrow()
+        return messageRepository.findAllByConversationId(conversationId, limit, offset).getOrThrow()
     }
 
-    suspend fun updateStatus(entry: MessageEntry, status: MessageStatus): MessageEntry = updateStatus(db, entry, status)
-    suspend fun updateStatus(db: QueryExecutor, entry: MessageEntry, status: MessageStatus): MessageEntry {
+    context(db: QueryExecutor)
+    suspend fun save(
+        entry: MessageEntry,
+        status: MessageStatus
+    ): MessageEntry {
         val updated = entry.copy(status = status)
-        return messageRepository.update(db, updated).getOrThrow()
+        return messageRepository.update(updated).getOrThrow()
     }
 
-    suspend fun deleteAll(tx: Transaction) {
-        messageRepository.deleteAll(tx).getOrThrow()
+    context(db: QueryExecutor)
+    suspend fun save(
+        message: Message,
+        status: MessageStatus
+    ): MessageEntry {
+        val entry = MessageEntry.from(message = message, status = status)
+        return messageRepository.insert(entry).getOrThrow()
+    }
+
+    context(db: Transaction)
+    suspend fun deleteAll() {
+        messageRepository.deleteAll().getOrThrow()
     }
 }

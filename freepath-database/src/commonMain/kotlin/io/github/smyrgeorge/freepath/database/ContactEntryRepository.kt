@@ -8,11 +8,14 @@ import io.github.smyrgeorge.sqlx4k.annotation.Repository
 @Repository
 interface ContactEntryRepository : AuditableRepository<ContactEntry> {
     @Query("SELECT * FROM contact")
-    suspend fun findAll(context: QueryExecutor): Result<List<ContactEntry>>
+    context(context: QueryExecutor)
+    suspend fun findAll(): Result<List<ContactEntry>>
 
     @Query("SELECT * FROM contact WHERE peer_id = :peerId")
-    suspend fun findOneByPeerId(context: QueryExecutor, peerId: String): Result<ContactEntry?>
+    context(context: QueryExecutor)
+    suspend fun findOneByPeerId(peerId: String): Result<ContactEntry?>
 
     @Query("DELETE FROM contact")
-    suspend fun deleteAll(context: QueryExecutor): Result<Long>
+    context(context: QueryExecutor)
+    suspend fun deleteAll(): Result<Long>
 }
