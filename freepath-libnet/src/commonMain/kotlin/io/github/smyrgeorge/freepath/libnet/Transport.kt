@@ -20,6 +20,7 @@ enum class Transport(
         platforms = setOf(
             Platform.ANDROID,
             Platform.IOS,
+            Platform.IOS_SIMULATOR,
             Platform.JVM
         ),
     ),

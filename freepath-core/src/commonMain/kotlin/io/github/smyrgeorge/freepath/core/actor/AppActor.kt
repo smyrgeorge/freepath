@@ -11,6 +11,7 @@ import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.MessageStatus
 import io.github.smyrgeorge.freepath.model.content.Message
 import io.github.smyrgeorge.freepath.model.content.MessageCodec
+import io.github.smyrgeorge.freepath.util.currentPlatform
 import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.impl.extensions.doEvery
 import io.github.smyrgeorge.log4k.impl.extensions.launch
@@ -36,7 +37,7 @@ class AppActor(
     }
 
     override suspend fun onActivate(m: AppProtocol) {
-        log.info("[onActivate] Activating... ($m)")
+        log.info("[onActivate] Activating on ${currentPlatform}... ($m)")
         val time = measureTime {
             resources.initializeDatabase()
             state.initialize()
