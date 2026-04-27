@@ -3,6 +3,7 @@ package io.github.smyrgeorge.freepath.libble
 import io.github.smyrgeorge.freepath.libble.BleConstants.FREEPATH_SERVICE_UUID
 import io.github.smyrgeorge.freepath.libble.BleConstants.toHex
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.info
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext

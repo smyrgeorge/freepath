@@ -20,6 +20,8 @@ import io.github.smyrgeorge.freepath.model.content.Content
 import io.github.smyrgeorge.freepath.model.content.ContentBody
 import io.github.smyrgeorge.freepath.model.content.Message
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.error
+import io.github.smyrgeorge.log4k.classic.info
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,6 +54,9 @@ abstract class AbstractAppState(
 
     private val _feedEntries = MutableStateFlow<List<ContentEntry>>(emptyList())
     val feedEntries: StateFlow<List<ContentEntry>> = _feedEntries.asStateFlow()
+
+    private val _profileEntries = MutableStateFlow<List<ContentEntry>>(emptyList())
+    val profileEntries: StateFlow<List<ContentEntry>> = _profileEntries.asStateFlow()
 
     /**
      * Peers physically nearby, keyed by peerId. Value is the set of local transports
@@ -132,6 +137,10 @@ abstract class AbstractAppState(
         }
     }
 
+    suspend fun loadProfile(authorId: String, limit: Int = 50, offset: Int = 0) {
+        _profileEntries.value = contentService.db { getByAuthor(authorId, limit, offset) }
+    }
+
     fun cancelContactExchange() {
         viewState.hideExchangeDrawer()
     }
@@ -203,12 +212,14 @@ abstract class AbstractAppState(
     }
 
     suspend fun generateRandomSelfContent() {
-        contentService.tx { generateRandomSelfContent() }
+        val entries = contentService.tx { generateRandomSelfContent() }
+        log.info("[dev] Generated ${entries.size} random self content entries.")
         loadFeed()
     }
 
     suspend fun generateRandomContactContent() {
-        contentService.tx { generateRandomContactContent() }
+        val entries = contentService.tx { generateRandomContactContent() }
+        log.info("[dev] Generated ${entries.size} random contact content entries.")
         loadFeed()
     }
 

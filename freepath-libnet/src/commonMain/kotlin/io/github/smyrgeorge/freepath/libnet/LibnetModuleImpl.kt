@@ -7,6 +7,9 @@ import io.github.smyrgeorge.freepath.libnet.client.model.ReassemblyBuffer
 import io.github.smyrgeorge.freepath.libp2p.Libp2pEvent
 import io.github.smyrgeorge.freepath.libp2p.Libp2pModule
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
+import io.github.smyrgeorge.log4k.classic.error
+import io.github.smyrgeorge.log4k.classic.warn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO

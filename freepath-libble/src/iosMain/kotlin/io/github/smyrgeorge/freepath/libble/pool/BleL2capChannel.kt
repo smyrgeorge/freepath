@@ -2,6 +2,8 @@ package io.github.smyrgeorge.freepath.libble.pool
 
 import io.github.smyrgeorge.freepath.libble.CentralManagerHolder
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
+import io.github.smyrgeorge.log4k.classic.warn
 import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.reinterpret

@@ -49,6 +49,7 @@ import kotlin.io.encoding.Base64
 fun PostDetailScreen(
     entry: ContentEntry,
     onBack: () -> Unit,
+    onAuthorClick: () -> Unit = {},
 ) {
     val contacts by AppState.contacts.collectAsState()
     val contactContents by AppState.contactContents.collectAsState()
@@ -88,10 +89,18 @@ fun PostDetailScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Author row
+            // Author row — tap to open profile
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(),
+                        onClick = onAuthorClick,
+                    )
+                    .padding(vertical = 4.dp),
             ) {
                 FreepathAvatar(
                     label = avatarLabel,

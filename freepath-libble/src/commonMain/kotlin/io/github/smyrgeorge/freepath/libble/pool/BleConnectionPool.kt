@@ -3,6 +3,9 @@ package io.github.smyrgeorge.freepath.libble.pool
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.util.rpc.RpcManager
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
+import io.github.smyrgeorge.log4k.classic.info
+import io.github.smyrgeorge.log4k.classic.warn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable

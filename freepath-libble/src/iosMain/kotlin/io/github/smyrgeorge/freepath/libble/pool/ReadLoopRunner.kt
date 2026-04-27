@@ -1,6 +1,7 @@
 package io.github.smyrgeorge.freepath.libble.pool
 
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.warn
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned

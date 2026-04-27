@@ -1,6 +1,7 @@
 package io.github.smyrgeorge.freepath.util.rpc
 
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.warn
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex

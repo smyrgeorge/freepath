@@ -14,6 +14,7 @@ import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.decryptCo
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.deriveKeys
 import io.github.smyrgeorge.freepath.libble.exchange.BleExchangeCrypto.encryptContact
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds

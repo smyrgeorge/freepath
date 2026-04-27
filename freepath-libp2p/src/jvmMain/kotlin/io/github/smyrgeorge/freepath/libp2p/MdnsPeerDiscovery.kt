@@ -1,6 +1,8 @@
 package io.github.smyrgeorge.freepath.libp2p
 
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
+import io.github.smyrgeorge.log4k.classic.info
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

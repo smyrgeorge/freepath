@@ -42,6 +42,9 @@ import io.github.smyrgeorge.freepath.model.contact.Contact
 import io.github.smyrgeorge.freepath.model.contact.Identity
 import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.error
+import io.github.smyrgeorge.log4k.classic.info
+import io.github.smyrgeorge.log4k.classic.warn
 import io.github.smyrgeorge.log4k.impl.extensions.launch
 import io.github.smyrgeorge.sqlx4k.ConnectionPool
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite

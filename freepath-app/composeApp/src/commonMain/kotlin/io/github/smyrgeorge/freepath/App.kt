@@ -39,9 +39,10 @@ import io.github.smyrgeorge.freepath.ui.screens.NetworkScreen
 import io.github.smyrgeorge.freepath.ui.screens.OnboardingScreen
 import io.github.smyrgeorge.freepath.ui.screens.PostDetailScreen
 import io.github.smyrgeorge.freepath.ui.screens.SplashScreen
+import io.github.smyrgeorge.freepath.ui.screens.UserProfileScreen
 import io.github.smyrgeorge.freepath.ui.theme.FreepathTheme
 
-private enum class Screen { Splash, Onboarding, Nearby, Network, Feed, Me, Chat, PostDetail, ComposePost }
+private enum class Screen { Splash, Onboarding, Nearby, Network, Feed, Me, Chat, PostDetail, ComposePost, UserProfile }
 
 private val APP_TABS = listOf(
     TabItem(icon = "☰", label = "Feed"),
@@ -60,6 +61,8 @@ fun App() {
     var chatContact by remember { mutableStateOf<ContactEntry?>(null) }
     var chatReturnScreen by remember { mutableStateOf(Screen.Network) }
     var selectedFeedEntry by remember { mutableStateOf<ContentEntry?>(null) }
+    var profilePeerId by remember { mutableStateOf<String?>(null) }
+    var profileReturnScreen by remember { mutableStateOf(Screen.PostDetail) }
     val startupRoute by AppViewState.startupRoute.collectAsState()
     val pendingDeepLink by AppViewState.pendingDeepLink.collectAsState()
 
@@ -128,6 +131,22 @@ fun App() {
                                 onBack = {
                                     selectedFeedEntry = null
                                     screen = Screen.Feed
+                                },
+                                onAuthorClick = {
+                                    profilePeerId = entry.authorId
+                                    profileReturnScreen = Screen.PostDetail
+                                    screen = Screen.UserProfile
+                                },
+                            )
+                        }
+
+                        Screen.UserProfile -> profilePeerId?.let { peerId ->
+                            UserProfileScreen(
+                                peerId = peerId,
+                                onBack = { screen = profileReturnScreen },
+                                onPostClick = { entry ->
+                                    selectedFeedEntry = entry
+                                    screen = Screen.PostDetail
                                 },
                             )
                         }

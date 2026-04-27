@@ -1,13 +1,11 @@
 package io.github.smyrgeorge.freepath.core.state
 
+import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.model.content.Content
 import io.github.smyrgeorge.freepath.model.content.ContentBody
 import io.github.smyrgeorge.freepath.model.content.ContentCodec
 import io.github.smyrgeorge.freepath.model.content.ContentType
 import io.github.smyrgeorge.freepath.model.content.ImageFormat
-import io.github.smyrgeorge.freepath.database.ContactEntry
-import io.github.smyrgeorge.freepath.database.ContentEntry
-import io.github.smyrgeorge.freepath.database.ContentTrust
 import kotlin.io.encoding.Base64
 import kotlin.random.Random
 import kotlin.time.Clock
@@ -17,25 +15,22 @@ object RandomContentGenerator {
     fun generateSelfContent(
         selfPeerId: String,
         selfSigKeyPrivate: ByteArray,
-    ): List<ContentEntry> {
-        val now = Clock.System.now().toEpochMilliseconds()
+    ): List<Content> {
         return listOf(
             randomArticleBody(),
             randomImageBody(),
-        ).mapIndexed { i, body ->
-            val createdAt = now - ((i + 1) * 1_800_000L + Random.nextLong(0, 3_600_000L))
-            val envelope = ContentCodec.seal(
+        ).map { body ->
+            ContentCodec.seal(
                 body = body,
                 authorId = selfPeerId,
                 sigKeyPrivate = selfSigKeyPrivate,
-            ).copy(createdAt = Instant.fromEpochMilliseconds(createdAt))
-            ContentEntry.from(envelope, trust = ContentTrust.VERIFIED)
+            )
         }
     }
 
     fun generateContactContent(
         contacts: List<ContactEntry>,
-    ): List<ContentEntry> {
+    ): List<Content> {
         val now = Clock.System.now().toEpochMilliseconds()
         return contacts.flatMap { contact ->
             listOf(
@@ -44,7 +39,7 @@ object RandomContentGenerator {
             ).mapIndexed { i, (type, body) ->
                 val createdAt = now - ((i + 1) * 3_600_000L + Random.nextLong(0, 86_400_000L))
                 val contentId = "dev-${contact.peerId.takeLast(6)}-$createdAt"
-                val envelope = Content(
+                Content(
                     id = contentId,
                     type = type,
                     authorId = contact.peerId,
@@ -52,7 +47,6 @@ object RandomContentGenerator {
                     signature = "dev",
                     body = body,
                 )
-                ContentEntry.from(envelope)
             }
         }
     }
@@ -153,26 +147,113 @@ Vel illum qui dolorem eum fugiat quo voluptas nulla pariatur.""",
             "Consectetur adipiscing",
             "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua, consectetur adipiscing elit amet.",
         )
+        val side = 512
+        val tile = listOf(16, 32, 64, 128).random()
+        val phase = Random.nextInt(2)
         return ContentBody.Image(
-            data = Base64.encode(PLACEHOLDER_PNG),
+            data = Base64.encode(checkerboardPng(side, tile, phase)),
             format = ImageFormat.PNG,
-            width = 1,
-            height = 1,
+            width = side,
+            height = side,
             caption = captions.random(),
         )
     }
 
-    // Minimal valid 1x1 transparent PNG used as a placeholder image for dev-generated content.
-    // Keeps this module free of platform-specific image-encoding dependencies.
-    private val PLACEHOLDER_PNG: ByteArray = byteArrayOf(
-        -119, 80, 78, 71, 13, 10, 26, 10,
-        0, 0, 0, 13, 73, 72, 68, 82,
-        0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0,
-        31, 21, -60, -119,
-        0, 0, 0, 13, 73, 68, 65, 84,
-        120, -100, 99, 96, 0, 2, 0, 0, 5, 0, 1,
-        -30, 38, 5, -5,
-        0, 0, 0, 0, 73, 69, 78, 68,
-        -82, 66, 96, -126,
-    )
+    private fun checkerboardPng(side: Int, tile: Int, phase: Int): ByteArray {
+        val pixels = ByteArray(side * side)
+        for (y in 0 until side) {
+            for (x in 0 until side) {
+                val light = ((x / tile) + (y / tile) + phase) % 2 == 0
+                pixels[y * side + x] = if (light) 0xFF.toByte() else 0x00.toByte()
+            }
+        }
+        return encodeGrayscalePng(side, side, pixels)
+    }
+
+    // Minimal pure-Kotlin PNG encoder used for dev-generated content. Stays in commonMain by
+    // emitting uncompressed DEFLATE (stored) blocks instead of relying on a zlib implementation.
+    private fun encodeGrayscalePng(width: Int, height: Int, pixels: ByteArray): ByteArray {
+        require(pixels.size == width * height) { "pixels must be width*height bytes" }
+
+        val ihdr = ByteArray(13)
+        writeInt32BE(ihdr, 0, width)
+        writeInt32BE(ihdr, 4, height)
+        ihdr[8] = 8 // bit depth; color type 0 (grayscale), compression 0, filter 0, interlace 0
+
+        val filtered = ByteArray(height * (1 + width))
+        for (y in 0 until height) {
+            pixels.copyInto(filtered, y * (1 + width) + 1, y * width, (y + 1) * width)
+        }
+
+        return PNG_SIGNATURE +
+                pngChunk("IHDR", ihdr) +
+                pngChunk("IDAT", zlibStored(filtered)) +
+                pngChunk("IEND", ByteArray(0))
+    }
+
+    private val PNG_SIGNATURE: ByteArray = byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10)
+
+    private fun pngChunk(type: String, data: ByteArray): ByteArray {
+        val typeBytes = type.encodeToByteArray()
+        val len = ByteArray(4).also { writeInt32BE(it, 0, data.size) }
+        val crc = ByteArray(4).also { writeInt32BE(it, 0, crc32(typeBytes + data)) }
+        return len + typeBytes + data + crc
+    }
+
+    private fun zlibStored(data: ByteArray): ByteArray {
+        val maxBlock = 65535
+        val blocks = if (data.isEmpty()) 1 else (data.size + maxBlock - 1) / maxBlock
+        val out = ByteArray(2 + blocks * 5 + data.size + 4)
+        var idx = 0
+        out[idx++] = 0x78.toByte() // CMF: deflate, 32K window
+        out[idx++] = 0x01.toByte() // FLG: no preset dict, fastest
+
+        var pos = 0
+        do {
+            val len = minOf(maxBlock, data.size - pos)
+            val isFinal = pos + len >= data.size
+            out[idx++] = if (isFinal) 0x01.toByte() else 0x00.toByte()
+            writeInt16LE(out, idx, len); idx += 2
+            writeInt16LE(out, idx, len.inv() and 0xFFFF); idx += 2
+            if (len > 0) data.copyInto(out, idx, pos, pos + len)
+            idx += len
+            pos += len
+        } while (pos < data.size)
+
+        writeInt32BE(out, idx, adler32(data))
+        return out
+    }
+
+    private fun writeInt32BE(buf: ByteArray, off: Int, v: Int) {
+        buf[off] = (v ushr 24 and 0xFF).toByte()
+        buf[off + 1] = (v ushr 16 and 0xFF).toByte()
+        buf[off + 2] = (v ushr 8 and 0xFF).toByte()
+        buf[off + 3] = (v and 0xFF).toByte()
+    }
+
+    private fun writeInt16LE(buf: ByteArray, off: Int, v: Int) {
+        buf[off] = (v and 0xFF).toByte()
+        buf[off + 1] = (v ushr 8 and 0xFF).toByte()
+    }
+
+    private fun crc32(data: ByteArray): Int {
+        var crc = 0xFFFFFFFF.toInt()
+        for (b in data) {
+            crc = crc xor (b.toInt() and 0xFF)
+            repeat(8) {
+                crc = if (crc and 1 == 1) (crc ushr 1) xor 0xEDB88320.toInt() else crc ushr 1
+            }
+        }
+        return crc.inv()
+    }
+
+    private fun adler32(data: ByteArray): Int {
+        var a = 1
+        var b = 0
+        for (byte in data) {
+            a = (a + (byte.toInt() and 0xFF)) % 65521
+            b = (b + a) % 65521
+        }
+        return (b shl 16) or a
+    }
 }

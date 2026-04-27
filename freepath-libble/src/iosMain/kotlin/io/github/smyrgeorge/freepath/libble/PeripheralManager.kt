@@ -1,6 +1,7 @@
 package io.github.smyrgeorge.freepath.libble
 
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
 import platform.CoreBluetooth.CBATTRequest
 import platform.CoreBluetooth.CBL2CAPChannel
 import platform.CoreBluetooth.CBPeripheralManager

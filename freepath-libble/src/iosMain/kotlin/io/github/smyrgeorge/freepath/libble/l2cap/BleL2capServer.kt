@@ -4,6 +4,9 @@ import io.github.smyrgeorge.freepath.libble.CentralManagerHolder
 import io.github.smyrgeorge.freepath.libble.PeripheralManagerHolder
 import io.github.smyrgeorge.freepath.libble.pool.BleL2capChannel
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
+import io.github.smyrgeorge.log4k.classic.info
+import io.github.smyrgeorge.log4k.classic.warn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.suspendCancellableCoroutine

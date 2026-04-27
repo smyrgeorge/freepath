@@ -1,7 +1,6 @@
 package io.github.smyrgeorge.freepath.libble
 
 import com.juul.kable.Scanner
-import io.github.smyrgeorge.freepath.model.contact.Contact
 import io.github.smyrgeorge.freepath.libble.BleConstants.FREEPATH_SERVICE_UUID
 import io.github.smyrgeorge.freepath.libble.BleConstants.fromHex
 import io.github.smyrgeorge.freepath.libble.BleConstants.toHex
@@ -15,8 +14,13 @@ import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetrics
 import io.github.smyrgeorge.freepath.libble.pool.BleConnectionPool
 import io.github.smyrgeorge.freepath.libble.pool.BleFrameType
 import io.github.smyrgeorge.freepath.libble.pool.BleL2capChannel
+import io.github.smyrgeorge.freepath.model.contact.Contact
 import io.github.smyrgeorge.freepath.util.rpc.RpcManager
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
+import io.github.smyrgeorge.log4k.classic.error
+import io.github.smyrgeorge.log4k.classic.info
+import io.github.smyrgeorge.log4k.classic.warn
 import io.github.smyrgeorge.log4k.impl.extensions.doEvery
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope

@@ -3,6 +3,8 @@ package io.github.smyrgeorge.freepath.libp2p
 import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetrics
 import io.github.smyrgeorge.freepath.util.rpc.RpcManager
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
+import io.github.smyrgeorge.log4k.classic.error
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO

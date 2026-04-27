@@ -19,6 +19,14 @@ interface ContentEntryRepository : AuditableRepository<ContentEntry> {
     context(context: QueryExecutor)
     suspend fun findAllByLimitAndOffset(limit: Int, offset: Int): Result<List<ContentEntry>>
 
+    @Query("SELECT * FROM content WHERE author_id = :authorId AND type NOT IN ('CONTACT') ORDER BY id DESC LIMIT :limit OFFSET :offset")
+    context(context: QueryExecutor)
+    suspend fun findAllByAuthorIdAndLimitAndOffset(
+        authorId: String,
+        limit: Int,
+        offset: Int,
+    ): Result<List<ContentEntry>>
+
     @Query("DELETE FROM content")
     context(context: QueryExecutor)
     suspend fun deleteAll(): Result<Long>

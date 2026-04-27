@@ -178,6 +178,55 @@ class ContentCodecTest {
     }
 
     @Test
+    fun seal_encode_decode_verify_roundTrip() {
+        val (kp, authorId) = makeKeys()
+        val env = ContentCodec.seal(
+            body = articleBody(),
+            authorId = authorId,
+            sigKeyPrivate = kp.privateKey,
+        )
+        val decoded = ContentCodec.decode(ContentCodec.encode(env)).getOrThrow()
+        assertTrue(ContentCodec.verify(decoded, kp.publicKey))
+    }
+
+    // Mimics the full BLE receive path: peerId-style authorId (Base58 multihash),
+    // sigKey as Base64 string (as stored on the receiver's Contact), all three body types.
+    @Test
+    fun productionFlow_seal_encode_decode_verify() {
+        val kp = CryptoProvider.generateEd25519KeyPair()
+        val senderPeerId = io.github.smyrgeorge.freepath.model.contact.ContactCodec.derivePeerId(kp.publicKey)
+        val sigKeyAsStoredOnContact = Base64.encode(kp.publicKey)
+
+        val bodies = listOf(
+            ContentBody.Article("title", "body"),
+            ContentBody.Image(
+                data = Base64.encode(byteArrayOf(1, 2, 3)),
+                format = ImageFormat.PNG,
+                width = 1,
+                height = 1,
+                caption = null,
+            ),
+            ContentBody.Contact(bio = "hi", avatar = null, location = null),
+        )
+
+        for (body in bodies) {
+            val sealed = ContentCodec.seal(
+                body = body,
+                authorId = senderPeerId,
+                sigKeyPrivate = kp.privateKey,
+            )
+            val wireBytes = ContentCodec.encode(sealed)
+            val received = ContentCodec.decode(wireBytes).getOrThrow()
+
+            assertEquals(senderPeerId, received.authorId, "authorId survived round-trip")
+            assertTrue(
+                ContentCodec.verify(received, sigKeyAsStoredOnContact),
+                "verify failed for body=${body::class.simpleName}",
+            )
+        }
+    }
+
+    @Test
     fun decode_succeedsButVerifyFailsForTamperedSignature() {
         val (kp, authorId) = makeKeys()
         val env = ContentCodec.seal(

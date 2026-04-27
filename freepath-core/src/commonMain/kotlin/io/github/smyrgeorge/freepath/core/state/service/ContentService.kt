@@ -9,7 +9,9 @@ import io.github.smyrgeorge.freepath.database.ContentTrust
 import io.github.smyrgeorge.freepath.model.contact.Identity
 import io.github.smyrgeorge.freepath.model.content.Content
 import io.github.smyrgeorge.freepath.model.content.ContentBody
+import io.github.smyrgeorge.freepath.model.content.ContentBodyCodec
 import io.github.smyrgeorge.freepath.model.content.ContentCodec
+import io.github.smyrgeorge.freepath.model.content.ContentType
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
 import io.github.smyrgeorge.sqlx4k.Transaction
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
@@ -29,10 +31,28 @@ class ContentService(
         contentRepository.findAllByLimitAndOffset(limit, offset).getOrThrow()
 
     context(db: QueryExecutor)
-    suspend fun getContactContent(peerId: String): ContentEntry =
-        contentRepository
-            .findOneByAuthorIdAndTypeContact(peerId)
-            .getOrNull() ?: error("No contact content found for peer $peerId")
+    suspend fun getByAuthor(authorId: String, limit: Int = 50, offset: Int = 0): List<ContentEntry> =
+        contentRepository.findAllByAuthorIdAndLimitAndOffset(authorId, limit, offset).getOrThrow()
+
+    context(db: QueryExecutor)
+    suspend fun getContactContent(peerId: String): ContentEntry {
+        suspend fun getEmptyContactContent(peerId: String): ContentEntry {
+            val body = ContentBody.Contact(bio = null, avatar = null, location = null)
+            val content = Content(
+                id = ContentBodyCodec.deriveId(body),
+                type = ContentType.CONTACT,
+                authorId = peerId,
+                signature = "",
+                body = body,
+            )
+            val new = ContentEntry.from(content, trust = ContentTrust.UNKNOWN)
+            return contentRepository.insert(new).getOrThrow()
+        }
+
+        return contentRepository.findOneByAuthorIdAndTypeContact(peerId).getOrNull()
+            ?: getEmptyContactContent(peerId)
+    }
+
 
     context(db: QueryExecutor)
     suspend fun getOwnContactContent(): Pair<ContentEntry, ContentBody.Contact> {
@@ -117,23 +137,12 @@ class ContentService(
         contentSyncRepository.save(entry).getOrThrow()
 
     context(db: Transaction)
-    suspend fun generateRandomSelfContent(): List<ContentEntry> {
-        val entries = RandomContentGenerator.generateSelfContent(
-            selfPeerId = peerId,
-            selfSigKeyPrivate = identity.sigKeyPrivate,
-        )
-        entries.forEach { contentRepository.insert(it).getOrThrow() }
-        return entries
-    }
+    suspend fun generateRandomSelfContent(): List<ContentEntry> =
+        RandomContentGenerator.generateSelfContent(peerId, identity.sigKeyPrivate).map { save(it) }
 
     context(db: Transaction)
-    suspend fun generateRandomContactContent(): List<ContentEntry> {
-        val entries = RandomContentGenerator.generateContactContent(
-            contacts = contactService.getContacts(),
-        )
-        entries.forEach { contentRepository.insert(it).getOrThrow() }
-        return entries
-    }
+    suspend fun generateRandomContactContent(): List<ContentEntry> =
+        RandomContentGenerator.generateContactContent(contactService.getContacts()).map { save(it) }
 
     context(db: QueryExecutor)
     private suspend fun Content.trust(): ContentTrust {

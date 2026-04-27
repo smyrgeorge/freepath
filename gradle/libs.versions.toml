@@ -8,9 +8,9 @@ publish = "0.36.0"
 # https://github.com/Kotlin/dokka
 dokka = "2.2.0"
 # https://github.com/smyrgeorge/log4k
-log4k = "1.4.3"
+log4k = "2.0.1"
 # https://github.com/smyrgeorge/actor4k
-actor4k = "1.4.10"
+actor4k = "1.4.11"
 # https://github.com/Kotlin/kotlinx.serialization
 kotlinx-serialization = "1.11.0"
 # https://github.com/ktorio/ktor
@@ -68,7 +68,7 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 arrow-core = { module = "io.arrow-kt:arrow-core", version.ref = "arrow" }
-log4k = { module = "io.github.smyrgeorge:log4k", version.ref = "log4k" }
+log4k = { module = "io.github.smyrgeorge:log4k-classic", version.ref = "log4k" }
 log4k-slf4j = { module = "io.github.smyrgeorge:log4k-slf4j", version.ref = "log4k" }
 actor4k = { module = "io.github.smyrgeorge:actor4k", version.ref = "actor4k" }
 ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
