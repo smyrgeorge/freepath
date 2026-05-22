@@ -26,7 +26,7 @@ koin = "4.2.1"
 # https://github.com/smyrgeorge/sqlx4k
 sqlx4k = "1.7.4"
 # https://github.com/google/ksp
-ksp = "2.3.7"
+ksp = "2.3.8"
 # https://github.com/jmdns/jmdns
 jmdns = "3.6.3"
 # https://github.com/juullabs/kable
