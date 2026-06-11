@@ -34,7 +34,7 @@ kable = "0.43.0"
 # https://github.com/dylibso/chicory
 chicory = "1.7.5"
 # https://developer.android.com/studio/releases/gradle-plugin
-android-gradle-plugin = "9.0.0"
+android-gradle-plugin = "9.0.1"
 # https://github.com/alexzhirkevich/qrose
 qrose = "1.1.2"
 # https://github.com/arrow-kt/arrow
