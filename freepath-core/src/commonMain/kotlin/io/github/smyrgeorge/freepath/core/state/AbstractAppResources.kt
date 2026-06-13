@@ -182,8 +182,8 @@ abstract class AbstractAppResources(
     }
 
     suspend fun startNetworking() {
-        if (Transport.LIBP2P.isSupported) startLibp2p()
-        if (Transport.LIBBLE.isSupported) startLibble()
+        if (Transport.LIBP2P.supported) startLibp2p()
+        if (Transport.LIBBLE.supported) startLibble()
 
         libnet.start(peerId = identity.peerId)
         client = LibnetClientImpl(
@@ -215,8 +215,8 @@ abstract class AbstractAppResources(
     suspend fun stopNetworking() {
         client.stop()
         libnet.stop()
-        if (Transport.LIBP2P.isSupported) libp2p.stop()
-        if (Transport.LIBBLE.isSupported) libble.stop()
+        if (Transport.LIBP2P.supported) libp2p.stop()
+        if (Transport.LIBBLE.supported) libble.stop()
     }
 
     private suspend fun startLibp2p() {

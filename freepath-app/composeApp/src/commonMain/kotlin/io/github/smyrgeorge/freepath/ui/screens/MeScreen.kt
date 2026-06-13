@@ -94,6 +94,7 @@ import io.github.smyrgeorge.freepath.core.state.RandomAvatarGenerator
 import io.github.smyrgeorge.freepath.core.state.abbrev
 import io.github.smyrgeorge.freepath.core.util.InMemoryLoggingAppender
 import io.github.smyrgeorge.freepath.libble.metrics.LibbleMetricsSnapshot
+import io.github.smyrgeorge.freepath.libnet.Transport
 import io.github.smyrgeorge.freepath.libp2p.metrics.Libp2pMetricsSnapshot
 import io.github.smyrgeorge.freepath.libp2p.relayPeerIdToHost
 import io.github.smyrgeorge.freepath.model.contact.ContactSignedCodec
@@ -298,11 +299,9 @@ private fun LibbleMetricsPanel(metrics: LibbleMetricsSnapshot) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = stringResource(Res.string.dev_libble_metrics_title),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
+        PanelTitle(
+            title = stringResource(Res.string.dev_libble_metrics_title),
+            transport = Transport.LIBBLE,
         )
         FreepathDivider()
         MetricRow(
@@ -341,11 +340,9 @@ private fun Libp2pMetricsPanel(metrics: Libp2pMetricsSnapshot, selfPeerId: Strin
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = stringResource(Res.string.dev_libp2p_metrics_title),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
+        PanelTitle(
+            title = stringResource(Res.string.dev_libp2p_metrics_title),
+            transport = Transport.LIBP2P,
         )
         FreepathDivider()
         MetricRow(
@@ -496,6 +493,23 @@ private fun Level.uiColor(): Color = when (this) {
     Level.WARN -> Color(0xFFFFB74D)
     Level.ERROR -> Color(0xFFEF5350)
     Level.OFF -> Color(0xFFE0E0E0)
+}
+
+@Composable
+private fun PanelTitle(title: String, transport: Transport) {
+    val statusColor = if (transport.supported) Color(0xFF66BB6A) else MaterialTheme.colorScheme.error
+    Text(
+        text = buildAnnotatedString {
+            append(title)
+            append(' ')
+            withStyle(SpanStyle(color = statusColor, fontWeight = FontWeight.Normal)) {
+                append(if (transport.supported) "(supported)" else "(not supported)")
+            }
+        },
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
 }
 
 @Composable

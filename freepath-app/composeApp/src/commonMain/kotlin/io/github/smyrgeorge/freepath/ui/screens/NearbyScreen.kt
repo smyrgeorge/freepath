@@ -106,7 +106,7 @@ fun NearbyScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    if (Transport.LIBBLE.isSupported) {
+                    if (Transport.LIBBLE.supported) {
                         FreepathButton(
                             onClick = {
                                 scope.launch {
