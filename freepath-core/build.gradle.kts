@@ -7,9 +7,6 @@ plugins {
 }
 
 kotlin {
-    compilerOptions {
-        freeCompilerArgs.add("-Xcontext-parameters")
-    }
     jvm {
         compilerOptions {
             freeCompilerArgs.add("-Xjsr305=strict")
@@ -53,6 +50,7 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
         androidMain.dependencies {

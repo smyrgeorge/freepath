@@ -10,9 +10,6 @@ plugins {
 }
 
 kotlin {
-    compilerOptions {
-        freeCompilerArgs.add("-Xcontext-parameters")
-    }
     jvm {
         compilerOptions {
             freeCompilerArgs.add("-Xjsr305=strict")

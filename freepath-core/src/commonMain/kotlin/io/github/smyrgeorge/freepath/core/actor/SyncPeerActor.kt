@@ -21,7 +21,7 @@ class SyncPeerActor(
     resources: AbstractAppResources,
 ) : Actor<SyncPeerProtocol, SyncPeerProtocol.Response>(key) {
 
-    private val peerId: String get() = key
+    private val peerId: String get() = remotePeerIdOf(key)
     private val contactContent = state.contactContent
 
     private val client: LibnetClient = resources.client
@@ -160,5 +160,28 @@ class SyncPeerActor(
 
     companion object {
         const val RELAY_FETCH_LIMIT = 256
+
+        // The actor registry is a single global namespace. A SyncPeerActor is owned by the local
+        // node and scoped to one remote peer, so its key must encode BOTH — otherwise two nodes
+        // talking to the same remote peer (any relay/hub topology) would collide on the same key.
+        // In production there is one node, so the owner is always "self" and behaviour is unchanged.
+        // peerIds are Base58 (libp2p), so ':' never appears in them and is a safe separator.
+        private const val KEY_SEPARATOR = ":"
+
+        fun key(ownerPeerId: String, remotePeerId: String): String {
+            require(!ownerPeerId.contains(KEY_SEPARATOR)) { "ownerPeerId must not contain $KEY_SEPARATOR" }
+            require(!remotePeerId.contains(KEY_SEPARATOR)) { "remotePeerId must not contain $KEY_SEPARATOR" }
+            return "$ownerPeerId$KEY_SEPARATOR$remotePeerId"
+        }
+
+        fun ownerPeerIdOf(key: String): String {
+            require(key.contains(KEY_SEPARATOR)) { "key must contain $KEY_SEPARATOR" }
+            return key.substringBeforeLast(KEY_SEPARATOR)
+        }
+
+        fun remotePeerIdOf(key: String): String {
+            require(key.contains(KEY_SEPARATOR)) { "key must contain $KEY_SEPARATOR" }
+            return key.substringAfterLast(KEY_SEPARATOR)
+        }
     }
 }

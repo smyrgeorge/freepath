@@ -7,6 +7,9 @@ import android.content.Context
 import io.github.smyrgeorge.freepath.libble.pool.BleL2capChannel
 import io.github.smyrgeorge.freepath.util.AndroidContextHolder
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
+import io.github.smyrgeorge.log4k.classic.info
+import io.github.smyrgeorge.log4k.classic.warn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow

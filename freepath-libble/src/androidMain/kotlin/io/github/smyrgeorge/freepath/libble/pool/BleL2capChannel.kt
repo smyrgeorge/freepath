@@ -6,6 +6,8 @@ import android.bluetooth.BluetoothSocket
 import android.content.Context
 import io.github.smyrgeorge.freepath.util.AndroidContextHolder
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
+import io.github.smyrgeorge.log4k.classic.warn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable

@@ -1,6 +1,11 @@
 package io.github.smyrgeorge.freepath.libp2p
 
 import io.github.smyrgeorge.log4k.Logger
+import io.github.smyrgeorge.log4k.classic.debug
+import io.github.smyrgeorge.log4k.classic.error
+import io.github.smyrgeorge.log4k.classic.info
+import io.github.smyrgeorge.log4k.classic.trace
+import io.github.smyrgeorge.log4k.classic.warn
 
 internal object Libp2pLogger {
     private val log = Logger.of("freepath-libp2p")

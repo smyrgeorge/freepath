@@ -28,7 +28,6 @@ import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
 import io.github.smyrgeorge.freepath.libble.LibbleModule
-import io.github.smyrgeorge.freepath.libble.LibbleModuleImpl
 import io.github.smyrgeorge.freepath.libnet.LibnetModule
 import io.github.smyrgeorge.freepath.libnet.LibnetModuleImpl
 import io.github.smyrgeorge.freepath.libnet.Transport
@@ -53,7 +52,9 @@ import kotlin.io.encoding.Base64
 import kotlin.time.Duration.Companion.seconds
 
 abstract class AbstractAppResources(
-    private val database: String
+    private val database: String,
+    libp2pModule: Libp2pModule,
+    libbleModule: LibbleModule,
 ) {
     private val log = Logger.of(this::class)
 
@@ -110,7 +111,7 @@ abstract class AbstractAppResources(
         )
     }
 
-    val libp2p: Libp2pModule = Libp2pModule().setEventHandler { event ->
+    val libp2p: Libp2pModule = libp2pModule.setEventHandler { event ->
         log.info { "LIBP2P Event: $event" }
         when (event) {
             is Libp2pEvent.PeerConnected -> {
@@ -129,7 +130,7 @@ abstract class AbstractAppResources(
         }
     }
 
-    val libble: LibbleModule = LibbleModuleImpl().setEventHandler { event ->
+    val libble: LibbleModule = libbleModule.setEventHandler { event ->
         log.info { "LIBBLE Event: $event" }
         when (event) {
             is LibbleEvent.ContactExchange.Failed -> {

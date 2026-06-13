@@ -52,7 +52,6 @@ class AppActor(
         log.info("[onActivate] Contact: ${state.contactEntry}")
         log.info("[onActivate] Initialization took $time")
 
-
         val route = when {
             ContactEntry.TAG_ONBOARDING in state.contactEntry.tags -> StartupRoute.Onboarding
             viewState.pendingDeepLink.value != null -> {
@@ -91,8 +90,8 @@ class AppActor(
                 is AppProtocol.SendMessage -> {
                     val message = MessageCodec.seal(
                         sigKeyPrivate = state.identity.sigKeyPrivate,
-                        conversationId = Message.conversationId(state.identityEntry.peerId, m.peerId),
-                        senderId = state.identityEntry.peerId,
+                        conversationId = Message.conversationId(state.identity.peerId, m.peerId),
+                        senderId = state.identity.peerId,
                         recipientId = m.peerId,
                         body = m.text,
                     )
@@ -109,13 +108,13 @@ class AppActor(
                 is AppProtocol.ContentReceived -> state.receiveContent(m.envelope)
                 is AppProtocol.PublishContent -> state.publishContent(m.body)
                 is AppProtocol.PeerConnected -> {
-                    ActorSystem.get(SyncPeerActor::class, m.peerId)
+                    ActorSystem.get(SyncPeerActor::class, SyncPeerActor.key(state.identity.peerId, m.peerId))
                         .tell(SyncPeerProtocol.Connected)
                         .onFailure { log.warn("[PeerConnected] Failed to trigger for ${m.peerId}: ${it.message}") }
                 }
 
                 is AppProtocol.PeerIdentified -> {
-                    ActorSystem.get(SyncPeerActor::class, m.peerId)
+                    ActorSystem.get(SyncPeerActor::class, SyncPeerActor.key(state.identity.peerId, m.peerId))
                         .tell(SyncPeerProtocol.Identified)
                         .onFailure { log.warn("[PeerIdentified] Failed to trigger for ${m.peerId}: ${it.message}") }
                 }
