@@ -11,9 +11,9 @@ interface ContactRoutingEntryRepository : AuditableRepository<ContactRoutingEntr
     context(context: QueryExecutor)
     suspend fun findOneByPeerId(peerId: String): Result<ContactRoutingEntry?>
 
-    @Query("SELECT * FROM contact_routing WHERE ble_identity_secret IS NOT NULL AND 1=:dummy")
+    @Query("SELECT * FROM contact_routing WHERE ble_identity_secret IS NOT NULL")
     context(context: QueryExecutor)
-    suspend fun findAllByIdentitySecretNotNull(dummy: Int = 1): Result<List<ContactRoutingEntry>>
+    suspend fun findAllByIdentitySecretNotNull(): Result<List<ContactRoutingEntry>>
 
     @Query("DELETE FROM contact_routing")
     context(context: QueryExecutor)
