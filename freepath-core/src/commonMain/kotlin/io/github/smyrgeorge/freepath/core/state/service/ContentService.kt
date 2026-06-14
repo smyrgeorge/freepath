@@ -83,10 +83,16 @@ class ContentService(
 
     context(db: Transaction)
     suspend fun save(content: Content): ContentEntry {
-        // Contact content is keyed by authorId (peerId) in the DB, all other content by envelope.id.
-        val contentId = if (content.isContact) content.authorId else content.id
+        // Contact content is keyed per author — one card per peer — while everything else is
+        // content-addressed by its id. The `content_id` column is a hash of the body, so contact
+        // content must be looked up by author (not content_id) to find and update the existing row;
+        // otherwise every receive re-inserts and collides on the unique content_id.
+        val existing = if (content.isContact) {
+            contentRepository.findOneByAuthorIdAndTypeContact(content.authorId).getOrNull()
+        } else {
+            contentRepository.findOneByContentId(content.id).getOrNull()
+        }
 
-        val existing = contentRepository.findOneByContentId(contentId).getOrNull()
         // For non-contact content, skip if we already have this version or newer.
         // For contact content, always accept — the peer is the authoritative source for their own profile.
         if (!content.isContact
