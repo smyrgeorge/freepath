@@ -9,8 +9,6 @@ import io.github.smyrgeorge.freepath.core.state.AbstractViewState
 import io.github.smyrgeorge.freepath.core.state.model.StartupRoute
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.MessageStatus
-import io.github.smyrgeorge.freepath.model.content.Message
-import io.github.smyrgeorge.freepath.model.content.MessageCodec
 import io.github.smyrgeorge.freepath.util.currentPlatform
 import io.github.smyrgeorge.freepath.util.exitApplication
 import io.github.smyrgeorge.log4k.impl.extensions.doEvery
@@ -81,34 +79,11 @@ class AppActor(
         private val normal: suspend (AppActor, AppProtocol) -> Behavior<AppProtocol.Response> = normal@{ ctx, m ->
             val log = ctx.log
             val state = ctx.state
-            val resources = ctx.resources
             when (m) {
                 is AppProtocol.Ping -> return@normal Behavior.Reply(AppProtocol.Pong)
                 is AppProtocol.AcceptContact -> state.acceptContact(m.contact)
                 is AppProtocol.SetTrustLevel -> state.setTrustLevel(m.entry, m.level)
-
-                is AppProtocol.SendMessage -> {
-                    val message = MessageCodec.seal(
-                        sigKeyPrivate = state.identity.sigKeyPrivate,
-                        conversationId = Message.conversationId(state.identity.peerId, m.peerId),
-                        senderId = state.identity.peerId,
-                        recipientId = m.peerId,
-                        body = m.text,
-                    )
-                    val entry = state.saveMessage(message, MessageStatus.SENDING)
-                    resources.client.send(message, m.peerId)
-                        .onSuccess { state.updateMessageStatus(entry, MessageStatus.SENT) }
-                        .onFailure { error ->
-                            if (state.relay(message, m.peerId)) {
-                                state.updateMessageStatus(entry, MessageStatus.SENT)
-                                log.info("Direct send to ${m.peerId} failed (${error.message}); queued for relay")
-                            } else {
-                                state.updateMessageStatus(entry, MessageStatus.FAILED)
-                                log.error("Failed to send or queue message to ${m.peerId}: ${error.message}")
-                            }
-                        }
-                }
-
+                is AppProtocol.SendMessage -> state.send(m.peerId, m.text)
                 is AppProtocol.MessageReceived -> state.saveMessage(m.msg, MessageStatus.RECEIVED)
                 is AppProtocol.ContentReceived -> state.receiveContent(m.envelope)
                 is AppProtocol.PublishContent -> state.publishContent(m.body)
