@@ -46,7 +46,7 @@ class LibnetClientCodecTest {
         receiver: TestPeer,
         plaintext: ByteArray = "hello".encodeToByteArray(),
         type: Byte = LibnetClientCodec.TYPE_CHAT,
-    ) = LibnetClientCodec.seal(sender.identity, receiver.contact, type, plaintext)
+    ) = LibnetClientCodec.encode(LibnetClientCodec.seal(sender.identity, receiver.contact, type, plaintext))
 
     // ── Round-trip ────────────────────────────────────────────────────────────
 

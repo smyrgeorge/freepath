@@ -13,12 +13,16 @@ import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.MessageEntry
 import io.github.smyrgeorge.freepath.database.MessageStatus
+import io.github.smyrgeorge.freepath.database.RelayEntry.Companion.toRelayEntry
+import io.github.smyrgeorge.freepath.libnet.client.codec.LibnetClientCodec
+import io.github.smyrgeorge.freepath.libnet.client.model.RelayOptions
 import io.github.smyrgeorge.freepath.model.contact.Contact
 import io.github.smyrgeorge.freepath.model.contact.Identity
 import io.github.smyrgeorge.freepath.model.contact.TrustLevel
 import io.github.smyrgeorge.freepath.model.content.Content
 import io.github.smyrgeorge.freepath.model.content.ContentBody
 import io.github.smyrgeorge.freepath.model.content.Message
+import io.github.smyrgeorge.freepath.model.content.MessageCodec
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.log4k.classic.error
 import io.github.smyrgeorge.log4k.classic.info
@@ -167,6 +171,29 @@ abstract class AbstractAppState(
     suspend fun updateMessageStatus(entry: MessageEntry, status: MessageStatus) {
         val updated = messageService.db { save(entry, status) }
         upsertMessage(updated)
+    }
+
+    /**
+     * Stores a relay copy of [message] in this node's own relay queue for store-and-forward delivery
+     * to [peerId]. Used when a direct send fails because the recipient is offline; the relay mesh
+     * forwards it on the next peer connection. Returns false if the message could not be sealed
+     * (no contact card for [peerId]) or persisted — in which case the caller should mark it FAILED.
+     */
+    suspend fun relay(message: Message, peerId: String): Boolean {
+        val receiver = contactLookup(peerId) ?: run {
+            log.error("[relay] No contact card for $peerId; cannot seal a relay copy")
+            return false
+        }
+        val envelope = LibnetClientCodec.seal(
+            identity = identity,
+            receiverContact = receiver,
+            type = LibnetClientCodec.TYPE_CHAT,
+            plaintext = MessageCodec.encode(message),
+            relay = RelayOptions(),
+        )
+        return runCatching { relayService.tx { save(envelope.toRelayEntry()) } }
+            .onFailure { log.error("[relay] Failed to enqueue relay copy for $peerId: ${it.message}") }
+            .isSuccess
     }
 
     // The chat map is keyed by the remote peer's node ID so the UI can look up

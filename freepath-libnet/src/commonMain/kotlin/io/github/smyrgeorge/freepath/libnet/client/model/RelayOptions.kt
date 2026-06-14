@@ -1,12 +1,12 @@
 package io.github.smyrgeorge.freepath.libnet.client.model
 
 /**
- * Call-site input for [StatelessEnvelopeCodec.seal] when relay is needed.
- * [messageId] is computed internally by [StatelessEnvelopeCodec.seal] from nonce + ephemeralKey
- * and is NOT a field here — use [RelayMetadata] to read it after sealing.
+ * Call-site input for [io.github.smyrgeorge.freepath.libnet.client.codec.StatelessEnvelopeCodec.seal] when relay is needed.
+ * `messageId` is computed internally by [io.github.smyrgeorge.freepath.libnet.client.codec.StatelessEnvelopeCodec.seal]
+ * from nonce + ephemeralKey and is NOT a field here — use [RelayMetadata] to read it after sealing.
  */
 data class RelayOptions(
-    val ttl: Int,
+    val ttl: Int = DEFAULT_RELAY_TTL,
     val priority: Int = 1,
     val pow: ByteArray = ByteArray(0),
 ) {
@@ -29,4 +29,12 @@ data class RelayOptions(
 
     override fun toString(): String =
         "RelayOptions(ttl=$ttl, priority=$priority, pow=${pow.size}B)"
+
+    companion object {
+        /**
+         * Initial relay hop budget (TTL) for a store-and-forward copy. Each mesh forward attempt
+         * decrements it; the entry is discarded once it reaches zero.
+         */
+        const val DEFAULT_RELAY_TTL: Int = 16
+    }
 }

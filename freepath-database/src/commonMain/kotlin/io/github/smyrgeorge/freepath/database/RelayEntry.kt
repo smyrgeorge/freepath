@@ -3,8 +3,6 @@ package io.github.smyrgeorge.freepath.database
 import io.github.smyrgeorge.freepath.database.util.Auditable
 import io.github.smyrgeorge.freepath.database.util.InstantConverter
 import io.github.smyrgeorge.freepath.database.util.StatelessEnvelopeConverter
-import io.github.smyrgeorge.freepath.libnet.client.codec.LibnetClientCodec
-import io.github.smyrgeorge.freepath.libnet.client.codec.StatelessEnvelopeCodec
 import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
 import io.github.smyrgeorge.sqlx4k.annotation.Column
 import io.github.smyrgeorge.sqlx4k.annotation.Converter
@@ -28,9 +26,6 @@ data class RelayEntry(
     @Column(insert = false, update = false)
     val ttl: Int = envelope.relay?.ttl ?: error("Envelope without relay metadata"),
 ) : Auditable<Int> {
-
-    fun toWireBytes(): ByteArray =
-        byteArrayOf(LibnetClientCodec.VERSION, 0, 0, 0) + StatelessEnvelopeCodec.encode(envelope)
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

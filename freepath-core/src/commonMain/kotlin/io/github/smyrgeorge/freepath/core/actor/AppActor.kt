@@ -98,9 +98,14 @@ class AppActor(
                     val entry = state.saveMessage(message, MessageStatus.SENDING)
                     resources.client.send(message, m.peerId)
                         .onSuccess { state.updateMessageStatus(entry, MessageStatus.SENT) }
-                        .onFailure {
-                            state.updateMessageStatus(entry, MessageStatus.FAILED)
-                            log.error("Failed to send message: ${it.message}")
+                        .onFailure { error ->
+                            if (state.relay(message, m.peerId)) {
+                                state.updateMessageStatus(entry, MessageStatus.SENT)
+                                log.info("Direct send to ${m.peerId} failed (${error.message}); queued for relay")
+                            } else {
+                                state.updateMessageStatus(entry, MessageStatus.FAILED)
+                                log.error("Failed to send or queue message to ${m.peerId}: ${error.message}")
+                            }
                         }
                 }
 

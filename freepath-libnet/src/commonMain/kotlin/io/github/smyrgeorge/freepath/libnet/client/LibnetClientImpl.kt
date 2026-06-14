@@ -64,10 +64,10 @@ class LibnetClientImpl(
     }
 
     override suspend fun relay(
-        payload: ByteArray,
+        envelope: StatelessEnvelope,
         receiverId: String,
         reqId: Long,
-    ): Result<Unit> = libnet.request(reqId, receiverId, payload) { _, _, _ -> }.map { }
+    ): Result<Unit> = libnet.request(reqId, receiverId, LibnetClientCodec.encode(envelope)) { _, _, _ -> }.map { }
 
     private suspend fun open(request: NetRequest) {
         val (senderId, _, reqId, payload) = request
@@ -144,7 +144,7 @@ class LibnetClientImpl(
     }
 
     private fun seal(receiver: Contact, type: Byte, plaintext: ByteArray): ByteArray =
-        LibnetClientCodec.seal(identity, receiver, type, plaintext)
+        LibnetClientCodec.encode(LibnetClientCodec.seal(identity, receiver, type, plaintext))
 
     private fun open(senderId: String, envelope: StatelessEnvelope): Result<Pair<Byte, ByteArray>> =
         LibnetClientCodec.open(envelope, identity, contactLookup)?.let { Result.success(it) }

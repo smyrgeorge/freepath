@@ -75,7 +75,7 @@ class SyncPeerActor(
             entries
                 .filter { it.envelope.receiverIdHash.contentEquals(peerIdHash) }
                 .forEach { entry ->
-                    client.relay(entry.toWireBytes(), peerId)
+                    client.relay(entry.envelope, peerId)
                         .onSuccess {
                             runCatching {
                                 relayService.db { deleteById(entry.id) }
@@ -114,7 +114,7 @@ class SyncPeerActor(
                     log.error("[${peerId.abbrev()}] Failed to update TTL for relay entry ${entry.id}: ${it.message}")
                     return@forEach
                 }
-                client.relay(updated.toWireBytes(), peerId)
+                client.relay(updated.envelope, peerId)
                     .onSuccess { log.info("[${peerId.abbrev()}] Forwarded mesh hop ${entry.id} (ttl=${ttl - 1})") }
                     .onFailure { log.warn("[${peerId.abbrev()}] Failed to forward mesh hop ${entry.id}: ${it.message}") }
             }

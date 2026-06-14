@@ -1,5 +1,6 @@
 package io.github.smyrgeorge.freepath.libnet.client
 
+import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
 import io.github.smyrgeorge.freepath.model.content.Content
 import io.github.smyrgeorge.freepath.model.content.Message
 import kotlin.random.Random
@@ -23,7 +24,7 @@ interface LibnetClient {
     ): Result<Unit>
 
     suspend fun relay(
-        payload: ByteArray,
+        envelope: StatelessEnvelope,
         receiverId: String,
         reqId: Long = Random.nextLong(),
     ): Result<Unit>
