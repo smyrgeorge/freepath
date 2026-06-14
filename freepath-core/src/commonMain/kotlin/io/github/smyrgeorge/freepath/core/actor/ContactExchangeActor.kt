@@ -76,13 +76,13 @@ class ContactExchangeActor(
             is ContactExchangeProtocol.Cancelled -> {
                 exchangeJob?.cancel()
                 exchangeJob = null
-                state.cancelContactExchange()
+                viewState.hideExchangeDrawer()
             }
 
             is ContactExchangeProtocol.Succeeded -> {
                 exchangeJob = null
                 state.acceptBleContact(m.contact, m.identitySecret)
-                state.cancelContactExchange()
+                viewState.hideExchangeDrawer()
             }
 
             is ContactExchangeProtocol.Failed -> {

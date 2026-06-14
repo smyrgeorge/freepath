@@ -147,10 +147,6 @@ abstract class AbstractAppState(
         _profileEntries.value = contentService.db { getByAuthor(authorId, limit, offset) }
     }
 
-    fun cancelContactExchange() {
-        viewState.hideExchangeDrawer()
-    }
-
     suspend fun completeOnboarding(name: String?, bio: String?, location: String?, avatar: String?) {
         db.transaction {
             contactService.completeOnboarding(name)
@@ -164,7 +160,7 @@ abstract class AbstractAppState(
         _chats.update { current -> current + (peerId to messages) }
     }
 
-    suspend fun send(peerId: String, text: String) {
+    suspend fun sendMessage(peerId: String, text: String) {
         val message = MessageCodec.seal(
             sigKeyPrivate = identity.sigKeyPrivate,
             conversationId = Message.conversationId(identity.peerId, peerId),
@@ -176,7 +172,7 @@ abstract class AbstractAppState(
         client.send(message, peerId)
             .onSuccess { updateMessageStatus(entry, MessageStatus.SENT) }
             .onFailure { error ->
-                if (relay(message, peerId)) {
+                if (relayMessage(message, peerId)) {
                     updateMessageStatus(entry, MessageStatus.SENT)
                     log.info("[send] Direct send to $peerId failed (${error.message}); queued for relay")
                 } else {
@@ -197,7 +193,7 @@ abstract class AbstractAppState(
         upsertMessage(updated)
     }
 
-    suspend fun relay(message: Message, peerId: String): Boolean {
+    suspend fun relayMessage(message: Message, peerId: String): Boolean {
         val receiver = contactLookup(peerId) ?: run {
             log.error("[relay] No contact card for $peerId; cannot seal a relay copy")
             return false
@@ -209,7 +205,7 @@ abstract class AbstractAppState(
             plaintext = MessageCodec.encode(message),
             relay = RelayOptions(),
         )
-        return runCatching { relayService.tx { save(envelope.toRelayEntry()) } }
+        return runCatching { relayService.db { save(envelope.toRelayEntry()) } }
             .onFailure { log.error("[relay] Failed to enqueue relay copy for $peerId: ${it.message}") }
             .isSuccess
     }

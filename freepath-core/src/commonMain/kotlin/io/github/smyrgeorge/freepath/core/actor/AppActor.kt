@@ -83,7 +83,7 @@ class AppActor(
                 is AppProtocol.Ping -> return@normal Behavior.Reply(AppProtocol.Pong)
                 is AppProtocol.AcceptContact -> state.acceptContact(m.contact)
                 is AppProtocol.SetTrustLevel -> state.setTrustLevel(m.entry, m.level)
-                is AppProtocol.SendMessage -> state.send(m.peerId, m.text)
+                is AppProtocol.SendMessage -> state.sendMessage(m.peerId, m.text)
                 is AppProtocol.MessageReceived -> state.saveMessage(m.msg, MessageStatus.RECEIVED)
                 is AppProtocol.ContentReceived -> state.receiveContent(m.envelope)
                 is AppProtocol.PublishContent -> state.publishContent(m.body)
