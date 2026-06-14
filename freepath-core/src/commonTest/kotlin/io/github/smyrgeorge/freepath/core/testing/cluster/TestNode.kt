@@ -2,6 +2,7 @@ package io.github.smyrgeorge.freepath.core.testing.cluster
 
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
 import io.github.smyrgeorge.freepath.core.actor.AppProtocol
+import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.db
 import io.github.smyrgeorge.freepath.core.testing.state.TestAppResources
 import io.github.smyrgeorge.freepath.core.testing.state.TestAppState
 import io.github.smyrgeorge.freepath.core.testing.state.TestViewState
@@ -9,6 +10,7 @@ import io.github.smyrgeorge.freepath.core.testing.util.toContactCard
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.MessageEntry
+import io.github.smyrgeorge.freepath.database.RelayEntry
 import io.github.smyrgeorge.freepath.model.contact.Contact
 import io.github.smyrgeorge.freepath.model.contact.Identity
 import io.github.smyrgeorge.freepath.model.content.ContentBody
@@ -80,6 +82,9 @@ class TestNode internal constructor(
 
     /** Current in-memory chat with [other] (the chat map is keyed by the other node's peerId). */
     fun chatWith(other: TestNode): List<MessageEntry> = state.chats.value[other.peerId] ?: emptyList()
+
+    /** Snapshot of this node's store-and-forward relay queue (its pending mesh mailbox). */
+    suspend fun relayQueue(): List<RelayEntry> = resources.relayService.db { findAll(limit = 256) }
 
     /** Currently loaded contacts (excludes self). */
     val contacts: List<ContactEntry> get() = state.contacts.value

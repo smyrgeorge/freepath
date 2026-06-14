@@ -12,9 +12,9 @@ import kotlin.test.assertTrue
  * `LibnetClient` framing and per-node in-memory databases, with only the physical transport faked
  * by the in-process network.
  *
- * Chat `send` is direct-only (no relay metadata), so this suite covers direct delivery. Mesh
- * store-and-forward (the relay queue + `SyncPeerActor.relay`) is a separate subsystem and deserves
- * its own suite.
+ * This suite covers direct delivery between connected peers. When the recipient is unreachable,
+ * `send` falls back to store-and-forward via the relay mesh (the relay queue + `SyncPeerActor.relay`)
+ * — that path has its own suite, `StoreAndForwardTest`.
  *
  * The cluster framework is JVM-only (in-memory SQLite + `LIBP2P` supported / `LIBBLE` not), so each
  * test no-ops on non-JVM targets that also compile this common source set.
@@ -60,20 +60,6 @@ class MessageExchangeTest {
 
         awaitUntil { bob.chatWith(alice).any { it.message.body == "ping" } }
         awaitUntil { alice.chatWith(bob).any { it.message.body == "pong" } }
-    }
-
-    @Test
-    fun `message to an unreachable peer is marked FAILED`() = clusterTest { cluster ->
-        val (alice, bob) = cluster.nodes
-        cluster.seedMutualContacts(alice, bob)
-        // intentionally NOT connected — bob is unreachable
-
-        alice.sendMessage(to = bob, text = "into the void")
-
-        awaitUntil {
-            alice.chatWith(bob).any { it.message.body == "into the void" && it.status == MessageStatus.FAILED }
-        }
-        assertTrue(bob.chatWith(alice).isEmpty(), "bob should not have received anything")
     }
 
     @Test
