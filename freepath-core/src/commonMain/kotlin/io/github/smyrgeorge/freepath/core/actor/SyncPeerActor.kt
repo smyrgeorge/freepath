@@ -92,30 +92,21 @@ class SyncPeerActor(
 
         // Pass 2: forward mesh hop packets (not intended for this peer).
         // If peerIdHash is unknown (unidentified peer), forward all entries as mesh hops.
+        // RelayService owns the TTL policy: it decrements + persists the TTL before the send
+        // (per-attempt semantics, to prevent retry storms) or discards an entry whose TTL is
+        // exhausted. A null result means "exhausted and discarded — nothing to forward". On a
+        // DB failure we skip the send rather than forward with a stale TTL.
         entries
             .filter { peerIdHash == null || !it.envelope.receiverIdHash.contentEquals(peerIdHash) }
             .forEach { entry ->
-                val ttl = entry.ttl
-                if (ttl <= 0) {
-                    // TTL expired — discard.
-                    runCatching { relayService.db { deleteById(entry.id) } }.onFailure {
-                        log.error("[${peerId.abbrev()}] Failed to delete expired relay entry ${entry.id}: ${it.message}")
-                    }
-                    return@forEach
-                }
-                // Decrement TTL before sending (per-attempt semantics: TTL counts forward
-                // attempts, not successful deliveries). This prevents retry storms — if the send
-                // repeatedly fails, TTL still decrements and the entry is eventually discarded.
-                // If the save fails, we skip the send to avoid forwarding with a stale TTL.
-                val updated = entry.copy(
-                    envelope = entry.envelope.copy(relay = entry.envelope.relay!!.copy(ttl = ttl - 1))
-                )
-                runCatching { relayService.db { save(updated) } }.onFailure {
-                    log.error("[${peerId.abbrev()}] Failed to update TTL for relay entry ${entry.id}: ${it.message}")
-                    return@forEach
-                }
-                client.relay(updated.envelope, peerId)
-                    .onSuccess { log.info("[${peerId.abbrev()}] Forwarded mesh hop ${entry.id} (ttl=${ttl - 1})") }
+                val forward = runCatching { relayService.db { decrementTtlOrDiscard(entry) } }
+                    .getOrElse {
+                        log.error("[${peerId.abbrev()}] Failed to advance TTL for relay entry ${entry.id}: ${it.message}")
+                        return@forEach
+                    } ?: return@forEach
+
+                client.relay(forward.envelope, peerId)
+                    .onSuccess { log.info("[${peerId.abbrev()}] Forwarded mesh hop ${entry.id} (ttl=${forward.envelope.relay?.ttl})") }
                     .onFailure { log.warn("[${peerId.abbrev()}] Failed to forward mesh hop ${entry.id}: ${it.message}") }
             }
     }
