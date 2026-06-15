@@ -8,6 +8,13 @@ interface LibnetModule {
     fun start(peerId: String)
     fun stop()
 
+    /**
+     * PeerIds reachable right now — identified on any transport (LAN via libp2p, or BLE). These are
+     * the peers a relay copy can be handed to immediately for mesh forwarding; an empty set means
+     * the message can only be queued for later.
+     */
+    fun onlinePeerIds(): Set<String>
+
     suspend fun request(
         reqId: Long,
         peerId: String,

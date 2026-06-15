@@ -288,8 +288,31 @@ private fun MessageStatusIcon(status: MessageStatus, tint: Color) {
             // (not drawn)
             MessageStatus.SENDING -> Unit
 
-            // ✓
-            MessageStatus.SENT -> {
+            // ⏱ clock — stored for relay, not yet handed to any peer
+            MessageStatus.QUEUED -> {
+                val stroke = 1.4.dp.toPx()
+                val r = minOf(w, h) / 2f - stroke
+                val cx = w / 2f
+                val cy = h / 2f
+                drawCircle(color = tint, radius = r, center = Offset(cx, cy), style = Stroke(width = stroke))
+                drawLine(
+                    color = tint,
+                    start = Offset(cx, cy),
+                    end = Offset(cx, cy - r * 0.55f),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Round,
+                )
+                drawLine(
+                    color = tint,
+                    start = Offset(cx, cy),
+                    end = Offset(cx + r * 0.45f, cy),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Round,
+                )
+            }
+
+            // ✓ single check — handed to the mesh (best-effort, no receipt)
+            MessageStatus.RELAYED -> {
                 val stroke = 1.6.dp.toPx()
                 val path = Path().apply {
                     moveTo(w * 0.12f, h * 0.55f)
@@ -301,6 +324,19 @@ private fun MessageStatusIcon(status: MessageStatus, tint: Color) {
                     color = tint,
                     style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round),
                 )
+            }
+
+            // ✓✓ double check — recipient's node acked (direct delivery)
+            MessageStatus.SENT -> {
+                val stroke = 1.6.dp.toPx()
+                fun tick(dx: Float): Path = Path().apply {
+                    moveTo(w * (0.04f + dx), h * 0.55f)
+                    lineTo(w * (0.30f + dx), h * 0.82f)
+                    lineTo(w * (0.74f + dx), h * 0.22f)
+                }
+                val style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                drawPath(path = tick(0.18f), color = tint, style = style)
+                drawPath(path = tick(0.00f), color = tint, style = style)
             }
 
             // ⓘ (red disc with white "!")

@@ -12,9 +12,11 @@ import kotlin.test.assertTrue
  * sender seals a relay copy into its own relay queue and the existing `SyncPeerActor.relay` path
  * carries it — directly once the peer reconnects, or across an intermediate relay node.
  *
- * Both direct delivery and store-and-forward surface as [MessageStatus.SENT] on the sender: here
- * "sent" means "handed off" — acked by the recipient directly, or queued in the relay mailbox for
- * the mesh to carry. The mesh is fire-and-forget (no end-to-end delivery receipt).
+ * Sender-side status distinguishes how far a message got: [MessageStatus.SENT] only on a direct
+ * ack from the recipient; [MessageStatus.RELAYED] when the relay copy is handed to an online peer;
+ * [MessageStatus.QUEUED] when it is stored but no peer is reachable yet. The mesh is fire-and-forget
+ * (no end-to-end receipt), so a QUEUED message that the mesh later delivers stays QUEUED on the
+ * sender — there is no signal to promote it (a live QUEUED→RELAYED transition is future work).
  *
  * Like [MessageExchangeTest], the cluster framework is JVM-only, so each test no-ops on the other
  * targets that also compile this common source set.
@@ -30,7 +32,7 @@ class StoreAndForwardTest {
         alice.sendMessage(to = bob, text = "into the void")
 
         awaitUntil {
-            alice.chatWith(bob).any { it.message.body == "into the void" && it.status == MessageStatus.SENT }
+            alice.chatWith(bob).any { it.message.body == "into the void" && it.status == MessageStatus.QUEUED }
         }
         assertTrue(alice.relayQueue().isNotEmpty(), "the message should be queued for store-and-forward")
         assertTrue(bob.chatWith(alice).isEmpty(), "bob should not have received anything")
@@ -40,10 +42,10 @@ class StoreAndForwardTest {
     fun `queued message is delivered when the peer reconnects`() = clusterTest { cluster ->
         val (alice, bob) = cluster.nodes
         cluster.seedMutualContacts(alice, bob)
-        // bob is offline when the message is sent, so it is queued for relay (and marked SENT)…
+        // bob is offline when the message is sent, so it is stored for relay and marked QUEUED…
         alice.sendMessage(to = bob, text = "deferred hello")
         awaitUntil {
-            alice.chatWith(bob).any { it.message.body == "deferred hello" && it.status == MessageStatus.SENT }
+            alice.chatWith(bob).any { it.message.body == "deferred hello" && it.status == MessageStatus.QUEUED }
         }
         assertTrue(alice.relayQueue().isNotEmpty())
 
@@ -57,9 +59,10 @@ class StoreAndForwardTest {
         assertEquals(MessageStatus.RECEIVED, received.status)
         assertEquals(alice.peerId, received.senderId)
 
-        // "sent" already meant "queued for relay"; it stays SENT after the mesh delivers it.
+        // The mesh is fire-and-forget: there is no receipt back to alice, so her copy stays QUEUED
+        // even though bob received it. Promoting QUEUED→RELAYED/SENT on delivery is future work.
         val sent = alice.chatWith(bob).single { it.message.body == "deferred hello" }
-        assertEquals(MessageStatus.SENT, sent.status)
+        assertEquals(MessageStatus.QUEUED, sent.status)
     }
 
     @Test

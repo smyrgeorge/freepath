@@ -14,6 +14,7 @@ import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.MessageEntry
 import io.github.smyrgeorge.freepath.database.MessageStatus
 import io.github.smyrgeorge.freepath.database.RelayEntry.Companion.toRelayEntry
+import io.github.smyrgeorge.freepath.libnet.LibnetModule
 import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
 import io.github.smyrgeorge.freepath.libnet.client.codec.LibnetClientCodec
 import io.github.smyrgeorge.freepath.libnet.client.model.RelayOptions
@@ -27,6 +28,7 @@ import io.github.smyrgeorge.freepath.model.content.MessageCodec
 import io.github.smyrgeorge.log4k.Logger
 import io.github.smyrgeorge.log4k.classic.error
 import io.github.smyrgeorge.log4k.classic.info
+import io.github.smyrgeorge.log4k.classic.warn
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +50,7 @@ abstract class AbstractAppState(
     private val messageService: MessageService by lazy { resources.messageService }
     private val relayService: RelayService by lazy { resources.relayService }
     private val client: LibnetClient by lazy { resources.client }
+    private val libnet: LibnetModule by lazy { resources.libnet }
 
     private val _contacts = MutableStateFlow<List<ContactEntry>>(emptyList())
     val contacts: StateFlow<List<ContactEntry>> = _contacts.asStateFlow()
@@ -172,12 +175,15 @@ abstract class AbstractAppState(
         client.send(message, peerId)
             .onSuccess { updateMessageStatus(entry, MessageStatus.SENT) }
             .onFailure { error ->
-                if (relayMessage(message, peerId)) {
-                    updateMessageStatus(entry, MessageStatus.SENT)
-                    log.info("[send] Direct send to $peerId failed (${error.message}); queued for relay")
-                } else {
-                    updateMessageStatus(entry, MessageStatus.FAILED)
-                    log.error("[send] Failed to send or queue message to $peerId: ${error.message}")
+                val status = relayMessage(message, peerId)
+                updateMessageStatus(entry, status)
+                when (status) {
+                    MessageStatus.RELAYED ->
+                        log.info("[send] Direct send to $peerId failed (${error.message}); relayed to the mesh")
+                    MessageStatus.QUEUED ->
+                        log.info("[send] Direct send to $peerId failed (${error.message}); queued for relay")
+                    else ->
+                        log.error("[send] Failed to send or queue message to $peerId: ${error.message}")
                 }
             }
     }
@@ -193,10 +199,10 @@ abstract class AbstractAppState(
         upsertMessage(updated)
     }
 
-    suspend fun relayMessage(message: Message, peerId: String): Boolean {
+    suspend fun relayMessage(message: Message, peerId: String): MessageStatus {
         val receiver = contactLookup(peerId) ?: run {
             log.error("[relay] No contact card for $peerId; cannot seal a relay copy")
-            return false
+            return MessageStatus.FAILED
         }
         val envelope = LibnetClientCodec.seal(
             identity = identity,
@@ -205,9 +211,40 @@ abstract class AbstractAppState(
             plaintext = MessageCodec.encode(message),
             relay = RelayOptions(),
         )
-        return runCatching { relayService.db { save(envelope.toRelayEntry()) } }
-            .onFailure { log.error("[relay] Failed to enqueue relay copy for $peerId: ${it.message}") }
-            .isSuccess
+
+        // Persist the master copy first. This is what keeps store-and-forward working when no peer
+        // is online now: SyncPeerActor forwards it whenever a peer (re)connects.
+        val stored = runCatching { relayService.db { save(envelope.toRelayEntry()) } }
+            .getOrElse {
+                log.error("[relay] Failed to enqueue relay copy for $peerId: ${it.message}")
+                return MessageStatus.FAILED
+            }
+
+        // Fan out to peers reachable right now. Each forwarded copy carries ttl-1 (one hop from us);
+        // the stored master keeps its full hop budget for future reconnects, so breadth (how many
+        // peers we hand it to) never eats into depth (how far it can still travel through the mesh).
+        val onlinePeers = libnet.onlinePeerIds()
+        if (onlinePeers.isEmpty()) {
+            log.info("[relay] No peers online; queued relay copy for $peerId (entry ${stored.id})")
+            return MessageStatus.QUEUED
+        }
+
+        val relay = envelope.relay ?: error("Relay envelope for $peerId has no relay metadata")
+        val hop = envelope.copy(relay = relay.copy(ttl = relay.ttl - 1))
+        var forwarded = 0
+        onlinePeers.forEach { nextHop ->
+            client.relay(hop, nextHop)
+                .onSuccess { forwarded++ }
+                .onFailure { log.warn("[relay] Failed to forward relay copy to $nextHop: ${it.message}") }
+        }
+
+        return if (forwarded > 0) {
+            log.info("[relay] Relayed copy for $peerId to $forwarded/${onlinePeers.size} online peer(s)")
+            MessageStatus.RELAYED
+        } else {
+            log.info("[relay] No online peer accepted the relay copy for $peerId; left queued (entry ${stored.id})")
+            MessageStatus.QUEUED
+        }
     }
 
     private fun upsertMessage(entry: MessageEntry) {

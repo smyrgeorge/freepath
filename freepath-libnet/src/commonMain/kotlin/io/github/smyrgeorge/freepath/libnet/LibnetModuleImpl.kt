@@ -81,6 +81,9 @@ class LibnetModuleImpl(
         scope.cancel()
     }
 
+    override fun onlinePeerIds(): Set<String> =
+        libp2p.metrics.value.value.identifiedPeers + libble.metrics.value.value.identifiedPeers
+
     override suspend fun request(
         reqId: Long,
         peerId: String,
