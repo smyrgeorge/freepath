@@ -155,10 +155,10 @@ class StatelessEnvelopeCodecTest {
         val bob = makeTestPeer()
         val plaintext = "relay message".encodeToByteArray()
 
-        val envelope = seal(alice, bob, plaintext, relay = RelayOptions(ttl = 3, priority = 2))
+        val envelope = seal(alice, bob, plaintext, relay = RelayOptions(copies = 8, priority = 2))
 
         val relay = assertNotNull(envelope.relay)
-        assertEquals(3, relay.ttl)
+        assertEquals(8, relay.copies)
         assertEquals(2, relay.priority)
         assertEquals(32, relay.messageId.size)
 
@@ -171,22 +171,22 @@ class StatelessEnvelopeCodecTest {
         val alice = makeTestPeer()
         val bob = makeTestPeer()
 
-        val envelope = seal(alice, bob, relay = RelayOptions(ttl = 3))
+        val envelope = seal(alice, bob, relay = RelayOptions())
 
         val expected = CryptoProvider.sha256(envelope.nonce + envelope.ephemeralKey)
         assertContentEquals(expected, envelope.relay!!.messageId)
     }
 
     @Test
-    fun `relay ttl can be decremented without breaking open`() {
+    fun `relay copies can be changed without breaking open`() {
         val alice = makeTestPeer()
         val bob = makeTestPeer()
 
-        val envelope = seal(alice, bob, relay = RelayOptions(ttl = 3))
-        // TTL is excluded from AAD — relay nodes may decrement it legitimately.
-        val decremented = envelope.copy(relay = envelope.relay!!.copy(ttl = 2))
+        val envelope = seal(alice, bob, relay = RelayOptions(copies = 8))
+        // copies is excluded from AAD — relay nodes rewrite it legitimately on each spray.
+        val mutated = envelope.copy(relay = envelope.relay!!.copy(copies = 4))
 
-        val (_, result) = StatelessEnvelopeCodec.open(decremented, bob.identity, lookup(alice))
+        val (_, result) = StatelessEnvelopeCodec.open(mutated, bob.identity, lookup(alice))
         assertContentEquals("hello".encodeToByteArray(), result)
     }
 
@@ -195,7 +195,7 @@ class StatelessEnvelopeCodecTest {
         val alice = makeTestPeer()
         val bob = makeTestPeer()
 
-        val envelope = seal(alice, bob, relay = RelayOptions(ttl = 3))
+        val envelope = seal(alice, bob, relay = RelayOptions())
         val tampered = envelope.copy(
             relay = envelope.relay!!.copy(messageId = ByteArray(32) { 0xFF.toByte() })
         )
@@ -208,8 +208,21 @@ class StatelessEnvelopeCodecTest {
         val alice = makeTestPeer()
         val bob = makeTestPeer()
 
-        val envelope = seal(alice, bob, relay = RelayOptions(ttl = 3, priority = 1))
+        val envelope = seal(alice, bob, relay = RelayOptions(priority = 1))
         val tampered = envelope.copy(relay = envelope.relay!!.copy(priority = 99))
+
+        assertFails { StatelessEnvelopeCodec.open(tampered, bob.identity, lookup(alice)) }
+    }
+
+    @Test
+    fun `open fails when relay expiresAt is tampered`() {
+        val alice = makeTestPeer()
+        val bob = makeTestPeer()
+
+        val envelope = seal(alice, bob, relay = RelayOptions())
+        val tampered = envelope.copy(
+            relay = envelope.relay!!.copy(expiresAt = Instant.fromEpochMilliseconds(0))
+        )
 
         assertFails { StatelessEnvelopeCodec.open(tampered, bob.identity, lookup(alice)) }
     }

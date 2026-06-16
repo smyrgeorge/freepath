@@ -13,7 +13,7 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import kotlin.time.Instant
 
 object StatelessEnvelopeCodec {
-    const val SCHEMA = 2
+    const val SCHEMA = 1
     private val HKDF_INFO_PREFIX = "freepath-stateless-v1".encodeToByteArray()
 
     fun seal(
@@ -37,7 +37,12 @@ object StatelessEnvelopeCodec {
 
         val relayMetadata = relay?.let {
             val messageId = CryptoProvider.sha256(nonce + ephKeyPair.publicKey)
-            RelayMetadata(ttl = it.ttl, messageId = messageId, priority = it.priority, pow = it.pow)
+            RelayMetadata(
+                messageId = messageId,
+                priority = it.priority,
+                copies = it.copies,
+                expiresAt = it.expiresAt,
+            )
         }
 
         val aad = buildAad(SCHEMA, receiverIdRaw, timestamp, nonce, relayMetadata)
@@ -122,10 +127,11 @@ object StatelessEnvelopeCodec {
 
     /**
      * AAD = schema(4BE) ∥ receiverIdRaw(32) ∥ timestamp(8BE) ∥ nonce(12)
-     *       [ ∥ messageId(32) ∥ priority(4BE) ]   ← appended only when relay != null
+     *       [ ∥ messageId(32) ∥ priority(4BE) ∥ expiresAt(8BE) ]
+     *       ← the bracketed relay fields are appended only when relay != null
      *
-     * TTL and pow are excluded from AAD: TTL is mutable (relay nodes decrement it);
-     * pow is a placeholder not yet implemented.
+     * The mutable relay counter (copies) is excluded from AAD — relay nodes rewrite it, and it is
+     * clamped to a protocol-wide constant on receipt instead.
      */
     private fun buildAad(
         schema: Int,
@@ -135,7 +141,8 @@ object StatelessEnvelopeCodec {
         relay: RelayMetadata? = null,
     ): ByteArray {
         require(receiverIdRaw.size == 32) { "receiverIdRaw must be 32 bytes (sha256 of peerId), got ${receiverIdRaw.size}" }
-        val relaySize = if (relay != null) 32 + 4 else 0   // messageId(32) + priority(4BE)
+        // messageId(32) + priority(4BE) + expiresAt(8BE)
+        val relaySize = if (relay != null) 32 + 4 + 8 else 0
         val buf = ByteArray(4 + 32 + 8 + 12 + relaySize)
         var off = 0
         off = BinaryCodec.writeInt32BE(buf, off, schema)
@@ -147,7 +154,8 @@ object StatelessEnvelopeCodec {
         if (relay != null) {
             relay.messageId.copyInto(buf, off)
             off += 32
-            BinaryCodec.writeInt32BE(buf, off, relay.priority)
+            off = BinaryCodec.writeInt32BE(buf, off, relay.priority)
+            BinaryCodec.writeInt64BE(buf, off, relay.expiresAt.toEpochMilliseconds())
         }
         return buf
     }

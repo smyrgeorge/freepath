@@ -88,14 +88,14 @@ class AppActor(
                 is AppProtocol.ContentReceived -> state.receiveContent(m.envelope)
                 is AppProtocol.PublishContent -> state.publishContent(m.body)
                 is AppProtocol.PeerConnected -> {
-                    ActorSystem.get(SyncPeerActor::class, SyncPeerActor.key(state.identity.peerId, m.peerId))
-                        .tell(SyncPeerProtocol.Connected)
+                    ActorSystem.get(PeerActor::class, PeerActor.key(state.identity.peerId, m.peerId))
+                        .tell(PeerProtocol.Connected)
                         .onFailure { log.warn("[PeerConnected] Failed to trigger for ${m.peerId}: ${it.message}") }
                 }
 
                 is AppProtocol.PeerIdentified -> {
-                    ActorSystem.get(SyncPeerActor::class, SyncPeerActor.key(state.identity.peerId, m.peerId))
-                        .tell(SyncPeerProtocol.Identified)
+                    ActorSystem.get(PeerActor::class, PeerActor.key(state.identity.peerId, m.peerId))
+                        .tell(PeerProtocol.Identified)
                         .onFailure { log.warn("[PeerIdentified] Failed to trigger for ${m.peerId}: ${it.message}") }
                 }
 

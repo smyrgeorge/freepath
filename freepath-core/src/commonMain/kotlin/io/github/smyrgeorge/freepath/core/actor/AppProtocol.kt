@@ -14,10 +14,10 @@ sealed interface AppProtocol : ActorProtocol {
 
     // Generic fire-and-forget ack
     data object Ok : Response()
-
-    // Lifecycle
-    data object Ping : Request<Pong>()
     data object Pong : Response()
+
+    // Internal
+    data object Ping : Request<Pong>()
 
     // Contact management
     data class AcceptContact(val contact: Contact) : Request<Ok>()

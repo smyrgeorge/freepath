@@ -7,18 +7,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Exercises freepath-core's chat messaging exchange end-to-end: real actors, services,
- * `LibnetClient` framing and per-node in-memory databases, with only the physical transport faked
- * by the in-process network.
- *
- * This suite covers direct delivery between connected peers. When the recipient is unreachable,
- * `send` falls back to store-and-forward via the relay mesh (the relay queue + `SyncPeerActor.relay`)
- * — that path has its own suite, `StoreAndForwardTest`.
- *
- * The cluster framework is JVM-only (in-memory SQLite + `LIBP2P` supported / `LIBBLE` not), so each
- * test no-ops on non-JVM targets that also compile this common source set.
- */
 class MessageExchangeTest {
 
     @Test
@@ -72,6 +60,31 @@ class MessageExchangeTest {
         texts.forEach { alice.sendMessage(to = bob, text = it) }
 
         awaitUntil { bob.chatWith(alice).mapNotNull { it.message.body }.toSet() == texts.toSet() }
+    }
+
+    @Test
+    fun `a long message body is delivered intact across frames`() = clusterTest { cluster ->
+        val (alice, bob) = cluster.nodes
+        cluster.seedMutualContacts(alice, bob)
+        cluster.connect(alice, bob)
+
+        // Large enough to be split into multiple transport frames by FrameCodec.
+        val body = "x".repeat(8192)
+        alice.sendMessage(to = bob, text = body)
+
+        awaitUntil { bob.chatWith(alice).any { it.message.body == body } }
+    }
+
+    @Test
+    fun `a unicode message body is delivered intact`() = clusterTest { cluster ->
+        val (alice, bob) = cluster.nodes
+        cluster.seedMutualContacts(alice, bob)
+        cluster.connect(alice, bob)
+
+        val body = "héllo 🌍 こんにちは — ñ ü ß"
+        alice.sendMessage(to = bob, text = body)
+
+        awaitUntil { bob.chatWith(alice).any { it.message.body == body } }
     }
 
     @Test

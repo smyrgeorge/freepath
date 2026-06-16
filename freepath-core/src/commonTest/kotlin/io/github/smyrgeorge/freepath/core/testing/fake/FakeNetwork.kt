@@ -11,7 +11,7 @@ import kotlinx.coroutines.sync.withLock
  * Connectivity is expressed the same way the real stack learns it: by injecting
  * `PeerConnected`/`PeerIdentified`/`PeerDisconnected` events into each node, which drive the real
  * metrics (and hence `LibnetModule` routing) and the real app event handler (and hence the
- * `AppActor` → `SyncPeerActor` sync/relay path).
+ * `AppActor` → `PeerActor` sync/relay path).
  *
  * Request/response correlation: each outbound request is assigned a globally-unique *wire* reqId for
  * the receiver side, and the response is mapped back to the requester's original reqId. This mirrors

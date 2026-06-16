@@ -6,7 +6,8 @@ import io.github.smyrgeorge.actor4k.util.SimpleLoggerFactory
 import io.github.smyrgeorge.freepath.core.actor.AppActor
 import io.github.smyrgeorge.freepath.core.actor.AppProtocol
 import io.github.smyrgeorge.freepath.core.actor.ContactExchangeActor
-import io.github.smyrgeorge.freepath.core.actor.SyncPeerActor
+import io.github.smyrgeorge.freepath.core.actor.RelayActor
+import io.github.smyrgeorge.freepath.core.actor.PeerActor
 import io.github.smyrgeorge.freepath.core.util.InMemoryLoggingAppender
 import io.github.smyrgeorge.log4k.RootLogger
 import io.github.smyrgeorge.log4k.impl.extensions.launch
@@ -48,8 +49,11 @@ abstract class AbstractAppHooks(
                     resources = resources,
                 )
             }
-            .factoryFor(SyncPeerActor::class) { key ->
-                SyncPeerActor(key = key, state = state, resources = resources)
+            .factoryFor(PeerActor::class) { key ->
+                PeerActor(key = key, state = state, resources = resources)
+            }
+            .factoryFor(RelayActor::class) { key ->
+                RelayActor(key = key, resources = resources)
             }
 
         ActorSystem

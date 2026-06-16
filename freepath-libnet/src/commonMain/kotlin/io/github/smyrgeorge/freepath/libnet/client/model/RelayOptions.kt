@@ -1,40 +1,28 @@
 package io.github.smyrgeorge.freepath.libnet.client.model
 
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
+
 /**
  * Call-site input for [io.github.smyrgeorge.freepath.libnet.client.codec.StatelessEnvelopeCodec.seal] when relay is needed.
- * `messageId` is computed internally by [io.github.smyrgeorge.freepath.libnet.client.codec.StatelessEnvelopeCodec.seal]
- * from nonce + ephemeralKey and is NOT a field here — use [RelayMetadata] to read it after sealing.
+ * `messageId` is computed internally by the codec (from nonce + ephemeralKey) and is NOT a field
+ * here — read it from [RelayMetadata] after sealing.
  */
 data class RelayOptions(
-    val ttl: Int = DEFAULT_RELAY_TTL,
+    /** Initial copy budget (L) for binary Spray-and-Wait. Clamped to GLOBAL_MAX_COPIES on receipt. */
+    val copies: Int = DEFAULT_COPIES,
+    /** Priority hint. */
     val priority: Int = 1,
-    val pow: ByteArray = ByteArray(0),
+    /** Absolute expiry for the relay copy. Clamped to MAX_TTL_DURATION on receipt. */
+    val expiresAt: Instant = Clock.System.now() + DEFAULT_TTL_DURATION,
 ) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other == null || this::class != other::class) return false
-        other as RelayOptions
-        if (ttl != other.ttl) return false
-        if (priority != other.priority) return false
-        if (!pow.contentEquals(other.pow)) return false
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = ttl
-        result = 31 * result + priority
-        result = 31 * result + pow.contentHashCode()
-        return result
-    }
-
-    override fun toString(): String =
-        "RelayOptions(ttl=$ttl, priority=$priority, pow=${pow.size}B)"
-
     companion object {
-        /**
-         * Initial relay hop budget (TTL) for a store-and-forward copy. Each mesh forward attempt
-         * decrements it; the entry is discarded once it reaches zero.
-         */
-        const val DEFAULT_RELAY_TTL: Int = 16
+        /** Initial number of copies (L) sprayed into the mesh per binary Spray-and-Wait. */
+        const val DEFAULT_COPIES: Int = 8
+
+        /** Default lifetime of a store-and-forward copy before it expires. */
+        val DEFAULT_TTL_DURATION: Duration = 7.days
     }
 }

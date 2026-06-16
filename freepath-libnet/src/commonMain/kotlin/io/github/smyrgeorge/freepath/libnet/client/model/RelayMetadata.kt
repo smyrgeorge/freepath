@@ -1,42 +1,52 @@
 package io.github.smyrgeorge.freepath.libnet.client.model
 
+import io.github.smyrgeorge.freepath.util.serializer.InstantSerializer
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
+import kotlin.time.Instant
 
+/**
+ * Routing metadata for a store-and-forward (relay) envelope.
+ *
+ * The mutable counter [copies] is deliberately NOT bound to AAD — relay nodes rewrite it (and it is
+ * clamped to a protocol-wide constant on receipt). The remaining fields are bound to AAD and
+ * are tamper-evident. Propagation depth is bounded by the copy count itself (binary Spray-and-Wait),
+ * so there is no separate hop counter.
+ */
 @Serializable
 data class RelayMetadata(
-    /** Remaining hops. Decremented by each relay node. NOT bound to AAD — mutable by design. */
-    @ProtoNumber(1) val ttl: Int,
     /**
-     * sha256(nonce + ephemeralKey). Computed by [StatelessEnvelopeCodec.seal].
+     * sha256(nonce + ephemeralKey). Computed by [io.github.smyrgeorge.freepath.libnet.client.codec.StatelessEnvelopeCodec.seal].
      * Bound to AAD — tamper-evident via AEAD authentication.
      */
-    @Contextual @ProtoNumber(2) val messageId: ByteArray,
+    @Contextual @ProtoNumber(1) val messageId: ByteArray,
     /** Priority hint. Bound to AAD — tamper-evident. */
-    @ProtoNumber(3) val priority: Int = 1,
-    /** Reserved for anti-spam proof-of-work. Not yet implemented. */
-    @Contextual @ProtoNumber(4) val pow: ByteArray = ByteArray(0),
+    @ProtoNumber(2) val priority: Int = 1,
+    /** Remaining copies on THIS replica (binary Spray-and-Wait). NOT bound to AAD — mutable per spray. */
+    @ProtoNumber(3) val copies: Int,
+    /** Absolute expiry. Clamped to MAX_TTL_DURATION on receipt. Bound to AAD — tamper-evident. */
+    @ProtoNumber(4) @Serializable(with = InstantSerializer::class) val expiresAt: Instant,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
         other as RelayMetadata
-        if (ttl != other.ttl) return false
         if (!messageId.contentEquals(other.messageId)) return false
         if (priority != other.priority) return false
-        if (!pow.contentEquals(other.pow)) return false
+        if (copies != other.copies) return false
+        if (expiresAt != other.expiresAt) return false
         return true
     }
 
     override fun hashCode(): Int {
-        var result = ttl
-        result = 31 * result + messageId.contentHashCode()
+        var result = messageId.contentHashCode()
         result = 31 * result + priority
-        result = 31 * result + pow.contentHashCode()
+        result = 31 * result + copies
+        result = 31 * result + expiresAt.hashCode()
         return result
     }
 
     override fun toString(): String =
-        "RelayMetadata(ttl=$ttl, messageId=${messageId.size}B, priority=$priority, pow=${pow.size}B)"
+        "RelayMetadata(messageId=${messageId.size}B, priority=$priority, copies=$copies, expiresAt=$expiresAt)"
 }

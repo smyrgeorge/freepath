@@ -5,7 +5,8 @@ import io.github.smyrgeorge.actor4k.system.registry.SimpleActorRegistry
 import io.github.smyrgeorge.actor4k.util.SimpleLoggerFactory
 import io.github.smyrgeorge.freepath.core.actor.AppActor
 import io.github.smyrgeorge.freepath.core.actor.ContactExchangeActor
-import io.github.smyrgeorge.freepath.core.actor.SyncPeerActor
+import io.github.smyrgeorge.freepath.core.actor.RelayActor
+import io.github.smyrgeorge.freepath.core.actor.PeerActor
 import io.github.smyrgeorge.freepath.core.state.model.StartupRoute
 import io.github.smyrgeorge.freepath.core.testing.fake.FakeNetwork
 import io.github.smyrgeorge.freepath.core.testing.state.TestAppResources
@@ -103,7 +104,7 @@ class TestCluster private constructor(
             }
 
             // Wait for activation to finish, then expose each peerId and register it so the
-            // SyncPeerActor factory can resolve the owning node.
+            // PeerActor factory can resolve the owning node.
             nodeList.forEach { node ->
                 awaitUntil(timeout = 30.seconds) {
                     node.viewState.startupRoute.value != StartupRoute.Loading
@@ -118,7 +119,7 @@ class TestCluster private constructor(
         private fun startActorSystem(registry: NodeRegistry) {
             val conf = ActorSystem.Conf(
                 actorActivateTimeout = 60.seconds,   // onActivate runs DB init + a ~1s startup pad
-                actorExpiresAfter = 1.hours,         // don't let an idle SyncPeerActor expire mid-test
+                actorExpiresAfter = 1.hours,         // don't let an idle PeerActor expire mid-test
                 registryCleanupEvery = 1.hours,
                 systemCollectStatsEvery = 1.hours,   // stats effectively disabled
                 systemLogStatsEvery = 1.hours,
@@ -139,9 +140,13 @@ class TestCluster private constructor(
                         resources = node.resources
                     )
                 }
-                .factoryFor(SyncPeerActor::class) { key ->
-                    val node = registry.byPeerId(SyncPeerActor.ownerPeerIdOf(key))
-                    SyncPeerActor(key = key, state = node.state, resources = node.resources)
+                .factoryFor(PeerActor::class) { key ->
+                    val node = registry.byPeerId(PeerActor.ownerPeerIdOf(key))
+                    PeerActor(key = key, state = node.state, resources = node.resources)
+                }
+                .factoryFor(RelayActor::class) { key ->
+                    val node = registry.byPeerId(key)
+                    RelayActor(key = key, resources = node.resources)
                 }
 
             ActorSystem

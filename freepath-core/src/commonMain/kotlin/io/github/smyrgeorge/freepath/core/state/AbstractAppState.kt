@@ -1,6 +1,12 @@
 package io.github.smyrgeorge.freepath.core.state
 
+import io.github.smyrgeorge.actor4k.system.ActorSystem
+import io.github.smyrgeorge.freepath.core.actor.RelayActor
+import io.github.smyrgeorge.freepath.core.actor.RelayProtocol
+import io.github.smyrgeorge.freepath.core.actor.PeerActor
+import io.github.smyrgeorge.freepath.core.actor.PeerProtocol
 import io.github.smyrgeorge.freepath.core.state.model.ConnectionSource
+import io.github.smyrgeorge.freepath.core.state.service.ContactEncounterService
 import io.github.smyrgeorge.freepath.core.state.service.ContactService
 import io.github.smyrgeorge.freepath.core.state.service.ContentService
 import io.github.smyrgeorge.freepath.core.state.service.IdentityService
@@ -44,6 +50,7 @@ abstract class AbstractAppState(
 
     private val db: ISQLite by lazy { resources.db }
 
+    private val contactEncounterService: ContactEncounterService by lazy { resources.contactEncounterService }
     private val contactService: ContactService by lazy { resources.contactService }
     private val contentService: ContentService by lazy { resources.contentService }
     private val identityService: IdentityService by lazy { resources.identityService }
@@ -178,12 +185,9 @@ abstract class AbstractAppState(
                 val status = relayMessage(message, peerId)
                 updateMessageStatus(entry, status)
                 when (status) {
-                    MessageStatus.RELAYED ->
-                        log.info("[send] Direct send to $peerId failed (${error.message}); relayed to the mesh")
-                    MessageStatus.QUEUED ->
-                        log.info("[send] Direct send to $peerId failed (${error.message}); queued for relay")
-                    else ->
-                        log.error("[send] Failed to send or queue message to $peerId: ${error.message}")
+                    MessageStatus.RELAYED -> log.info("[send] Direct send to $peerId failed (${error.message}); relayed to the mesh")
+                    MessageStatus.QUEUED -> log.info("[send] Direct send to $peerId failed (${error.message}); queued for relay")
+                    else -> log.error("[send] Failed to send or queue message to $peerId: ${error.message}")
                 }
             }
     }
@@ -212,39 +216,38 @@ abstract class AbstractAppState(
             relay = RelayOptions(),
         )
 
-        // Persist the master copy first. This is what keeps store-and-forward working when no peer
-        // is online now: SyncPeerActor forwards it whenever a peer (re)connects.
-        val stored = runCatching { relayService.db { save(envelope.toRelayEntry()) } }
+        // Persist the master replica first (copies = L) via the relay-queue owner. This is what keeps
+        // store-and-forward working when no peer is online now: PeerActor sprays it whenever a
+        // peer (re)connects. We await the enqueue so the nudge below can't outrun the committed row.
+        val stored = ActorSystem.get(RelayActor::class, RelayActor.key(identity.peerId))
+            .ask(RelayProtocol.Enqueue(envelope.toRelayEntry()))
             .getOrElse {
                 log.error("[relay] Failed to enqueue relay copy for $peerId: ${it.message}")
                 return MessageStatus.FAILED
             }
+            .entry
 
-        // Fan out to peers reachable right now. Each forwarded copy carries ttl-1 (one hop from us);
-        // the stored master keeps its full hop budget for future reconnects, so breadth (how many
-        // peers we hand it to) never eats into depth (how far it can still travel through the mesh).
-        val onlinePeers = libnet.onlinePeerIds()
-        if (onlinePeers.isEmpty()) {
+        // Nudge peers reachable right now to spray immediately — otherwise the freshly-queued
+        // replica would sit until the next connection event. PeerActor drives the spray pass and
+        // per-peer dedup, while the copy-budget accounting lives in RelayActor; we only trigger
+        // it here, so this is best-effort ("handed to the mesh"), hence RELAYED rather than SENT.
+        val online = libnet.onlinePeerIds()
+        if (online.isEmpty()) {
             log.info("[relay] No peers online; queued relay copy for $peerId (entry ${stored.id})")
             return MessageStatus.QUEUED
         }
-
-        val relay = envelope.relay ?: error("Relay envelope for $peerId has no relay metadata")
-        val hop = envelope.copy(relay = relay.copy(ttl = relay.ttl - 1))
-        var forwarded = 0
-        onlinePeers.forEach { nextHop ->
-            client.relay(hop, nextHop)
-                .onSuccess { forwarded++ }
-                .onFailure { log.warn("[relay] Failed to forward relay copy to $nextHop: ${it.message}") }
+        // Shuffle so copies fan out to a random subset of carriers. Binary Spray-and-Wait halves the
+        // budget per peer, so only the first ~log2(copies) peers to reserve get a copy at all; with a
+        // stable peer order that would always be the same few carriers. Randomizing spreads the carrier
+        // load across the reachable population and improves delivery diversity. (When the encounter
+        // heuristic is wired in, this becomes a ranked order — best carriers first — instead of random.)
+        online.shuffled().forEach { peer ->
+            ActorSystem.get(PeerActor::class, PeerActor.key(identity.peerId, peer))
+                .tell(PeerProtocol.Relay)
+                .onFailure { log.warn("[relay] Failed to trigger spray to $peer: ${it.message}") }
         }
-
-        return if (forwarded > 0) {
-            log.info("[relay] Relayed copy for $peerId to $forwarded/${onlinePeers.size} online peer(s)")
-            MessageStatus.RELAYED
-        } else {
-            log.info("[relay] No online peer accepted the relay copy for $peerId; left queued (entry ${stored.id})")
-            MessageStatus.QUEUED
-        }
+        log.info("[relay] Queued relay copy for $peerId (entry ${stored.id}); spraying to ${online.size} online peer(s)")
+        return MessageStatus.RELAYED
     }
 
     private fun upsertMessage(entry: MessageEntry) {
@@ -267,6 +270,7 @@ abstract class AbstractAppState(
         viewState.showResetClearing()
         return runCatching {
             db.transaction {
+                contactEncounterService.deleteAll()
                 contactService.deleteAll()
                 contentService.deleteAll()
                 identityService.deleteAll()

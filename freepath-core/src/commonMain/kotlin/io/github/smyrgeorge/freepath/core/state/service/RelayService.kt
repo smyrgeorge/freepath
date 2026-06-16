@@ -5,11 +5,15 @@ import io.github.smyrgeorge.freepath.database.RelayEntryRepository
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
 import io.github.smyrgeorge.sqlx4k.Transaction
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 class RelayService(
     override val db: ISQLite,
     private val relayRepository: RelayEntryRepository,
 ) : Service {
+
     context(db: QueryExecutor)
     suspend fun findAll(limit: Int): List<RelayEntry> =
         relayRepository.findAllByLimit(limit).getOrThrow()
@@ -18,29 +22,21 @@ class RelayService(
     suspend fun save(entry: RelayEntry): RelayEntry =
         relayRepository.save(entry).getOrThrow()
 
-    /**
-     * Applies mesh-forwarding TTL policy to [entry] and returns the entry to forward, or `null`
-     * if it should not be forwarded (TTL exhausted — the entry is discarded from the queue).
-     *
-     * Per-attempt semantics: TTL counts forward *attempts*, not successful deliveries, so it is
-     * decremented and persisted here — before the send — to prevent retry storms. A repeatedly
-     * failing entry still ages out and is eventually discarded rather than forwarded forever.
-     *
-     * The caller forwards the returned entry's [RelayEntry.envelope]; the decremented TTL is
-     * authoritative in `envelope.relay.ttl` (the [RelayEntry.ttl] column is generated/read-only).
-     */
-    context(db: QueryExecutor)
-    suspend fun decrementTtlOrDiscard(entry: RelayEntry): RelayEntry? {
-        if (entry.ttl <= 0) {
-            deleteById(entry.id)
-            return null
-        }
-        val relay = entry.envelope.relay
-            ?: error("Relay entry ${entry.id} has no relay metadata")
-        val updated = entry.copy(
-            envelope = entry.envelope.copy(relay = relay.copy(ttl = entry.ttl - 1))
+    context(db: Transaction)
+    suspend fun reserveSprayCopy(entryId: Int): RelayEntry? {
+        val current = relayRepository.findOneById(entryId).getOrThrow() ?: return null
+        // Wait phase: a single copy left → hold it for direct delivery only.
+        if (current.copies <= 1) return null
+
+        val transferred = current.copies / 2
+        val kept = current.copies - transferred
+        relayRepository.save(current.copy(copies = kept)).getOrThrow()
+
+        val relay = current.envelope.relay ?: error("Relay entry $entryId has no relay metadata")
+        return current.copy(
+            copies = transferred,
+            envelope = current.envelope.copy(relay = relay.copy(copies = transferred)),
         )
-        return save(updated)
     }
 
     context(db: QueryExecutor)
@@ -48,8 +44,19 @@ class RelayService(
         relayRepository.deleteById(id).getOrThrow()
     }
 
+    context(db: QueryExecutor)
+    suspend fun deleteExpired(now: Instant): Long =
+        relayRepository.executeDeleteExpired(
+            now = now.toEpochMilliseconds(),
+            minCreatedAt = (now - MAX_TTL_DURATION).toEpochMilliseconds(),
+        ).getOrThrow()
+
     context(db: Transaction)
     suspend fun deleteAll() {
         relayRepository.deleteAll().getOrThrow()
+    }
+
+    companion object {
+        val MAX_TTL_DURATION: Duration = 7.days
     }
 }

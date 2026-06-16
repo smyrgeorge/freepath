@@ -1,27 +1,19 @@
 package io.github.smyrgeorge.freepath.core.messaging
 
+import io.github.smyrgeorge.freepath.core.testing.cluster.TestNode
 import io.github.smyrgeorge.freepath.core.testing.util.awaitUntil
 import io.github.smyrgeorge.freepath.core.testing.util.clusterTest
 import io.github.smyrgeorge.freepath.database.MessageStatus
+import io.github.smyrgeorge.freepath.database.RelayEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Exercises mesh store-and-forward: when a chat `send` can't reach the recipient directly, the
- * sender seals a relay copy into its own relay queue and the existing `SyncPeerActor.relay` path
- * carries it — directly once the peer reconnects, or across an intermediate relay node.
- *
- * Sender-side status distinguishes how far a message got: [MessageStatus.SENT] only on a direct
- * ack from the recipient; [MessageStatus.RELAYED] when the relay copy is handed to an online peer;
- * [MessageStatus.QUEUED] when it is stored but no peer is reachable yet. The mesh is fire-and-forget
- * (no end-to-end receipt), so a QUEUED message that the mesh later delivers stays QUEUED on the
- * sender — there is no signal to promote it (a live QUEUED→RELAYED transition is future work).
- *
- * Like [MessageExchangeTest], the cluster framework is JVM-only, so each test no-ops on the other
- * targets that also compile this common source set.
- */
 class StoreAndForwardTest {
+
+    /** True if this relay entry is addressed to [recipient] (Pass-1 direct-delivery match). */
+    private fun RelayEntry.isFor(recipient: TestNode): Boolean =
+        envelope.receiverIdHash.contentEquals(recipient.identity.peerIdHash)
 
     @Test
     fun `message to an unreachable peer is queued for relay`() = clusterTest { cluster ->
@@ -103,4 +95,43 @@ class StoreAndForwardTest {
         assertTrue(alice.relayQueue().isEmpty(), "nothing should be queued without a contact card")
         assertTrue(bob.chatWith(alice).isEmpty(), "bob should not have received anything")
     }
+
+    @Test
+    fun `a message queued while a relay peer is online is RELAYED`() = clusterTest(nodes = 3) { cluster ->
+        val (alice, bob, carol) = cluster.nodes
+        cluster.seedMutualContacts(alice, bob)   // alice can seal a relay copy for bob
+        cluster.connect(alice, carol)            // a relay is online; bob is not
+
+        alice.sendMessage(to = bob, text = "relay me")
+
+        // Direct delivery to bob fails (offline); the copy is handed to the mesh → RELAYED.
+        awaitUntil {
+            alice.chatWith(bob).any { it.message.body == "relay me" && it.status == MessageStatus.RELAYED }
+        }
+        // …and it is actually sprayed to the online relay.
+        awaitUntil { carol.relayQueue().any { it.isFor(bob) } }
+    }
+
+    @Test
+    fun `spraying to a relay halves the sender's copy budget`() =
+        clusterTest(nodes = 3) { cluster ->
+            val (alice, bob, carol) = cluster.nodes
+            cluster.seedMutualContacts(alice, bob)
+            // bob stays offline; carol is an intermediate mesh relay.
+
+            alice.sendMessage(to = bob, text = "spray me")
+            awaitUntil { alice.relayQueue().any { it.isFor(bob) } }
+            val master = alice.relayQueue().single { it.isFor(bob) }
+            assertEquals(8, master.copies, "a fresh relay copy starts with L copies")
+
+            cluster.connect(alice, carol)
+
+            // carol receives a sprayed copy with a halved copy budget.
+            awaitUntil { carol.relayQueue().any { it.isFor(bob) } }
+            val sprayed = carol.relayQueue().first { it.isFor(bob) }
+            assertTrue(sprayed.copies in 1..4, "expected a halved copy budget, got ${sprayed.copies}")
+
+            // alice handed off half its budget and keeps the rest (single relay → deterministic).
+            awaitUntil { alice.relayQueue().singleOrNull { it.isFor(bob) }?.copies == 4 }
+        }
 }

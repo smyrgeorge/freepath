@@ -13,9 +13,13 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 class RelayEntryRepositoryTest {
 
@@ -42,21 +46,31 @@ class RelayEntryRepositoryTest {
 
     private fun envelope(
         receiverIdHash: ByteArray = CryptoProvider.randomBytes(32),
-        ttl: Int = 5,
+        copies: Int = 8,
+        // Default far in the future so it never interferes with the sweep tests.
+        expiresAt: Instant = Clock.System.now() + 1.days,
     ) = StatelessEnvelope(
-        schema = 2,
+        schema = 3,
         receiverIdHash = receiverIdHash,
         timestamp = Clock.System.now(),
         nonce = CryptoProvider.randomBytes(12),
         ephemeralKey = CryptoProvider.randomBytes(32),
         payload = byteArrayOf(1, 2, 3, 4),
-        relay = RelayMetadata(ttl = ttl, messageId = CryptoProvider.randomBytes(32), priority = 1),
+        relay = RelayMetadata(
+            messageId = CryptoProvider.randomBytes(32),
+            priority = 1,
+            copies = copies,
+            expiresAt = expiresAt,
+        ),
     )
 
     private fun entry(
         receiverIdHash: ByteArray = CryptoProvider.randomBytes(32),
-        ttl: Int = 5,
-    ) = envelope(receiverIdHash, ttl).toRelayEntry()
+        copies: Int = 8,
+        expiresAt: Instant = Clock.System.now() + 1.days,
+    ) = envelope(receiverIdHash, copies, expiresAt).toRelayEntry()
+
+    private fun nowMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
     // ── insert ────────────────────────────────────────────────────────────────
 
@@ -72,12 +86,12 @@ class RelayEntryRepositoryTest {
     fun `insert persists envelope fields`() = runTest {
         with(db) {
             val hash = CryptoProvider.randomBytes(32)
-            repo.insert(entry(receiverIdHash = hash, ttl = 5)).getOrThrow()
+            repo.insert(entry(receiverIdHash = hash, copies = 8)).getOrThrow()
 
             val fetched = repo.findAllByLimit(100).getOrThrow().first()
             assertTrue(fetched.envelope.receiverIdHash.contentEquals(hash))
-            assertEquals(2, fetched.envelope.schema)
-            assertEquals(5, fetched.ttl)
+            assertEquals(3, fetched.envelope.schema)
+            assertEquals(8, fetched.copies)
             assertEquals(1, fetched.envelope.relay?.priority)
         }
     }
@@ -104,31 +118,26 @@ class RelayEntryRepositoryTest {
         }
     }
 
-    // ── update ────────────────────────────────────────────────────────────────
+    // ── update / save (mutable copies budget) ───────────────────────────────────
 
     @Test
-    fun `update persists changed ttl`() = runTest {
+    fun `update persists changed copies`() = runTest {
         with(db) {
-            val inserted = repo.insert(entry(ttl = 5)).getOrThrow()
-            val newEnvelope = inserted.envelope.copy(relay = inserted.envelope.relay!!.copy(ttl = 3))
-            val updated = repo.update(inserted.copy(envelope = newEnvelope)).getOrThrow()
+            val inserted = repo.insert(entry(copies = 8)).getOrThrow()
+            val updated = repo.update(inserted.copy(copies = 4)).getOrThrow()
             assertEquals(inserted.id, updated.id)
-            assertEquals(3, updated.ttl)
-            assertEquals(3, updated.envelope.relay?.ttl)
+            assertEquals(4, updated.copies)
         }
     }
 
     @Test
     fun `update sets updatedAt to a more recent timestamp`() = runTest {
         with(db) {
-            val inserted = repo.insert(entry(ttl = 5)).getOrThrow()
-            val newEnvelope = inserted.envelope.copy(relay = inserted.envelope.relay!!.copy(ttl = 4))
-            val updated = repo.update(inserted.copy(envelope = newEnvelope)).getOrThrow()
+            val inserted = repo.insert(entry(copies = 8)).getOrThrow()
+            val updated = repo.update(inserted.copy(copies = 4)).getOrThrow()
             assertTrue(updated.updatedAt >= inserted.updatedAt)
         }
     }
-
-    // ── save ─────────────────────────────────────────────────────────────────
 
     @Test
     fun `save with id=0 inserts new entry`() = runTest {
@@ -141,50 +150,42 @@ class RelayEntryRepositoryTest {
     @Test
     fun `save with existing id updates entry`() = runTest {
         with(db) {
-            val inserted = repo.insert(entry(ttl = 5)).getOrThrow()
-            val newEnvelope = inserted.envelope.copy(relay = inserted.envelope.relay!!.copy(ttl = 2))
-            val updated = repo.save(inserted.copy(envelope = newEnvelope)).getOrThrow()
+            val inserted = repo.insert(entry(copies = 8)).getOrThrow()
+            val updated = repo.save(inserted.copy(copies = 2)).getOrThrow()
             assertEquals(inserted.id, updated.id)
-            assertEquals(2, updated.ttl)
+            assertEquals(2, updated.copies)
         }
     }
 
-    // ── TTL update via save ───────────────────────────────────────────────────
-
     @Test
-    fun `save with decremented ttl persists new ttl and generated column`() = runTest {
+    fun `save with halved copies persists the new budget`() = runTest {
         with(db) {
-            val inserted = repo.insert(entry(ttl = 5)).getOrThrow()
-            val newEnvelope = inserted.envelope.copy(relay = inserted.envelope.relay!!.copy(ttl = 4))
-            val updated = repo.save(inserted.copy(envelope = newEnvelope)).getOrThrow()
-
-            assertEquals(4, updated.ttl)
-            assertEquals(4, updated.envelope.relay?.ttl)
+            val inserted = repo.insert(entry(copies = 8)).getOrThrow()
+            val updated = repo.save(inserted.copy(copies = 4)).getOrThrow()
+            assertEquals(4, updated.copies)
             assertTrue(updated.updatedAt >= inserted.updatedAt)
         }
     }
 
     @Test
-    fun `save with ttl=0 does not delete the entry`() = runTest {
+    fun `save with copies=1 in the wait phase does not delete the entry`() = runTest {
         with(db) {
-            val inserted = repo.insert(entry(ttl = 1)).getOrThrow()
-            val newEnvelope = inserted.envelope.copy(relay = inserted.envelope.relay!!.copy(ttl = 0))
-            repo.save(inserted.copy(envelope = newEnvelope)).getOrThrow()
+            val inserted = repo.insert(entry(copies = 2)).getOrThrow()
+            repo.save(inserted.copy(copies = 1)).getOrThrow()
 
             val remaining = repo.findAllByLimit(100).getOrThrow()
             assertEquals(1, remaining.size)
-            assertEquals(0, remaining.first().ttl)
+            assertEquals(1, remaining.first().copies)
         }
     }
 
     @Test
-    fun `save with updated ttl does not affect other envelope fields`() = runTest {
+    fun `save with updated copies does not affect other envelope fields`() = runTest {
         with(db) {
-            val inserted = repo.insert(entry(ttl = 5)).getOrThrow()
-            val newEnvelope = inserted.envelope.copy(relay = inserted.envelope.relay!!.copy(ttl = 3))
-            val updated = repo.save(inserted.copy(envelope = newEnvelope)).getOrThrow()
+            val inserted = repo.insert(entry(copies = 8)).getOrThrow()
+            val updated = repo.save(inserted.copy(copies = 3)).getOrThrow()
 
-            assertEquals(3, updated.ttl)
+            assertEquals(3, updated.copies)
             assertTrue(updated.envelope.relay!!.messageId.contentEquals(inserted.envelope.relay!!.messageId))
             assertEquals(inserted.envelope.relay!!.priority, updated.envelope.relay!!.priority)
             assertTrue(updated.envelope.receiverIdHash.contentEquals(inserted.envelope.receiverIdHash))
@@ -227,13 +228,11 @@ class RelayEntryRepositoryTest {
     @Test
     fun `batchUpdate persists changed fields for all entries`() = runTest {
         with(db) {
-            val inserted = repo.batchInsert(listOf(entry(ttl = 5), entry(ttl = 5))).getOrThrow()
-            val modified = inserted.map { e ->
-                e.copy(envelope = e.envelope.copy(relay = e.envelope.relay!!.copy(ttl = 2)))
-            }
+            val inserted = repo.batchInsert(listOf(entry(copies = 8), entry(copies = 8))).getOrThrow()
+            val modified = inserted.map { e -> e.copy(copies = 2) }
             val updated = repo.batchUpdate(modified).getOrThrow()
             assertEquals(2, updated.size)
-            assertTrue(updated.all { it.ttl == 2 })
+            assertTrue(updated.all { it.copies == 2 })
         }
     }
 
@@ -282,13 +281,23 @@ class RelayEntryRepositoryTest {
         }
     }
 
+    // ── findOneById ───────────────────────────────────────────────────────────
+
     @Test
-    fun `findAllByLimit includes entries with ttl = 0`() = runTest {
+    fun `findOneById returns the matching entry`() = runTest {
         with(db) {
-            repo.insert(entry(ttl = 0)).getOrThrow()
-            val result = repo.findAllByLimit(100).getOrThrow()
-            assertEquals(1, result.size)
-            assertEquals(0, result.first().ttl)
+            val inserted = repo.insert(entry()).getOrThrow()
+            val found = assertNotNull(repo.findOneById(inserted.id).getOrThrow())
+            assertEquals(inserted.id, found.id)
+            assertTrue(found.envelope.relay!!.messageId.contentEquals(inserted.envelope.relay!!.messageId))
+        }
+    }
+
+    @Test
+    fun `findOneById returns null for a missing id`() = runTest {
+        with(db) {
+            repo.insert(entry()).getOrThrow()
+            assertNull(repo.findOneById(999_999).getOrThrow())
         }
     }
 
@@ -328,41 +337,46 @@ class RelayEntryRepositoryTest {
         }
     }
 
-    // ── executeDeleteExpiredTtl ───────────────────────────────────────────────
+    // ── executeDeleteExpired (lifecycle sweep) ────────────────────────────────
 
     @Test
-    fun `executeDeleteExpiredTtl removes entries where ttl = 0`() = runTest {
+    fun `executeDeleteExpired removes time-expired entries`() = runTest {
         with(db) {
-            repo.insert(entry(ttl = 0)).getOrThrow()
-            repo.insert(entry(ttl = 0)).getOrThrow()
-            repo.insert(entry(ttl = 3)).getOrThrow()
+            repo.insert(entry(expiresAt = Instant.fromEpochMilliseconds(1))).getOrThrow() // long past
+            repo.insert(entry()).getOrThrow()                                             // future expiry
 
-            val deleted = repo.executeDeleteExpiredTtl().getOrThrow()
+            val deleted = repo.executeDeleteExpired(now = nowMillis(), minCreatedAt = 0).getOrThrow()
+            assertEquals(1L, deleted)
+            assertEquals(1, repo.findAllByLimit(100).getOrThrow().size)
+        }
+    }
+
+    @Test
+    fun `executeDeleteExpired removes entries older than the age cap`() = runTest {
+        with(db) {
+            repeat(2) { repo.insert(entry()).getOrThrow() } // future expiry
+            // now = 0 ⇒ nothing is time-expired; a future minCreatedAt ⇒ every row is "too old" ⇒ swept.
+            val future = nowMillis() + 60_000
+            val deleted = repo.executeDeleteExpired(now = 0, minCreatedAt = future).getOrThrow()
             assertEquals(2L, deleted)
-
-            val remaining = repo.findAllByLimit(100).getOrThrow()
-            assertEquals(1, remaining.size)
-            assertEquals(3, remaining.first().ttl)
         }
     }
 
     @Test
-    fun `executeDeleteExpiredTtl does not remove entries with positive ttl`() = runTest {
+    fun `executeDeleteExpired keeps live entries`() = runTest {
         with(db) {
-            repeat(3) { repo.insert(entry(ttl = 5)).getOrThrow() }
+            repeat(3) { repo.insert(entry()).getOrThrow() }
 
-            val deleted = repo.executeDeleteExpiredTtl().getOrThrow()
+            val deleted = repo.executeDeleteExpired(now = nowMillis(), minCreatedAt = 0).getOrThrow()
             assertEquals(0L, deleted)
-
-            val remaining = repo.findAllByLimit(100).getOrThrow()
-            assertEquals(3, remaining.size)
+            assertEquals(3, repo.findAllByLimit(100).getOrThrow().size)
         }
     }
 
     @Test
-    fun `executeDeleteExpiredTtl on empty table succeeds and returns 0`() = runTest {
+    fun `executeDeleteExpired on empty table succeeds and returns 0`() = runTest {
         with(db) {
-            val deleted = repo.executeDeleteExpiredTtl().getOrThrow()
+            val deleted = repo.executeDeleteExpired(now = nowMillis(), minCreatedAt = 0).getOrThrow()
             assertEquals(0L, deleted)
         }
     }
@@ -383,8 +397,33 @@ class RelayEntryRepositoryTest {
             assertTrue(fetched.envelope.payload.contentEquals(original.payload))
             assertNotNull(fetched.envelope.relay)
             assertTrue(fetched.envelope.relay!!.messageId.contentEquals(original.relay!!.messageId))
-            assertEquals(original.relay!!.ttl, fetched.envelope.relay!!.ttl)
+            assertEquals(original.relay!!.copies, fetched.envelope.relay!!.copies)
             assertEquals(original.relay!!.priority, fetched.envelope.relay!!.priority)
+        }
+    }
+
+    // ── generated columns & dedup index ─────────────────────────────────────────
+
+    @Test
+    fun `message_id unique index rejects a duplicate replica`() = runTest {
+        with(db) {
+            val original = envelope()
+            repo.insert(RelayEntry(envelope = original)).getOrThrow()
+            // A second replica with the same messageId must not be stored twice (dedup).
+            assertFails { repo.insert(RelayEntry(envelope = original.copy())).getOrThrow() }
+        }
+    }
+
+    @Test
+    fun `expires_at generated column reflects the envelope`() = runTest {
+        with(db) {
+            val expiry = Instant.fromEpochMilliseconds(1_700_000_000_000)
+            val e = envelope().let { it.copy(relay = it.relay!!.copy(expiresAt = expiry)) }
+            repo.insert(RelayEntry(envelope = e)).getOrThrow()
+
+            val fetched = repo.findAllByLimit(1).getOrThrow().first()
+            assertEquals(expiry, fetched.expiresAt)
+            assertEquals(expiry, fetched.envelope.relay!!.expiresAt)
         }
     }
 }

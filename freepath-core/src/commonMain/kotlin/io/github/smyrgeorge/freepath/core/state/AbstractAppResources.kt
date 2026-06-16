@@ -1,14 +1,18 @@
 package io.github.smyrgeorge.freepath.core.state
 
 import io.github.smyrgeorge.actor4k.actor.ref.ActorRef
+import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.freepath.core.actor.AppProtocol
+import io.github.smyrgeorge.freepath.core.actor.RelayActor
+import io.github.smyrgeorge.freepath.core.actor.RelayProtocol
+import io.github.smyrgeorge.freepath.core.state.service.ContactEncounterService
 import io.github.smyrgeorge.freepath.core.state.service.ContactService
 import io.github.smyrgeorge.freepath.core.state.service.ContentService
 import io.github.smyrgeorge.freepath.core.state.service.IdentityService
 import io.github.smyrgeorge.freepath.core.state.service.MessageService
 import io.github.smyrgeorge.freepath.core.state.service.RelayService
 import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.db
-import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.tx
+import io.github.smyrgeorge.freepath.database.ContactEncounterEntryRepository
 import io.github.smyrgeorge.freepath.database.ContactEntryRepository
 import io.github.smyrgeorge.freepath.database.ContactRoutingEntryRepository
 import io.github.smyrgeorge.freepath.database.ContentEntryRepository
@@ -17,6 +21,7 @@ import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.database.MessageEntryRepository
 import io.github.smyrgeorge.freepath.database.RelayEntry.Companion.toRelayEntry
 import io.github.smyrgeorge.freepath.database.RelayEntryRepository
+import io.github.smyrgeorge.freepath.database.generated.ContactEncounterEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContactEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContactRoutingEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContentEntryRepositoryImpl
@@ -67,6 +72,7 @@ abstract class AbstractAppResources(
     lateinit var contactLookup: (String) -> Contact?
 
     val identityRepository: IdentityEntryRepository = IdentityEntryRepositoryImpl
+    val contactEncounterRepository: ContactEncounterEntryRepository = ContactEncounterEntryRepositoryImpl
     val contactRepository: ContactEntryRepository = ContactEntryRepositoryImpl
     val contentRepository: ContentEntryRepository = ContentEntryRepositoryImpl
     val contentSyncRepository: ContentSyncEntryRepository = ContentSyncEntryRepositoryImpl
@@ -78,6 +84,12 @@ abstract class AbstractAppResources(
         IdentityService(
             db = db,
             identityRepository = identityRepository,
+        )
+    }
+    val contactEncounterService: ContactEncounterService by lazy {
+        ContactEncounterService(
+            db = db,
+            repository = contactEncounterRepository,
         )
     }
     val contactService: ContactService by lazy {
@@ -200,12 +212,18 @@ abstract class AbstractAppResources(
                 app.tell(cmd)
             },
             onRelayPacket = { envelope ->
+                // Admission is contact-gated at the connection layer (libp2p only accepts sessions
+                // from known contacts), so only contacts can hand us relay packets.
+                // TODO: tighten further — store only when receiverIdHash ∈ {my contacts}
+                //   ("I relay only for my friends") and add per-contact rate limits + a store cap
+                //   with eviction so a misbehaving contact can't churn the queue.
                 if (envelope.relay == null) {
                     log.warn { "Received relay packet without relay metadata, dropping" }
                 } else {
-                    runCatching {
-                        relayService.tx { save(envelope.toRelayEntry()) }
-                    }.onFailure { log.error { "Failed to store relay packet: ${it.message}" } }
+                    // Store via the relay-queue owner so all writes share one serialization point.
+                    ActorSystem.get(RelayActor::class, RelayActor.key(identity.peerId))
+                        .tell(RelayProtocol.Enqueue(envelope.toRelayEntry()))
+                        .onFailure { log.error { "Failed to store relay packet: ${it.message}" } }
                 }
             },
         ).apply {

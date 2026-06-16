@@ -7,6 +7,7 @@ import io.github.smyrgeorge.freepath.core.testing.state.TestAppResources
 import io.github.smyrgeorge.freepath.core.testing.state.TestAppState
 import io.github.smyrgeorge.freepath.core.testing.state.TestViewState
 import io.github.smyrgeorge.freepath.core.testing.util.toContactCard
+import io.github.smyrgeorge.freepath.database.ContactEncounterEntry
 import io.github.smyrgeorge.freepath.database.ContactEntry
 import io.github.smyrgeorge.freepath.database.ContentEntry
 import io.github.smyrgeorge.freepath.database.MessageEntry
@@ -85,6 +86,10 @@ class TestNode internal constructor(
 
     /** Snapshot of this node's store-and-forward relay queue (its pending mesh mailbox). */
     suspend fun relayQueue(): List<RelayEntry> = resources.relayService.db { findAll(limit = 256) }
+
+    /** This node's local (never-shared) encounter record for [peer], if any — the encounter heuristic. */
+    suspend fun encounterWith(peer: TestNode): ContactEncounterEntry? =
+        resources.contactEncounterService.db { getByPeerId(peer.peerId) }
 
     /** Currently loaded contacts (excludes self). */
     val contacts: List<ContactEntry> get() = state.contacts.value

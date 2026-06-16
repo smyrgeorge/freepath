@@ -22,9 +22,15 @@ data class RelayEntry(
     /** Full StatelessEnvelope stored as JSON. ByteArray fields are base64-encoded. */
     @Converter(StatelessEnvelopeConverter::class)
     val envelope: StatelessEnvelope,
-    /** Generated column: json_extract(envelope, '$.relay.ttl'). Read-only — managed by SQLite. */
+    /**
+     * Remaining copies for THIS replica (binary Spray-and-Wait). Mutable: decremented and persisted
+     * on each spray. Seeded from `envelope.relay.copies`.
+     */
+    val copies: Int = envelope.relay?.copies ?: error("Envelope without relay metadata"),
+    /** Generated column: json_extract(envelope, '$.relay.expiresAt'). Read-only — managed by SQLite. */
     @Column(insert = false, update = false)
-    val ttl: Int = envelope.relay?.ttl ?: error("Envelope without relay metadata"),
+    @Converter(InstantConverter::class)
+    val expiresAt: Instant = envelope.relay?.expiresAt ?: error("Envelope without relay metadata"),
 ) : Auditable<Int> {
 
     override fun equals(other: Any?): Boolean {
@@ -34,6 +40,7 @@ data class RelayEntry(
         if (id != other.id) return false
         if (createdAt != other.createdAt) return false
         if (updatedAt != other.updatedAt) return false
+        if (copies != other.copies) return false
         if (envelope != other.envelope) return false
         return true
     }
@@ -42,12 +49,13 @@ data class RelayEntry(
         var result = id
         result = 31 * result + createdAt.hashCode()
         result = 31 * result + updatedAt.hashCode()
+        result = 31 * result + copies
         result = 31 * result + envelope.hashCode()
         return result
     }
 
     override fun toString(): String =
-        "RelayEntry(id=$id, ttl=$ttl, timestamp=${envelope.timestamp}, updatedAt=$updatedAt)"
+        "RelayEntry(id=$id, copies=$copies, expiresAt=$expiresAt, updatedAt=$updatedAt)"
 
     companion object {
         /**
