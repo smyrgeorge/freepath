@@ -3,8 +3,6 @@ package io.github.smyrgeorge.freepath.core.state
 import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.freepath.core.actor.RelayActor
 import io.github.smyrgeorge.freepath.core.actor.RelayProtocol
-import io.github.smyrgeorge.freepath.core.actor.PeerActor
-import io.github.smyrgeorge.freepath.core.actor.PeerProtocol
 import io.github.smyrgeorge.freepath.core.state.model.ConnectionSource
 import io.github.smyrgeorge.freepath.core.state.service.ContactEncounterService
 import io.github.smyrgeorge.freepath.core.state.service.ContactService
@@ -20,7 +18,6 @@ import io.github.smyrgeorge.freepath.database.IdentityEntry
 import io.github.smyrgeorge.freepath.database.MessageEntry
 import io.github.smyrgeorge.freepath.database.MessageStatus
 import io.github.smyrgeorge.freepath.database.RelayEntry.Companion.toRelayEntry
-import io.github.smyrgeorge.freepath.libnet.LibnetModule
 import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
 import io.github.smyrgeorge.freepath.libnet.client.codec.LibnetClientCodec
 import io.github.smyrgeorge.freepath.libnet.client.model.RelayOptions
@@ -57,7 +54,6 @@ abstract class AbstractAppState(
     private val messageService: MessageService by lazy { resources.messageService }
     private val relayService: RelayService by lazy { resources.relayService }
     private val client: LibnetClient by lazy { resources.client }
-    private val libnet: LibnetModule by lazy { resources.libnet }
 
     private val _contacts = MutableStateFlow<List<ContactEntry>>(emptyList())
     val contacts: StateFlow<List<ContactEntry>> = _contacts.asStateFlow()
@@ -216,10 +212,12 @@ abstract class AbstractAppState(
             relay = RelayOptions(),
         )
 
-        // Persist the master replica first (copies = L) via the relay-queue owner. This is what keeps
-        // store-and-forward working when no peer is online now: PeerActor sprays it whenever a
-        // peer (re)connects. We await the enqueue so the nudge below can't outrun the committed row.
-        val stored = ActorSystem.get(RelayActor::class, RelayActor.key(identity.peerId))
+        // All relay logic is owned by the RelayActor (the single owner of the relay queue and the
+        // copy budget). We persist the master replica first (copies = L) so store-and-forward keeps
+        // working when no peer is online now, then ask it to distribute to peers reachable right now.
+        // We await the enqueue so the distribute can't outrun the committed row.
+        val relayActor = ActorSystem.get(RelayActor::class, RelayActor.key(identity.peerId))
+        val stored = relayActor
             .ask(RelayProtocol.Enqueue(envelope.toRelayEntry()))
             .getOrElse {
                 log.error("[relay] Failed to enqueue relay copy for $peerId: ${it.message}")
@@ -227,27 +225,20 @@ abstract class AbstractAppState(
             }
             .entry
 
-        // Nudge peers reachable right now to spray immediately — otherwise the freshly-queued
-        // replica would sit until the next connection event. PeerActor drives the spray pass and
-        // per-peer dedup, while the copy-budget accounting lives in RelayActor; we only trigger
-        // it here, so this is best-effort ("handed to the mesh"), hence RELAYED rather than SENT.
-        val online = libnet.onlinePeerIds()
-        if (online.isEmpty()) {
-            log.info("[relay] No peers online; queued relay copy for $peerId (entry ${stored.id})")
+        // Ask the RelayActor to distribute the queue to currently-online peers. It owns the fan-out, the
+        // per-peer dedup and the copy-budget accounting; distributing is best-effort ("handed to the
+        // mesh"), hence RELAYED rather than SENT. If it distributed to no one, the copy stays QUEUED.
+        val distributedTo = relayActor.ask(RelayProtocol.Distribute).getOrElse {
+            log.warn("[relay] Failed to distribute relay copy for $peerId (entry ${stored.id}): ${it.message}; left queued")
             return MessageStatus.QUEUED
+        }.peerCount
+        return if (distributedTo == 0) {
+            log.info("[relay] No peers online; queued relay copy for $peerId (entry ${stored.id})")
+            MessageStatus.QUEUED
+        } else {
+            log.info("[relay] Queued relay copy for $peerId (entry ${stored.id}); distributed to $distributedTo online peer(s)")
+            MessageStatus.RELAYED
         }
-        // Shuffle so copies fan out to a random subset of carriers. Binary Spray-and-Wait halves the
-        // budget per peer, so only the first ~log2(copies) peers to reserve get a copy at all; with a
-        // stable peer order that would always be the same few carriers. Randomizing spreads the carrier
-        // load across the reachable population and improves delivery diversity. (When the encounter
-        // heuristic is wired in, this becomes a ranked order — best carriers first — instead of random.)
-        online.shuffled().forEach { peer ->
-            ActorSystem.get(PeerActor::class, PeerActor.key(identity.peerId, peer))
-                .tell(PeerProtocol.Relay)
-                .onFailure { log.warn("[relay] Failed to trigger spray to $peer: ${it.message}") }
-        }
-        log.info("[relay] Queued relay copy for $peerId (entry ${stored.id}); spraying to ${online.size} online peer(s)")
-        return MessageStatus.RELAYED
     }
 
     private fun upsertMessage(entry: MessageEntry) {

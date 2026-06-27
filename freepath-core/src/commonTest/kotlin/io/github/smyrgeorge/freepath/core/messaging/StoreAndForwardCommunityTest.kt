@@ -29,7 +29,7 @@ class StoreAndForwardCommunityTest {
     private fun RelayEntry.isFor(recipient: TestNode): Boolean =
         envelope.receiverIdHash.contentEquals(recipient.identity.peerIdHash)
 
-    /** Number of binary-spray steps a budget of [copies] yields from a single source (floor(log2)). */
+    /** Number of binary-distribute steps a budget of [copies] yields from a single source (floor(log2)). */
     private fun spreadDepth(copies: Int): Int {
         var c = copies
         var n = 0
@@ -52,7 +52,7 @@ class StoreAndForwardCommunityTest {
             alice.sendMessage(to = bob, text = "across the mesh")
             awaitUntil { alice.relayQueue().any { it.isFor(bob) } }
 
-            // Spray the copy down a 3-relay chain (alice → r1 → r2 → r3), halving the budget each step.
+            // Distribute the copy down a 3-relay chain (alice → r1 → r2 → r3), halving the budget each step.
             relayStep(cluster, alice, r1, bob)
             relayStep(cluster, r1, r2, bob)
             relayStep(cluster, r2, r3, bob)
@@ -134,10 +134,10 @@ class StoreAndForwardCommunityTest {
             awaitUntil { alice.relayQueue().any { it.isFor(bob) } }
 
             // Worst case for the shared copy counter: everyone connects to alice concurrently, so all
-            // of alice's per-peer PeerActors try to spray the same replica at once.
+            // of alice's per-peer PeerActors try to distribute the same replica at once.
             coroutineScope { candidates.forEach { peer -> launch { cluster.connect(alice, peer) } } }
 
-            // Binary Spray-and-Wait reserves copies atomically, so regardless of concurrency it hands
+            // Binary distribute-and-wait reserves copies atomically, so regardless of concurrency it hands
             // out exactly the budget: with L = 8 the copy reaches exactly log2(L) = 3 peers (4 + 2 + 1)
             // and the sender keeps the last one. Before the race fix this leaked to many more peers.
             val expectedCarriers = spreadDepth(RelayOptions.DEFAULT_COPIES)   // 3 for L = 8
@@ -151,7 +151,7 @@ class StoreAndForwardCommunityTest {
             assertEquals(1, alice.relayQueue().single { it.isFor(bob) }.copies)
         }
 
-    /** Spray [from]'s copy of the message-for-[recipient] to [to], then wait until [to] has it. */
+    /** Distribute [from]'s copy of the message-for-[recipient] to [to], then wait until [to] has it. */
     private suspend fun relayStep(cluster: TestCluster, from: TestNode, to: TestNode, recipient: TestNode) {
         cluster.connect(from, to)
         awaitUntil(timeout = STEP_TIMEOUT) { to.carries(recipient) }

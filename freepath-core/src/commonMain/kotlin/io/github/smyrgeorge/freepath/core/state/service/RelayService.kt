@@ -23,7 +23,7 @@ class RelayService(
         relayRepository.save(entry).getOrThrow()
 
     context(db: Transaction)
-    suspend fun reserveSprayCopy(entryId: Int): RelayEntry? {
+    suspend fun reserveCopy(entryId: Int): RelayEntry? {
         val current = relayRepository.findOneById(entryId).getOrThrow() ?: return null
         // Wait phase: a single copy left → hold it for direct delivery only.
         if (current.copies <= 1) return null

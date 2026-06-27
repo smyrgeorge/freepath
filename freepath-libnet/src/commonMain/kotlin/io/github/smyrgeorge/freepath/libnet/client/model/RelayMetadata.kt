@@ -11,7 +11,7 @@ import kotlin.time.Instant
  *
  * The mutable counter [copies] is deliberately NOT bound to AAD — relay nodes rewrite it (and it is
  * clamped to a protocol-wide constant on receipt). The remaining fields are bound to AAD and
- * are tamper-evident. Propagation depth is bounded by the copy count itself (binary Spray-and-Wait),
+ * are tamper-evident. Propagation depth is bounded by the copy count itself (binary distribute-and-wait),
  * so there is no separate hop counter.
  */
 @Serializable
@@ -23,7 +23,7 @@ data class RelayMetadata(
     @Contextual @ProtoNumber(1) val messageId: ByteArray,
     /** Priority hint. Bound to AAD — tamper-evident. */
     @ProtoNumber(2) val priority: Int = 1,
-    /** Remaining copies on THIS replica (binary Spray-and-Wait). NOT bound to AAD — mutable per spray. */
+    /** Remaining copies on THIS replica (binary distribute-and-wait). NOT bound to AAD — mutable per distribute. */
     @ProtoNumber(3) val copies: Int,
     /** Absolute expiry. Clamped to MAX_TTL_DURATION on receipt. Bound to AAD — tamper-evident. */
     @ProtoNumber(4) @Serializable(with = InstantSerializer::class) val expiresAt: Instant,

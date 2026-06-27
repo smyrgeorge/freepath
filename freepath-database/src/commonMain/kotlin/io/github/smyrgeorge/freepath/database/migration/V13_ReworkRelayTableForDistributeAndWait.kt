@@ -2,7 +2,7 @@ package io.github.smyrgeorge.freepath.database.migration
 
 @Suppress("SqlNoDataSourceInspection")
 // language=SQLite
-internal const val V13_ReworkRelayTableForSprayAndWait = """
+internal const val V13_ReworkRelayTableForDistributeAndWait = """
 DROP TABLE IF EXISTS relay;
 CREATE TABLE relay
 (
@@ -10,7 +10,7 @@ CREATE TABLE relay
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     envelope   JSON    NOT NULL,
-    -- Mutable per-replica Spray-and-Wait budget. Seeded from the envelope, then decremented on spray.
+    -- Mutable per-replica distribute-and-wait budget. Seeded from the envelope, then decremented on distribute.
     copies     INTEGER NOT NULL,
     -- Read-only routing fields derived from the envelope JSON (managed by SQLite).
     expires_at INTEGER NOT NULL GENERATED ALWAYS AS (json_extract(envelope, '$.relay.expiresAt')) STORED,

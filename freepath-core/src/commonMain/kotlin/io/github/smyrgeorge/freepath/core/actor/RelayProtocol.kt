@@ -12,22 +12,25 @@ sealed interface RelayProtocol : ActorProtocol {
     /** Carries the persisted master replica back to the caller (for its id / logging). */
     data class Stored(val entry: RelayEntry) : Response()
 
-    /** Carries the reserved copy to send, or `null` when the entry is in the wait phase / gone. */
-    data class Reserved(val entry: RelayEntry?) : Response()
+    /** Carries the number of currently-online peers the queue was distributed to (0 ⇒ still only queued). */
+    data class Distributed(val peerCount: Int) : Response()
 
     /** Persist a freshly-sealed master replica (copies = L). Reply once it is durably committed. */
     data class Enqueue(val entry: RelayEntry) : Request<Stored>()
 
     /**
-     * Atomically reserve the sprayed half of an entry's copy budget (binary Spray-and-Wait split).
-     * Reply carries the copy to send onward, or `null` if only one copy is left (wait phase) or the
-     * entry is gone.
+     * Run the full relay pass — Pass 1 direct delivery + Pass 2 binary distribute-and-wait — against a
+     * single connected [peerId]. Sent by [PeerActor] when a peer connects / is identified.
      */
-    data class ReserveSpray(val entryId: Int) : Request<Reserved>()
+    data class RelayToPeer(val peerId: String) : Request<Ok>()
 
-    /** A replica was handed off / delivered — drop it from the queue. */
-    data class Delivered(val entryId: Int) : Request<Ok>()
+    /**
+     * Distribute the relay queue to every peer reachable right now (used when a message is freshly
+     * queued). The reply [Distributed.peerCount] is the number of online peers reached, so the caller
+     * can map the outcome to `RELAYED` (≥1) vs `QUEUED` (0).
+     */
+    data object Distribute : Request<Distributed>()
 
-    /** Periodic lifecycle sweep: drop expired / over-aged replicas. */
+    /** Periodic lifecycle sweep: drop expired / over-aged replicas. Self-sent by the sweep timer. */
     data object Sweep : Request<Ok>()
 }

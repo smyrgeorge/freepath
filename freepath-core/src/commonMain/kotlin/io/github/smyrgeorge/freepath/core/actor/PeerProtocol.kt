@@ -13,10 +13,4 @@ sealed interface PeerProtocol : ActorProtocol {
 
     /** Peer identity confirmed. Flush relay queue + sync content. */
     data object Identified : Request<Ok>()
-
-    /**
-     * Spray the relay queue to this (already-connected) peer — e.g. after a message was freshly
-     * queued. Runs the relay pass only (no content sync).
-     */
-    data object Relay : Request<Ok>()
 }

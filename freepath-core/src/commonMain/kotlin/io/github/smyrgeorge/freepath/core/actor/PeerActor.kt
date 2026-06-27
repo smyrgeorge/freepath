@@ -9,7 +9,6 @@ import io.github.smyrgeorge.freepath.core.state.abbrev
 import io.github.smyrgeorge.freepath.core.state.service.ContactEncounterService
 import io.github.smyrgeorge.freepath.core.state.service.ContactService
 import io.github.smyrgeorge.freepath.core.state.service.ContentService
-import io.github.smyrgeorge.freepath.core.state.service.RelayService
 import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.db
 import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.tx
 import io.github.smyrgeorge.freepath.database.ContentSyncEntry
@@ -31,20 +30,14 @@ class PeerActor(
     private val contactService: ContactService = resources.contactService
     private val contactEncounterService: ContactEncounterService = resources.contactEncounterService
     private val contentService: ContentService = resources.contentService
-    private val relayService: RelayService = resources.relayService
 
-    // The relay queue's single owner: all copy-budget mutations (reserve, delivery-delete) go
-    // through it so the Spray-and-Wait accounting is serialized without a lock. We only
-    // read the queue (findAll) directly. Resolved per use — it is a node-wide singleton.
+    // All relay logic lives in the node-wide RelayActor (the single owner of the relay queue and the
+    // copy budget). On connect/identify we only nudge it to run a relay pass for this peer; the
+    // forwarding decisions, copy accounting and sends happen there. Resolved per use — it is a
+    // node-wide singleton.
     private suspend fun relayActor() = ActorSystem.get(RelayActor::class, RelayActor.key(ownerPeerId))
 
-    // Per-(this peer) Spray-and-Wait dedup: relay entry ids already sprayed to this peer during the
-    // lifetime of this actor. Scoped to one peer (the actor is keyed per remote peer), so the entry
-    // id alone is enough. Prevents re-spraying — and thus re-halving — the same replica to the same
-    // peer within a session.
-    private val offered = mutableSetOf<Int>()
-
-    // TODO: Make sync/relay smarter — redundant work on every reconnect:
+    // TODO: Make sync smarter — redundant work on every reconnect:
     //   1. sync() walks the whole feed on every reconnect (no per-peer high-water mark or digest).
     //      It doesn't re-send — the ContentSyncEntry version check prevents that — but it still walks.
     //   2. Connected + Identified both trigger a full pass; Identified follows Connected by seconds.
@@ -54,10 +47,6 @@ class PeerActor(
     // Cheap pre-protocol-change wins:
     //   - Drop sync on Connected; keep only Identified (or debounce).
     //   - Per-peer last_content_sync_at → only walk content modified after it.
-    //   - Persist the in-memory `offered` set so Pass 2 dedup survives an actor restart (today it
-    //     resets on respawn; the copy budget still caps re-spray, so this is only an optimization).
-    // Also tighten: unidentified peers currently receive the full mailbox (peerIdHash == null
-    // branch in relay()) — privacy issue, fix when revisiting.
     override suspend fun onReceive(m: PeerProtocol): Behavior<PeerProtocol.Response> {
         when (m) {
             is PeerProtocol.Connected -> {
@@ -66,82 +55,18 @@ class PeerActor(
             }
 
             is PeerProtocol.Identified -> {
-                recordEncounter()
                 sync(contactContent)
                 relay()
                 sync()
             }
-
-            is PeerProtocol.Relay -> relay()
         }
         return Behavior.Reply(PeerProtocol.Ok)
     }
 
-    private suspend fun recordEncounter() {
-        runCatching { contactEncounterService.db { recordEncounter(peerId) } }
-            .onFailure { log.warn("[${peerId.abbrev()}] Failed to record encounter: ${it.message}") }
-    }
-
+    /** Hand the relay pass for this peer to the RelayActor (fire-and-forget; it owns the queue). */
     private suspend fun relay() {
-        // Highest priority first: under limited airtime, more important messages move sooner.
-        // sortedByDescending is stable, so equal-priority entries keep their id-ascending order.
-        val entries = runCatching { relayService.db { findAll(RELAY_FETCH_LIMIT) } }
-            .getOrElse {
-                log.error("[${peerId.abbrev()}] Failed to load relay queue: ${it.message}")
-                return
-            }
-            .sortedByDescending { it.envelope.relay?.priority ?: 0 }
-
-        // Look up this peer's receiverIdHash to distinguish Pass 1 (for them) vs Pass 2 (forward onward).
-        val peerIdHash: ByteArray? = runCatching { contactService.db { getByPeerId(peerId) } }
-            .getOrNull()?.contact?.peerIdHash
-
-        // Pass 1: deliver packets intended for this peer (final delivery — no copy accounting).
-        // TODO: when authenticated delivery ACKs land, delete on ACK rather than on successful
-        //   hand-off, so a re-encounter can't resurrect-then-redeliver. For now we delete on delivery
-        //   to avoid infinite redelivery.
-        if (peerIdHash != null) {
-            entries
-                .filter { it.envelope.receiverIdHash.contentEquals(peerIdHash) }
-                .forEach { entry ->
-                    client.relay(entry.envelope, peerId)
-                        .onSuccess {
-                            relayActor().tell(RelayProtocol.Delivered(entry.id))
-                                .onFailure {
-                                    log.error("[${peerId.abbrev()}] Failed to delete relay entry ${entry.id}: ${it.message}")
-                                }
-                            log.info("[${peerId.abbrev()}] Delivered relay packet ${entry.id}")
-                        }
-                        .onFailure {
-                            log.warn("[${peerId.abbrev()}] Failed to deliver relay packet ${entry.id}: ${it.message}")
-                        }
-                }
-        }
-
-        // Pass 2: spray packets not intended for this peer onward — binary Spray-and-Wait.
-        // If peerIdHash is unknown (unidentified peer), treat every entry as forwardable.
-        // RelayActor atomically decides spray vs wait and reserves the copies before we send
-        // (its mailbox serializes the budget across this node's actors); we never spray the same
-        // replica to this peer twice (offered).
-        entries
-            .filter { peerIdHash == null || !it.envelope.receiverIdHash.contentEquals(peerIdHash) }
-            .forEach { entry ->
-                if (entry.id in offered) return@forEach
-
-                // Atomically reserve the sprayed copies (RelayActor re-reads the current budget and
-                // serializes the read-modify-write via its mailbox).
-                // null → wait phase / entry gone → hold the replica for direct delivery only.
-                val sprayed = relayActor().ask(RelayProtocol.ReserveSpray(entry.id))
-                    .getOrElse {
-                        log.error("[${peerId.abbrev()}] Failed to reserve spray for ${entry.id}: ${it.message}")
-                        return@forEach
-                    }.entry ?: return@forEach
-                offered += entry.id   // copies already spent — never re-reserve for this peer
-
-                client.relay(sprayed.envelope, peerId)
-                    .onSuccess { log.info("[${peerId.abbrev()}] Sprayed ${sprayed.copies} copy/copies of ${entry.id}") }
-                    .onFailure { log.warn("[${peerId.abbrev()}] Failed to spray ${entry.id}: ${it.message}") }
-            }
+        relayActor().tell(RelayProtocol.RelayToPeer(peerId))
+            .onFailure { log.warn("[${peerId.abbrev()}] Failed to trigger relay: ${it.message}") }
     }
 
     private suspend fun sync() {
@@ -183,8 +108,6 @@ class PeerActor(
     }
 
     companion object {
-        const val RELAY_FETCH_LIMIT: Int = 256
-
         // The actor registry is a single global namespace. A PeerActor is owned by the local
         // node and scoped to one remote peer, so its key must encode BOTH — otherwise two nodes
         // talking to the same remote peer (any relay/hub topology) would collide on the same key.

@@ -183,7 +183,7 @@ class StatelessEnvelopeCodecTest {
         val bob = makeTestPeer()
 
         val envelope = seal(alice, bob, relay = RelayOptions(copies = 8))
-        // copies is excluded from AAD — relay nodes rewrite it legitimately on each spray.
+        // copies is excluded from AAD — relay nodes rewrite it legitimately on each distribute.
         val mutated = envelope.copy(relay = envelope.relay!!.copy(copies = 4))
 
         val (_, result) = StatelessEnvelopeCodec.open(mutated, bob.identity, lookup(alice))

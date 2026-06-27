@@ -23,8 +23,8 @@ data class RelayEntry(
     @Converter(StatelessEnvelopeConverter::class)
     val envelope: StatelessEnvelope,
     /**
-     * Remaining copies for THIS replica (binary Spray-and-Wait). Mutable: decremented and persisted
-     * on each spray. Seeded from `envelope.relay.copies`.
+     * Remaining copies for THIS replica (binary distribute-and-wait). Mutable: decremented and persisted
+     * on each distribute. Seeded from `envelope.relay.copies`.
      */
     val copies: Int = envelope.relay?.copies ?: error("Envelope without relay metadata"),
     /** Generated column: json_extract(envelope, '$.relay.expiresAt'). Read-only — managed by SQLite. */

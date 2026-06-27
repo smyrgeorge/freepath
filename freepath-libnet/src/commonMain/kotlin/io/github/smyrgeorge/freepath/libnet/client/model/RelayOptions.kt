@@ -11,7 +11,7 @@ import kotlin.time.Instant
  * here — read it from [RelayMetadata] after sealing.
  */
 data class RelayOptions(
-    /** Initial copy budget (L) for binary Spray-and-Wait. Clamped to GLOBAL_MAX_COPIES on receipt. */
+    /** Initial copy budget (L) for binary distribute-and-wait. Clamped to GLOBAL_MAX_COPIES on receipt. */
     val copies: Int = DEFAULT_COPIES,
     /** Priority hint. */
     val priority: Int = 1,
@@ -19,7 +19,7 @@ data class RelayOptions(
     val expiresAt: Instant = Clock.System.now() + DEFAULT_TTL_DURATION,
 ) {
     companion object {
-        /** Initial number of copies (L) sprayed into the mesh per binary Spray-and-Wait. */
+        /** Initial number of copies (L) distributed into the mesh per binary distribute-and-wait. */
         const val DEFAULT_COPIES: Int = 8
 
         /** Default lifetime of a store-and-forward copy before it expires. */

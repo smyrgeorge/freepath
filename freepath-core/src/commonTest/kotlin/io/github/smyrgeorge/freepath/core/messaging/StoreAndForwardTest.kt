@@ -108,28 +108,28 @@ class StoreAndForwardTest {
         awaitUntil {
             alice.chatWith(bob).any { it.message.body == "relay me" && it.status == MessageStatus.RELAYED }
         }
-        // …and it is actually sprayed to the online relay.
+        // …and it is actually distributed to the online relay.
         awaitUntil { carol.relayQueue().any { it.isFor(bob) } }
     }
 
     @Test
-    fun `spraying to a relay halves the sender's copy budget`() =
+    fun `distributing to a relay halves the sender's copy budget`() =
         clusterTest(nodes = 3) { cluster ->
             val (alice, bob, carol) = cluster.nodes
             cluster.seedMutualContacts(alice, bob)
             // bob stays offline; carol is an intermediate mesh relay.
 
-            alice.sendMessage(to = bob, text = "spray me")
+            alice.sendMessage(to = bob, text = "distribute me")
             awaitUntil { alice.relayQueue().any { it.isFor(bob) } }
             val master = alice.relayQueue().single { it.isFor(bob) }
             assertEquals(8, master.copies, "a fresh relay copy starts with L copies")
 
             cluster.connect(alice, carol)
 
-            // carol receives a sprayed copy with a halved copy budget.
+            // carol receives a distributed copy with a halved copy budget.
             awaitUntil { carol.relayQueue().any { it.isFor(bob) } }
-            val sprayed = carol.relayQueue().first { it.isFor(bob) }
-            assertTrue(sprayed.copies in 1..4, "expected a halved copy budget, got ${sprayed.copies}")
+            val distributed = carol.relayQueue().first { it.isFor(bob) }
+            assertTrue(distributed.copies in 1..4, "expected a halved copy budget, got ${distributed.copies}")
 
             // alice handed off half its budget and keeps the rest (single relay → deterministic).
             awaitUntil { alice.relayQueue().singleOrNull { it.isFor(bob) }?.copies == 4 }
