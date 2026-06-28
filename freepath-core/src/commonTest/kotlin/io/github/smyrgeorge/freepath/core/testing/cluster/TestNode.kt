@@ -80,6 +80,12 @@ class TestNode internal constructor(
         appRef.tell(AppProtocol.PublishContent(body)).getOrThrow()
     }
 
+    /** Update this node's own avatar — same path as the UI: persist the new card, push it to online contacts. */
+    suspend fun updateAvatar(avatar: String) = state.updateOwnAvatar(avatar)
+
+    /** This node's stored avatar for [other] (from received contact content), or null if none yet. */
+    fun avatarOf(other: TestNode): String? = state.contactContents.value[other.peerId]?.avatar
+
     /** Current in-memory chat with [other] (the chat map is keyed by the other node's peerId). */
     fun chatWith(other: TestNode): List<MessageEntry> = state.chats.value[other.peerId] ?: emptyList()
 

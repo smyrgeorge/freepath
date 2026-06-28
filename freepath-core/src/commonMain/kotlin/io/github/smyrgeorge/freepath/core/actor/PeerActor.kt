@@ -57,6 +57,12 @@ class PeerActor(
                 relay()
                 sync(contactContent)
             }
+
+            // Our contact card was updated (e.g. avatar): push the fresh card now rather than
+            // waiting for this peer to reconnect. The per-peer version check no-ops if they have it.
+            is PeerProtocol.SyncContact -> {
+                sync(m.content)
+            }
         }
         return Behavior.Reply(PeerProtocol.Ok)
     }

@@ -1,6 +1,8 @@
 package io.github.smyrgeorge.freepath.core.state
 
 import io.github.smyrgeorge.actor4k.system.ActorSystem
+import io.github.smyrgeorge.freepath.core.actor.PeerActor
+import io.github.smyrgeorge.freepath.core.actor.PeerProtocol
 import io.github.smyrgeorge.freepath.core.actor.RelayActor
 import io.github.smyrgeorge.freepath.core.actor.RelayProtocol
 import io.github.smyrgeorge.freepath.core.state.model.ConnectionSource
@@ -295,6 +297,15 @@ abstract class AbstractAppState(
     suspend fun updateOwnAvatar(avatar: String) {
         contentService.tx { updateAvatar(avatar) }
         loadOwnContact()
+        syncContactToOnline()
+    }
+
+    private suspend fun syncContactToOnline() {
+        onlinePeers.value.forEach { peerId ->
+            ActorSystem.get(PeerActor::class, PeerActor.key(identity.peerId, peerId))
+                .tell(PeerProtocol.SyncContact(contactContent))
+                .onFailure { log.warn("[contact-sync] Failed to push contact card to $peerId: ${it.message}") }
+        }
     }
 
     private suspend fun loadOwnContact() {

@@ -30,4 +30,15 @@ class PeerActorTest {
         assertEquals(PeerProtocol.Ok, ref.ask(PeerProtocol.Connected).getOrThrow())
         assertTrue(node.relayQueue().isEmpty())
     }
+
+    @Test
+    fun `SyncContact to an unreachable peer is a safe no-op`() = clusterTest { cluster ->
+        val node = cluster.nodes.first()
+        node.ensureOnboarded()
+        // The remote is neither a contact nor connected, so the card send fails inside sync(); the
+        // actor is best-effort/fire-and-forget, so it must still reply Ok rather than throw.
+        val ref = ActorSystem.get(PeerActor::class, PeerActor.key(node.peerId, unknownPeer))
+        val reply = ref.ask(PeerProtocol.SyncContact(node.state.contactContent)).getOrThrow()
+        assertEquals(PeerProtocol.Ok, reply)
+    }
 }
