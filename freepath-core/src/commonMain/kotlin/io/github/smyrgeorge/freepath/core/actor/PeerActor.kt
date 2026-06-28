@@ -6,7 +6,6 @@ import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.freepath.core.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.core.state.AbstractAppState
 import io.github.smyrgeorge.freepath.core.state.abbrev
-import io.github.smyrgeorge.freepath.core.state.service.ContactEncounterService
 import io.github.smyrgeorge.freepath.core.state.service.ContactService
 import io.github.smyrgeorge.freepath.core.state.service.ContentService
 import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.db
@@ -28,7 +27,6 @@ class PeerActor(
 
     private val client: LibnetClient = resources.client
     private val contactService: ContactService = resources.contactService
-    private val contactEncounterService: ContactEncounterService = resources.contactEncounterService
     private val contentService: ContentService = resources.contentService
 
     // All relay logic lives in the node-wide RelayActor (the single owner of the relay queue and the

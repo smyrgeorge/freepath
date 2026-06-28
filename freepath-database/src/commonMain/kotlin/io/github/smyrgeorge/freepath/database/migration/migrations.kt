@@ -17,4 +17,5 @@ val migrations: List<MigrationFile> = listOf(
     MigrationFile("12_rework_relay_table.sql", V12_ReworkRelayTable),
     MigrationFile("13_rework_relay_table_for_distribute_and_wait.sql", V13_ReworkRelayTableForDistributeAndWait),
     MigrationFile("14_create_table_contact_encounter.sql", V14_CreateTableContactEncounter),
+    MigrationFile("15_create_table_relay_offered.sql", V15_CreateTableRelayOffered),
 )

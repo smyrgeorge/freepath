@@ -2,6 +2,8 @@ package io.github.smyrgeorge.freepath.core.state.service
 
 import io.github.smyrgeorge.freepath.database.RelayEntry
 import io.github.smyrgeorge.freepath.database.RelayEntryRepository
+import io.github.smyrgeorge.freepath.database.RelayOfferedEntry
+import io.github.smyrgeorge.freepath.database.RelayOfferedEntryRepository
 import io.github.smyrgeorge.sqlx4k.QueryExecutor
 import io.github.smyrgeorge.sqlx4k.Transaction
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
@@ -12,6 +14,7 @@ import kotlin.time.Instant
 class RelayService(
     override val db: ISQLite,
     private val relayRepository: RelayEntryRepository,
+    private val relayOfferedRepository: RelayOfferedEntryRepository,
 ) : Service {
 
     context(db: QueryExecutor)
@@ -51,9 +54,32 @@ class RelayService(
             minCreatedAt = (now - MAX_TTL_DURATION).toEpochMilliseconds(),
         ).getOrThrow()
 
+    // ── distribute-and-wait dedup (durable, survives restarts) ──────────────────
+
+    /** All relay-entry ids already offered to [peerId] — the persisted dedup set for a relay pass. */
+    context(db: QueryExecutor)
+    suspend fun offeredEntryIds(peerId: String): Set<Int> =
+        relayOfferedRepository.findAllByPeerId(peerId).getOrThrow().mapTo(mutableSetOf()) { it.relayEntryId }
+
+    /**
+     * Record that [entryId] has been offered to [peerId], so it is never re-offered (which would
+     * re-halve the copy budget). Idempotent: the `(relay_entry_id, peer_id)` unique index makes a
+     * repeat a no-op, so the rejected duplicate insert is ignored.
+     */
+    context(db: QueryExecutor)
+    suspend fun markOffered(entryId: Int, peerId: String) {
+        relayOfferedRepository.insert(RelayOfferedEntry(relayEntryId = entryId, peerId = peerId))
+    }
+
+    /** Reap offered rows whose replica is gone (delivered / swept). Returns the rows removed. */
+    context(db: QueryExecutor)
+    suspend fun deleteOrphanedOffered(): Long =
+        relayOfferedRepository.executeDeleteOrphaned().getOrThrow()
+
     context(db: Transaction)
     suspend fun deleteAll() {
         relayRepository.deleteAll().getOrThrow()
+        relayOfferedRepository.deleteAll().getOrThrow()
     }
 
     companion object {

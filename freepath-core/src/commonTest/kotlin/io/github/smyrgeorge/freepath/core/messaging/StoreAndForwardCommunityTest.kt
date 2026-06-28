@@ -1,5 +1,8 @@
 package io.github.smyrgeorge.freepath.core.messaging
 
+import io.github.smyrgeorge.actor4k.system.ActorSystem
+import io.github.smyrgeorge.freepath.core.actor.RelayActor
+import io.github.smyrgeorge.freepath.core.actor.RelayProtocol
 import io.github.smyrgeorge.freepath.core.testing.cluster.TestCluster
 import io.github.smyrgeorge.freepath.core.testing.cluster.TestNode
 import io.github.smyrgeorge.freepath.core.testing.util.awaitUntil
@@ -11,6 +14,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class StoreAndForwardCommunityTest {
@@ -149,6 +153,107 @@ class StoreAndForwardCommunityTest {
             )
             // …and the sender retains exactly one copy (wait phase) — the budget is conserved.
             assertEquals(1, alice.relayQueue().single { it.isFor(bob) }.copies)
+        }
+
+    @Test
+    fun `re-running the relay pass to a carrier does not re-distribute the same replica`() =
+        clusterTest(nodes = COMMUNITY, timeout = BOOT_TIMEOUT) { cluster ->
+            val alice = cluster.nodes[0]
+            val carol = cluster.nodes[50]
+            val bob = cluster.nodes.last()
+            cluster.seedMutualContacts(alice, bob)
+
+            alice.sendMessage(to = bob, text = "once is enough")
+            awaitUntil { alice.relayQueue().any { it.isFor(bob) } }
+
+            // First encounter: alice hands carol a halved copy (8 → keep 4, send 4).
+            cluster.connect(alice, carol)
+            awaitUntil(timeout = STEP_TIMEOUT) { carol.carries(bob) }
+            val aliceCopies = alice.relayQueue().single { it.isFor(bob) }.copies
+            val carolCopies = carol.relayQueue().single { it.isFor(bob) }.copies
+
+            // Re-run the relay pass to the same peer many times. The durable (DB-backed) offered set
+            // must make every pass a no-op — no further reservation — so neither budget shrinks.
+            // Without dedup, alice would keep re-halving 4 → 2 → 1 on each re-encounter.
+            val aliceRelay = ActorSystem.get(RelayActor::class, RelayActor.key(alice.peerId))
+            repeat(5) { aliceRelay.ask(RelayProtocol.RelayToPeer(carol.peerId)).getOrThrow() }
+
+            assertEquals(
+                aliceCopies,
+                alice.relayQueue().single { it.isFor(bob) }.copies,
+                "the sender must not re-distribute a replica it already offered this peer",
+            )
+            assertEquals(
+                carolCopies,
+                carol.relayQueue().single { it.isFor(bob) }.copies,
+                "the carrier must not be re-offered (and must hold a single replica)",
+            )
+            assertEquals(1, carol.relayQueue().count { it.isFor(bob) }, "no duplicate replica on the carrier")
+        }
+
+    @Test
+    fun `the message is stored once even when several carriers deliver it to the recipient`() =
+        clusterTest(nodes = COMMUNITY, timeout = BOOT_TIMEOUT) { cluster ->
+            val alice = cluster.nodes[0]
+            val c1 = cluster.nodes[10]
+            val c2 = cluster.nodes[20]
+            val bob = cluster.nodes.last()
+            cluster.seedMutualContacts(alice, bob)
+            cluster.seedMutualContacts(c1, bob)   // both carriers know bob → Pass-1 delivery
+            cluster.seedMutualContacts(c2, bob)
+
+            alice.sendMessage(to = bob, text = "deliver me once")
+            awaitUntil { alice.relayQueue().any { it.isFor(bob) } }
+
+            // Two carriers each pick up a copy from alice.
+            cluster.connect(alice, c1)
+            awaitUntil(timeout = STEP_TIMEOUT) { c1.carries(bob) }
+            cluster.connect(alice, c2)
+            awaitUntil(timeout = STEP_TIMEOUT) { c2.carries(bob) }
+
+            // Both meet bob and deliver; each drops its copy on a successful hand-off.
+            cluster.connect(c1, bob)
+            cluster.connect(c2, bob)
+            awaitUntil(timeout = STEP_TIMEOUT) { !c1.carries(bob) && !c2.carries(bob) }
+
+            // The message_id unique index makes the second delivery a no-op: bob stores it exactly once.
+            assertEquals(
+                1,
+                bob.chatWith(alice).count { it.message.body == "deliver me once" },
+                "the recipient must store the message exactly once, regardless of carrier count",
+            )
+        }
+
+    @Test
+    fun `independent messages each carry their own copy budget`() =
+        clusterTest(nodes = COMMUNITY, timeout = BOOT_TIMEOUT) { cluster ->
+            val alice = cluster.nodes[0]
+            val carol = cluster.nodes[30]
+            val bob = cluster.nodes.last()
+            cluster.seedMutualContacts(alice, bob)
+
+            val texts = listOf("m1", "m2", "m3")
+            texts.forEach { alice.sendMessage(to = bob, text = it) }
+            awaitUntil { alice.relayQueue().count { it.isFor(bob) } == texts.size }
+            // Each freshly-queued message starts at the full budget L.
+            assertTrue(
+                alice.relayQueue().filter { it.isFor(bob) }.all { it.copies == RelayOptions.DEFAULT_COPIES },
+                "every queued message starts at L copies",
+            )
+
+            // A single encounter distributes a halved copy of every queued message, independently.
+            cluster.connect(alice, carol)
+            awaitUntil(timeout = STEP_TIMEOUT) { carol.relayQueue().count { it.isFor(bob) } == texts.size }
+
+            val half = RelayOptions.DEFAULT_COPIES / 2
+            assertTrue(
+                alice.relayQueue().filter { it.isFor(bob) }.all { it.copies == half },
+                "the sender keeps half of each message's budget",
+            )
+            assertTrue(
+                carol.relayQueue().filter { it.isFor(bob) }.all { it.copies == half },
+                "the carrier receives half of each message's budget",
+            )
         }
 
     /** Distribute [from]'s copy of the message-for-[recipient] to [to], then wait until [to] has it. */

@@ -21,6 +21,7 @@ import io.github.smyrgeorge.freepath.database.IdentityEntryRepository
 import io.github.smyrgeorge.freepath.database.MessageEntryRepository
 import io.github.smyrgeorge.freepath.database.RelayEntry.Companion.toRelayEntry
 import io.github.smyrgeorge.freepath.database.RelayEntryRepository
+import io.github.smyrgeorge.freepath.database.RelayOfferedEntryRepository
 import io.github.smyrgeorge.freepath.database.generated.ContactEncounterEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContactEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.ContactRoutingEntryRepositoryImpl
@@ -29,6 +30,7 @@ import io.github.smyrgeorge.freepath.database.generated.ContentSyncEntryReposito
 import io.github.smyrgeorge.freepath.database.generated.IdentityEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.MessageEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.generated.RelayEntryRepositoryImpl
+import io.github.smyrgeorge.freepath.database.generated.RelayOfferedEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.database.sqlite
 import io.github.smyrgeorge.freepath.libble.LibbleEvent
@@ -79,6 +81,7 @@ abstract class AbstractAppResources(
     val contactRoutingRepository: ContactRoutingEntryRepository = ContactRoutingEntryRepositoryImpl
     val messageRepository: MessageEntryRepository = MessageEntryRepositoryImpl
     val relayRepository: RelayEntryRepository = RelayEntryRepositoryImpl
+    val relayOfferedRepository: RelayOfferedEntryRepository = RelayOfferedEntryRepositoryImpl
 
     val identityService: IdentityService by lazy {
         IdentityService(
@@ -120,6 +123,7 @@ abstract class AbstractAppResources(
         RelayService(
             db = db,
             relayRepository = relayRepository,
+            relayOfferedRepository = relayOfferedRepository,
         )
     }
 

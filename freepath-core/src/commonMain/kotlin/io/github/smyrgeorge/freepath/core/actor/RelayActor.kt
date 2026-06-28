@@ -17,17 +17,6 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
-/**
- * The single owner of the store-and-forward relay queue and the home of ALL relay logic. Keyed per
- * owning node, so every copy-budget mutation (enqueue, distribute reservation, delivery-delete) and every
- * forwarding decision is serialized through one mailbox — no lock needed, and concurrent distributes of
- * the same replica from many connection events can never hand out more than the budget `L`.
- *
- * Triggers come from two places, both of which delegate here rather than touching the queue
- * themselves:
- *  - [PeerActor] sends [RelayProtocol.RelayToPeer] when a peer connects / is identified.
- *  - `AbstractAppState.relayMessage` sends [RelayProtocol.Distribute] when a message is sent.
- */
 class RelayActor(
     key: String,
     resources: AbstractAppResources,
@@ -36,15 +25,8 @@ class RelayActor(
     private val relayService: RelayService = resources.relayService
     private val contactService: ContactService = resources.contactService
 
-    // lateinit-backed: resolved lazily so the actor can be constructed before networking is up.
     private val client: LibnetClient by lazy { resources.client }
     private val libnet: LibnetModule by lazy { resources.libnet }
-
-    // Per-peer distribute-and-wait dedup: relay-entry ids already distributed to a given peerId, so we never
-    // re-distribute — and thus re-halve — the same replica to the same peer. Lives here (not in PeerActor)
-    // now that the relay pass runs here; pruned to the live queue on every pass. Access is
-    // single-threaded (mailbox), so a plain map is safe.
-    private val offered = mutableMapOf<String, MutableSet<Int>>()
 
     private val timer: Job = doEvery(SWEEP_INTERVAL) {
         tell(RelayProtocol.Sweep).getOrElse { log.error("Failed to trigger relay sweep: ${it.message}") }
@@ -53,8 +35,11 @@ class RelayActor(
     override suspend fun onReceive(m: RelayProtocol): Behavior<RelayProtocol.Response> {
         when (m) {
             is RelayProtocol.Sweep -> {
-                runCatching { relayService.db { deleteExpired(Clock.System.now()) } }
-                    .onFailure { log.warn("Lifecycle sweep failed: ${it.message}") }
+                runCatching {
+                    relayService.db { deleteExpired(Clock.System.now()) }
+                    // Reap dedup rows whose replica is gone (delivered / swept) — FKs are not enforced.
+                    relayService.db { deleteOrphanedOffered() }
+                }.onFailure { log.warn("Lifecycle sweep failed: ${it.message}") }
             }
 
             is RelayProtocol.RelayToPeer -> relayTo(m.peerId)
@@ -68,7 +53,7 @@ class RelayActor(
                 // Never hand the copy back to the peer we received it from: mark it already-offered to
                 // that source. Without this the budget would halve an extra time per hop (bounce-back)
                 // and multi-hop delivery would starve before reaching the destination.
-                m.fromPeerId?.let { offered.getOrPut(it) { mutableSetOf() }.add(stored.id) }
+                m.fromPeerId?.let { relayService.db { markOffered(stored.id, it) } }
                 val reached = distributeToOnline()
                 if (reached == 0) log.info("No peers online; queued relay copy (entry ${stored.id})")
                 else log.info("Queued relay copy (entry ${stored.id}); distributed to $reached online peer(s)")
@@ -96,8 +81,7 @@ class RelayActor(
      * then distribute the rest onward via binary distribute-and-wait (Pass 2).
      *
      * TODO: an unidentified peer (no contact card → `peerIdHash == null`) currently receives the
-     *   full mailbox in Pass 2 — privacy issue; tighten when revisiting. Persisting [offered] across
-     *   restarts is only an optimization (the copy budget already caps re-distribute).
+     *   full mailbox in Pass 2 — privacy issue; tighten when revisiting.
      */
     private suspend fun relayTo(peerId: String) {
         // Highest priority first: under limited airtime, more important messages move sooner.
@@ -110,10 +94,10 @@ class RelayActor(
             .sortedByDescending { it.envelope.relay?.priority ?: 0 }
         if (entries.isEmpty()) return
 
-        // Drop dedup ids for replicas that are gone (delivered / expired / swept), keeping the
-        // in-memory set bounded by the live queue.
-        val liveIds = entries.mapTo(HashSet()) { it.id }
-        val offeredToPeer = offered.getOrPut(peerId) { mutableSetOf() }.apply { retainAll(liveIds) }
+        // Durable distribute-and-wait dedup (RelayService / DB): replicas already offered to this
+        // peer, so we never re-offer — and re-halve — the same replica. Survives app restarts; stale
+        // rows for deleted replicas are reaped by the sweep, so no pruning is needed here.
+        val offeredToPeer = relayService.db { offeredEntryIds(peerId) }.toMutableSet()
 
         // Look up this peer's receiverIdHash to distinguish Pass 1 (for them) vs Pass 2 (forward on).
         val peerIdHash: ByteArray? = runCatching { contactService.db { getByPeerId(peerId) } }
@@ -140,7 +124,8 @@ class RelayActor(
 
                 // null → wait phase / entry gone → hold the replica for direct delivery only.
                 val distributed = reserveCopy(entry.id) ?: return@forEach
-                offeredToPeer += entry.id   // copies already spent — never re-reserve for this peer
+                offeredToPeer += entry.id                            // within-pass dedup
+                relayService.db { markOffered(entry.id, peerId) }    // durable dedup (survives restarts)
 
                 // Reserve-before-send: a failed send forfeits the reserved copies (acceptable
                 // per-attempt anti-retry-storm semantics).
