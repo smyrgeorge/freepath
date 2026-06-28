@@ -8,6 +8,10 @@ import kotlin.uuid.Uuid
 
 @Repository
 interface MessageEntryRepository : AuditableRepository<MessageEntry> {
+    @Query("SELECT * FROM message WHERE id = :id")
+    context(context: QueryExecutor)
+    suspend fun findOneById(id: Int): Result<MessageEntry?>
+
     @Query("SELECT * FROM message WHERE conversation_id = :conversationId ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
     context(context: QueryExecutor)
     suspend fun findAllByConversationId(
