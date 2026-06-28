@@ -8,9 +8,9 @@ sealed interface PeerProtocol : ActorProtocol {
 
     data object Ok : Response()
 
-    /** Peer is reachable (libp2p). Flush relay queue only — identity not yet confirmed. */
+    /** Peer is reachable (libp2p), identity not yet confirmed. Sync stored content (full feed pass). */
     data object Connected : Request<Ok>()
 
-    /** Peer identity confirmed. Flush relay queue + sync content. */
+    /** Peer identity confirmed (known contact). Flush relay queue + push our contact card. */
     data object Identified : Request<Ok>()
 }

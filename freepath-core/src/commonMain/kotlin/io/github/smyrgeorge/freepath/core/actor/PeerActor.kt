@@ -35,27 +35,27 @@ class PeerActor(
     // node-wide singleton.
     private suspend fun relayActor() = ActorSystem.get(RelayActor::class, RelayActor.key(ownerPeerId))
 
-    // TODO: Make sync smarter — redundant work on every reconnect:
-    //   1. sync() walks the whole feed on every reconnect (no per-peer high-water mark or digest).
-    //      It doesn't re-send — the ContentSyncEntry version check prevents that — but it still walks.
-    //   2. Connected + Identified both trigger a full pass; Identified follows Connected by seconds.
+    // TODO: Make sync smarter — sync() still walks the whole feed on every (re)connect: no per-peer
+    //   high-water mark or digest. It doesn't re-send — the ContentSyncEntry version check prevents
+    //   that — but it still walks every page each time.
     // Target: advertise-then-pull — exchange a compact digest (list of (contentId, version) for
     // content; bloom/merkle for the relay queue), peer replies with what it wants, push only that.
     // Essentially gossipsub's IHAVE/IWANT applied point-to-point over request_response.
-    // Cheap pre-protocol-change wins:
-    //   - Drop sync on Connected; keep only Identified (or debounce).
+    // Cheap pre-protocol-change win:
     //   - Per-peer last_content_sync_at → only walk content modified after it.
     override suspend fun onReceive(m: PeerProtocol): Behavior<PeerProtocol.Response> {
         when (m) {
+            // Reachable but not yet confirmed as a contact: kick off the big job early — a full
+            // content feed pass (paged; the version check pushes only what the peer is missing).
             is PeerProtocol.Connected -> {
-                relay()
                 sync()
             }
 
+            // Confirmed contact: flush the relay queue to it (store-and-forward only goes to
+            // identified contacts), then push our own contact card.
             is PeerProtocol.Identified -> {
-                sync(contactContent)
                 relay()
-                sync()
+                sync(contactContent)
             }
         }
         return Behavior.Reply(PeerProtocol.Ok)
@@ -68,9 +68,9 @@ class PeerActor(
     }
 
     private suspend fun sync() {
-        // Contact should exist at this point (peer was identified), but guard defensively.
+        // Connections are contact-gated, so the contact should exist; guard defensively anyway.
         runCatching { contactService.db { getByPeerId(peerId) } }.getOrNull() ?: run {
-            log.warn("[${peerId.abbrev()}] Sync skipped — no contact entry found after Identified")
+            log.warn("[${peerId.abbrev()}] Sync skipped — no contact entry for connected peer")
             return
         }
 
