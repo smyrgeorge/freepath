@@ -9,27 +9,27 @@ sealed interface RelayProtocol : ActorProtocol {
 
     data object Ok : Response()
 
-    /** Carries the persisted master replica back to the caller (for its id / logging). */
-    data class Stored(val entry: RelayEntry) : Response()
-
     /** Carries the number of currently-online peers the queue was distributed to (0 ⇒ still only queued). */
     data class Distributed(val peerCount: Int) : Response()
 
-    /** Persist a freshly-sealed master replica (copies = L). Reply once it is durably committed. */
-    data class Enqueue(val entry: RelayEntry) : Request<Stored>()
+    /**
+     * Persist a relay replica (copies = L) AND immediately distribute it to every peer reachable
+     * right now. Used both for a locally-sent message and for an inbound relay packet we receive to
+     * carry onward. The reply [Distributed.peerCount] is the number of online peers reached, so the
+     * caller can map the outcome to `RELAYED` (≥1) vs `QUEUED` (0); a failed persist surfaces as an
+     * ask failure (→ `FAILED`).
+     *
+     * [fromPeerId] is the peer we received this replica from (null when we are the origin). It is
+     * recorded as already-offered, so we never hand the copy back to its source — otherwise the copy
+     * budget would halve an extra time on every hop and starve multi-hop delivery.
+     */
+    data class Distribute(val entry: RelayEntry, val fromPeerId: String? = null) : Request<Distributed>()
 
     /**
      * Run the full relay pass — Pass 1 direct delivery + Pass 2 binary distribute-and-wait — against a
      * single connected [peerId]. Sent by [PeerActor] when a peer connects / is identified.
      */
     data class RelayToPeer(val peerId: String) : Request<Ok>()
-
-    /**
-     * Distribute the relay queue to every peer reachable right now (used when a message is freshly
-     * queued). The reply [Distributed.peerCount] is the number of online peers reached, so the caller
-     * can map the outcome to `RELAYED` (≥1) vs `QUEUED` (0).
-     */
-    data object Distribute : Request<Distributed>()
 
     /** Periodic lifecycle sweep: drop expired / over-aged replicas. Self-sent by the sweep timer. */
     data object Sweep : Request<Ok>()

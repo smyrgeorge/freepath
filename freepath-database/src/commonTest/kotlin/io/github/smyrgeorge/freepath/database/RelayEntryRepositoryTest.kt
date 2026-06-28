@@ -1,11 +1,11 @@
 package io.github.smyrgeorge.freepath.database
 
-import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.freepath.database.RelayEntry.Companion.toRelayEntry
 import io.github.smyrgeorge.freepath.database.generated.RelayEntryRepositoryImpl
 import io.github.smyrgeorge.freepath.database.migration.migrations
 import io.github.smyrgeorge.freepath.libnet.client.model.RelayMetadata
 import io.github.smyrgeorge.freepath.libnet.client.model.StatelessEnvelope
+import io.github.smyrgeorge.freepath.util.crypto.CryptoProvider
 import io.github.smyrgeorge.sqlx4k.ConnectionPool
 import io.github.smyrgeorge.sqlx4k.sqlite.ISQLite
 import kotlinx.coroutines.test.runTest
@@ -29,12 +29,11 @@ class RelayEntryRepositoryTest {
     @BeforeTest
     fun setUp() = runTest {
         db = sqlite(
-            url = "freepath-test.db",
+            url = ":memory:",
             options = ConnectionPool.Options(minConnections = 1, maxConnections = 1),
         ).apply {
             migrate(files = migrations).getOrThrow()
         }
-        with(db) { repo.deleteAll().getOrThrow() }
     }
 
     @AfterTest

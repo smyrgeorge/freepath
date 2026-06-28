@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.minutes
  * Triggers come from two places, both of which delegate here rather than touching the queue
  * themselves:
  *  - [PeerActor] sends [RelayProtocol.RelayToPeer] when a peer connects / is identified.
- *  - `AbstractAppState.relayMessage` sends [RelayProtocol.Distribute] when a message is freshly queued.
+ *  - `AbstractAppState.relayMessage` sends [RelayProtocol.Distribute] when a message is sent.
  */
 class RelayActor(
     key: String,
@@ -52,15 +52,6 @@ class RelayActor(
 
     override suspend fun onReceive(m: RelayProtocol): Behavior<RelayProtocol.Response> {
         when (m) {
-            is RelayProtocol.Enqueue -> {
-                val stored = runCatching { relayService.db { save(m.entry) } }
-                    .getOrElse {
-                        log.error("Failed to enqueue relay entry: ${it.message}")
-                        throw it // surface to the asker so it can mark the send FAILED
-                    }
-                return Behavior.Reply(RelayProtocol.Stored(stored))
-            }
-
             is RelayProtocol.Sweep -> {
                 runCatching { relayService.db { deleteExpired(Clock.System.now()) } }
                     .onFailure { log.warn("Lifecycle sweep failed: ${it.message}") }
@@ -69,16 +60,35 @@ class RelayActor(
             is RelayProtocol.RelayToPeer -> relayTo(m.peerId)
 
             is RelayProtocol.Distribute -> {
-                // Shuffle so copies fan out to a random subset of carriers. Binary distribute-and-wait
-                // halves the budget per peer, so only the first ~log2(copies) peers to reserve get a
-                // copy at all; with a stable order that would always be the same few carriers.
-                // (When the encounter heuristic §7 is wired in, this becomes a ranked order.)
-                val online = libnet.onlinePeerIds().shuffled()
-                online.forEach { relayTo(it) }
-                return Behavior.Reply(RelayProtocol.Distributed(online.size))
+                val stored = runCatching { relayService.db { save(m.entry) } }
+                    .getOrElse {
+                        log.error("Failed to enqueue relay entry: ${it.message}")
+                        throw it // surface to the asker so it can mark the send FAILED
+                    }
+                // Never hand the copy back to the peer we received it from: mark it already-offered to
+                // that source. Without this the budget would halve an extra time per hop (bounce-back)
+                // and multi-hop delivery would starve before reaching the destination.
+                m.fromPeerId?.let { offered.getOrPut(it) { mutableSetOf() }.add(stored.id) }
+                val reached = distributeToOnline()
+                if (reached == 0) log.info("No peers online; queued relay copy (entry ${stored.id})")
+                else log.info("Queued relay copy (entry ${stored.id}); distributed to $reached online peer(s)")
+                return Behavior.Reply(RelayProtocol.Distributed(reached))
             }
         }
         return Behavior.Reply(RelayProtocol.Ok)
+    }
+
+    /**
+     * Distribute the whole relay queue to every peer reachable right now; returns the peer count.
+     * Shuffle so copies fan out to a random subset of carriers — binary distribute-and-wait halves the
+     * budget per peer, so only the first ~log2(copies) peers to reserve get a copy; with a stable order
+     * that would always be the same few. (When the encounter heuristic §7 is wired in, this becomes a
+     * ranked order instead of random.)
+     */
+    private suspend fun distributeToOnline(): Int {
+        val online = libnet.onlinePeerIds().shuffled()
+        online.forEach { relayTo(it) }
+        return online.size
     }
 
     /**

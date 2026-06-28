@@ -24,12 +24,11 @@ class ContactEncounterEntryRepositoryTest {
     @BeforeTest
     fun setUp() = runTest {
         db = sqlite(
-            url = "freepath-test.db",
+            url = ":memory:",
             options = ConnectionPool.Options(minConnections = 1, maxConnections = 1),
         ).apply {
             migrate(files = migrations).getOrThrow()
         }
-        with(db) { repo.deleteAll().getOrThrow() }
     }
 
     @AfterTest

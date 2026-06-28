@@ -212,33 +212,16 @@ abstract class AbstractAppState(
             relay = RelayOptions(),
         )
 
-        // All relay logic is owned by the RelayActor (the single owner of the relay queue and the
-        // copy budget). We persist the master replica first (copies = L) so store-and-forward keeps
-        // working when no peer is online now, then ask it to distribute to peers reachable right now.
-        // We await the enqueue so the distribute can't outrun the committed row.
+        // The RelayActor owns all relay logic: it persists the master replica (copies = L) so
+        // store-and-forward survives with no peer online, then distributes it to peers reachable now.
+        // It's best-effort ("handed to the mesh"), hence RELAYED rather than SENT; peerCount == 0 means
+        // nothing reached the mesh yet (QUEUED), and a failed persist surfaces as an ask failure (FAILED).
         val relayActor = ActorSystem.get(RelayActor::class, RelayActor.key(identity.peerId))
-        val stored = relayActor
-            .ask(RelayProtocol.Enqueue(envelope.toRelayEntry()))
-            .getOrElse {
-                log.error("[relay] Failed to enqueue relay copy for $peerId: ${it.message}")
-                return MessageStatus.FAILED
-            }
-            .entry
-
-        // Ask the RelayActor to distribute the queue to currently-online peers. It owns the fan-out, the
-        // per-peer dedup and the copy-budget accounting; distributing is best-effort ("handed to the
-        // mesh"), hence RELAYED rather than SENT. If it distributed to no one, the copy stays QUEUED.
-        val distributedTo = relayActor.ask(RelayProtocol.Distribute).getOrElse {
-            log.warn("[relay] Failed to distribute relay copy for $peerId (entry ${stored.id}): ${it.message}; left queued")
-            return MessageStatus.QUEUED
+        val reached = relayActor.ask(RelayProtocol.Distribute(envelope.toRelayEntry())).getOrElse {
+            log.error("[relay] Failed to relay copy for $peerId: ${it.message}")
+            return MessageStatus.FAILED
         }.peerCount
-        return if (distributedTo == 0) {
-            log.info("[relay] No peers online; queued relay copy for $peerId (entry ${stored.id})")
-            MessageStatus.QUEUED
-        } else {
-            log.info("[relay] Queued relay copy for $peerId (entry ${stored.id}); distributed to $distributedTo online peer(s)")
-            MessageStatus.RELAYED
-        }
+        return if (reached == 0) MessageStatus.QUEUED else MessageStatus.RELAYED
     }
 
     private fun upsertMessage(entry: MessageEntry) {

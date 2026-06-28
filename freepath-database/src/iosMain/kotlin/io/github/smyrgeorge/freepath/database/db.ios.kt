@@ -13,17 +13,22 @@ actual fun sqlite(
     options: ConnectionPool.Options,
     encoders: ValueEncoderRegistry
 ): ISQLite {
-    val resolvedUrl = if (url.startsWith("/")) {
-        url
-    } else {
-        val docs = NSFileManager.defaultManager.URLForDirectory(
-            directory = NSDocumentDirectory,
-            inDomain = NSUserDomainMask,
-            appropriateForURL = null,
-            create = true,
-            error = null,
-        )?.path ?: error("Cannot resolve Documents directory")
-        "$docs/$url"
+    val resolvedUrl = when {
+        // In-memory database — not a filesystem path, so don't resolve it against Documents.
+        url == ":memory:" -> url
+        // Absolute path — use as-is.
+        url.startsWith("/") -> url
+        // Relative name — store under the app's Documents directory.
+        else -> {
+            val docs = NSFileManager.defaultManager.URLForDirectory(
+                directory = NSDocumentDirectory,
+                inDomain = NSUserDomainMask,
+                appropriateForURL = null,
+                create = true,
+                error = null,
+            )?.path ?: error("Cannot resolve Documents directory")
+            "$docs/$url"
+        }
     }
     return sqlite(
         url = resolvedUrl,

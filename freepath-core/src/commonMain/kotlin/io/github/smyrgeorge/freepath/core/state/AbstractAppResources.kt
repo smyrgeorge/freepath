@@ -211,7 +211,7 @@ abstract class AbstractAppResources(
                 val cmd = AppProtocol.ContentReceived(content)
                 app.tell(cmd)
             },
-            onRelayPacket = { envelope ->
+            onRelayPacket = { envelope, fromPeerId ->
                 // Admission is contact-gated at the connection layer (libp2p only accepts sessions
                 // from known contacts), so only contacts can hand us relay packets.
                 // TODO: tighten further — store only when receiverIdHash ∈ {my contacts}
@@ -220,9 +220,11 @@ abstract class AbstractAppResources(
                 if (envelope.relay == null) {
                     log.warn { "Received relay packet without relay metadata, dropping" }
                 } else {
-                    // Store via the relay-queue owner so all writes share one serialization point.
+                    // Hand to the relay-queue owner so all writes share one serialization point. It
+                    // persists the packet and re-distributes it onward — but never back to [fromPeerId],
+                    // the peer we just received it from.
                     ActorSystem.get(RelayActor::class, RelayActor.key(identity.peerId))
-                        .tell(RelayProtocol.Enqueue(envelope.toRelayEntry()))
+                        .tell(RelayProtocol.Distribute(envelope.toRelayEntry(), fromPeerId = fromPeerId))
                         .onFailure { log.error { "Failed to store relay packet: ${it.message}" } }
                 }
             },

@@ -78,30 +78,21 @@ class RelayActorTest {
     }
 
     @Test
-    fun `distribute with no online peers reports zero and keeps the replica queued`() = clusterTest { cluster ->
-        val (alice, bob) = cluster.nodes
-        seedQueuedReplica(cluster, alice, bob) // bob is offline → nothing reachable to distribute to
-
-        val distributed = relayActorOf(alice).ask(RelayProtocol.Distribute).getOrThrow()
-        assertEquals(0, distributed.peerCount, "no peers online → nothing distributed")
-        assertEquals(1, alice.relayQueue().size, "the replica stays queued")
-    }
-
-    @Test
-    fun `enqueue persists a master replica`() = clusterTest { cluster ->
+    fun `distribute persists a master replica`() = clusterTest { cluster ->
         val (alice, bob) = cluster.nodes
         seedQueuedReplica(cluster, alice, bob)
         val relay = relayActorOf(alice)
 
-        // Remove the original, then re-enqueue a fresh row (id = 0 → INSERT; the message_id unique
-        // index is free again now the original is gone).
+        // Remove the original, then re-distribute a fresh row (id = 0 → INSERT; the message_id unique
+        // index is free again now the original is gone). No peers are online, so it is persisted only.
         val entry = alice.relayQueue().single()
         alice.deleteRelay(entry.id)
         awaitUntil { alice.relayQueue().isEmpty() }
 
-        val stored = relay.ask(RelayProtocol.Enqueue(entry.copy(id = 0))).getOrThrow().entry
-        assertEquals(8, stored.copies)
+        val reached = relay.ask(RelayProtocol.Distribute(entry.copy(id = 0))).getOrThrow().peerCount
+        assertEquals(0, reached, "no peers online → persisted only")
         awaitUntil { alice.relayQueue().size == 1 }
+        assertEquals(8, alice.relayQueue().single().copies, "a fresh master replica keeps L=8 copies")
     }
 
     @Test
@@ -110,7 +101,7 @@ class RelayActorTest {
         seedQueuedReplica(cluster, alice, bob)
         val relay = relayActorOf(alice)
 
-        // Re-enqueue the replica with an expiry in the past (the generated expires_at column is
+        // Re-insert the replica with an expiry in the past (the generated expires_at column is
         // derived from the envelope JSON, so the sweep query sees it as expired).
         val entry = alice.relayQueue().single()
         alice.deleteRelay(entry.id)
@@ -119,7 +110,7 @@ class RelayActorTest {
         val expiredEnvelope = entry.envelope.copy(
             relay = entry.envelope.relay!!.copy(expiresAt = Instant.fromEpochMilliseconds(0)),
         )
-        relay.ask(RelayProtocol.Enqueue(entry.copy(id = 0, envelope = expiredEnvelope))).getOrThrow()
+        relay.ask(RelayProtocol.Distribute(entry.copy(id = 0, envelope = expiredEnvelope))).getOrThrow()
         awaitUntil { alice.relayQueue().size == 1 }
 
         relay.ask(RelayProtocol.Sweep).getOrThrow()

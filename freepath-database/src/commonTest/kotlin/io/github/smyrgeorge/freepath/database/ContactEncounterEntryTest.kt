@@ -17,8 +17,10 @@ class ContactEncounterEntryTest {
     @Test
     fun `entries with the same values are equal`() {
         val now = Clock.System.now()
-        val a = ContactEncounterEntry(id = 1, createdAt = now, updatedAt = now, peerId = "p", lastSeenAt = now, count = 2)
-        val b = ContactEncounterEntry(id = 1, createdAt = now, updatedAt = now, peerId = "p", lastSeenAt = now, count = 2)
+        val a =
+            ContactEncounterEntry(id = 1, createdAt = now, updatedAt = now, peerId = "p", lastSeenAt = now, count = 2)
+        val b =
+            ContactEncounterEntry(id = 1, createdAt = now, updatedAt = now, peerId = "p", lastSeenAt = now, count = 2)
         assertEquals(a, b)
         assertEquals(a.hashCode(), b.hashCode())
     }
