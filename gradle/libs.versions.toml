@@ -10,7 +10,7 @@ dokka = "2.2.0"
 # https://github.com/smyrgeorge/log4k
 log4k = "2.2.0"
 # https://github.com/smyrgeorge/actor4k
-actor4k = "1.4.12"
+actor4k = "1.5.0"
 # https://github.com/Kotlin/kotlinx.serialization
 kotlinx-serialization = "1.11.0"
 # https://github.com/ktorio/ktor
