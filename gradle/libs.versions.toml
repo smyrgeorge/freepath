@@ -16,7 +16,7 @@ kotlinx-serialization = "1.11.0"
 # https://github.com/ktorio/ktor
 ktor = "3.5.1"
 # https://www.bouncycastle.org
-bouncycastle = "1.84"
+bouncycastle = "1.85"
 # https://github.com/whyoleg/cryptography-kotlin
 cryptography-kotlin = "0.6.0"
 # https://github.com/ionspin/kotlin-multiplatform-bignum
