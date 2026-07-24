@@ -30,7 +30,7 @@ ksp = "2.3.10"
 # https://github.com/jmdns/jmdns
 jmdns = "3.6.3"
 # https://github.com/juullabs/kable
-kable = "0.44.1"
+kable = "0.44.3"
 # https://github.com/dylibso/chicory
 chicory = "1.7.5"
 # https://developer.android.com/studio/releases/gradle-plugin
