@@ -8,7 +8,7 @@ publish = "0.37.0"
 # https://github.com/Kotlin/dokka
 dokka = "2.2.0"
 # https://github.com/smyrgeorge/log4k
-log4k = "2.2.0"
+log4k = "2.3.0"
 # https://github.com/smyrgeorge/actor4k
 actor4k = "1.5.0"
 # https://github.com/Kotlin/kotlinx.serialization
