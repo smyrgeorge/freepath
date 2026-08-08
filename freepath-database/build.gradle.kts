@@ -1,4 +1,4 @@
-import org.gradle.kotlin.dsl.withType
+import com.google.devtools.ksp.gradle.KspAATask
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
@@ -65,4 +65,10 @@ dependencies {
 
 tasks.withType<KotlinCompilationTask<*>> {
     dependsOn("kspCommonMainKotlinMetadata")
+}
+
+tasks.withType<KspAATask>().configureEach {
+    if (name != "kspCommonMainKotlinMetadata") {
+        dependsOn("kspCommonMainKotlinMetadata")
+    }
 }
