@@ -10,13 +10,13 @@ dokka = "2.2.0"
 # https://github.com/smyrgeorge/log4k
 log4k = "2.4.0"
 # https://github.com/smyrgeorge/actor4k
-actor4k = "1.5.0"
+actor4k = "1.6.0"
 # https://github.com/Kotlin/kotlinx.serialization
 kotlinx-serialization = "1.11.0"
 # https://github.com/ktorio/ktor
 ktor = "3.5.2"
 # https://www.bouncycastle.org
-bouncycastle = "1.85"
+bouncycastle = "1.85.2"
 # https://github.com/whyoleg/cryptography-kotlin
 cryptography-kotlin = "0.6.0"
 # https://github.com/ionspin/kotlin-multiplatform-bignum
