@@ -34,7 +34,7 @@ kable = "0.44.3"
 # https://github.com/dylibso/chicory
 chicory = "1.7.5"
 # https://developer.android.com/studio/releases/gradle-plugin
-android-gradle-plugin = "9.1.0"
+android-gradle-plugin = "9.3.1"
 # https://github.com/alexzhirkevich/qrose
 qrose = "1.1.2"
 # https://github.com/arrow-kt/arrow
@@ -44,7 +44,7 @@ compose-hot-reload = "1.2.0"
 compose-multiplatform = "1.11.1"
 androidx-activity-compose = "1.13.0"
 androidx-lifecycle = "2.11.0"
-android-compileSdk = "36"
+android-compileSdk = "37"
 android-minSdk = "26"
 android-targetSdk = "36"
 uiTooling = "1.11.4"
