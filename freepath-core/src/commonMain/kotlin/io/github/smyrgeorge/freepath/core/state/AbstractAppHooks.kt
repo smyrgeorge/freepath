@@ -3,14 +3,14 @@ package io.github.smyrgeorge.freepath.core.state
 import io.github.smyrgeorge.actor4k.system.ActorSystem
 import io.github.smyrgeorge.actor4k.system.registry.SimpleActorRegistry
 import io.github.smyrgeorge.actor4k.util.SimpleLoggerFactory
+import io.github.smyrgeorge.actor4k.util.extentions.launch
 import io.github.smyrgeorge.freepath.core.actor.AppActor
 import io.github.smyrgeorge.freepath.core.actor.AppProtocol
 import io.github.smyrgeorge.freepath.core.actor.ContactExchangeActor
-import io.github.smyrgeorge.freepath.core.actor.RelayActor
 import io.github.smyrgeorge.freepath.core.actor.PeerActor
+import io.github.smyrgeorge.freepath.core.actor.RelayActor
 import io.github.smyrgeorge.freepath.core.util.InMemoryLoggingAppender
 import io.github.smyrgeorge.log4k.RootLogger
-import io.github.smyrgeorge.log4k.impl.extensions.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds

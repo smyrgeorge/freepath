@@ -11,7 +11,7 @@ import io.github.smyrgeorge.freepath.core.state.service.Service.Companion.tx
 import io.github.smyrgeorge.freepath.database.RelayEntry
 import io.github.smyrgeorge.freepath.libnet.LibnetModule
 import io.github.smyrgeorge.freepath.libnet.client.LibnetClient
-import io.github.smyrgeorge.log4k.impl.extensions.doEvery
+import io.github.smyrgeorge.freepath.util.doEvery
 import kotlinx.coroutines.Job
 import kotlin.time.Clock
 import kotlin.time.Duration

@@ -3,7 +3,6 @@ package io.github.smyrgeorge.freepath.core.util
 import io.github.smyrgeorge.log4k.Appender
 import io.github.smyrgeorge.log4k.Level
 import io.github.smyrgeorge.log4k.LoggingEvent
-import io.github.smyrgeorge.log4k.impl.extensions.format
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -59,5 +58,13 @@ object InMemoryLoggingAppender : Appender<LoggingEvent> {
         if (parts.size < 3) return logger
         val head = parts.take(parts.size - 2).joinToString(".") { it.firstOrNull()?.toString() ?: "" }
         return head + "." + parts.takeLast(2).joinToString(".")
+    }
+
+    private fun String.format(args: Array<out Any?>): String {
+        var result = this
+        args.forEach { arg ->
+            result = result.replaceFirst("{}", arg.toString())
+        }
+        return result
     }
 }

@@ -2,11 +2,11 @@ package io.github.smyrgeorge.freepath.core.actor
 
 import io.github.smyrgeorge.actor4k.actor.Actor
 import io.github.smyrgeorge.actor4k.actor.Behavior
+import io.github.smyrgeorge.actor4k.util.extentions.launch
 import io.github.smyrgeorge.freepath.core.state.AbstractAppResources
 import io.github.smyrgeorge.freepath.core.state.AbstractAppState
 import io.github.smyrgeorge.freepath.core.state.AbstractViewState
-import io.github.smyrgeorge.log4k.impl.extensions.doEvery
-import io.github.smyrgeorge.log4k.impl.extensions.launch
+import io.github.smyrgeorge.freepath.util.doEvery
 import kotlinx.coroutines.Job
 import kotlin.time.Duration.Companion.seconds
 
